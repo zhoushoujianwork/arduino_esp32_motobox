@@ -4,6 +4,7 @@
 #include "bat/BAT.h"
 #include "device.h"
 #include "config.h"
+#include "tft/TFT.h"
 // 定义任务句柄
 TaskHandle_t deviceTaskHandle = NULL;
 TaskHandle_t btnTaskHandle = NULL;
@@ -26,6 +27,8 @@ GPS gps(12, 11);
 BAT bat(7, 2900, 3300); // 电池电压 3.3V - 4.2V
 BTN button(39);
 LED led(8); // 假设LED连接在GPIO 8上
+
+TFT tft(3); // 创建TFT对象，rotation设为3
 
 void deviceTask(void *parameter)
 {
@@ -68,6 +71,12 @@ void btnTask(void *parameter)
 #endif
             device.get_device_state()->gpsHz = hzs[hz];
         }
+
+        // 更新TFT
+#if Enable_TFT
+        tft.loop();
+#endif
+
         delay(10);
     }
 }
@@ -87,6 +96,11 @@ void gpsTask(void *parameter)
 void setup()
 {
     Serial.begin(115200);
+
+#if Enable_TFT
+    // 初始化TFT
+    tft.begin();
+#endif
 
 #if Enable_IMU
     // 添加IMU初始化检查
@@ -142,7 +156,6 @@ void setup()
 
 void loop()
 {
-
     led.loop();
 
 #if Enable_IMU

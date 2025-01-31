@@ -107,6 +107,7 @@ public:
     void begin();
     void loop();
     bool setGpsHz(int hz);
+    int getGpsHz();
     void printRawData();
     void printGpsData();
     gps_data_t *get_gps_data();
@@ -114,6 +115,7 @@ public:
     bool checkGpsResponse();
 
 private:
+    int gpsHz;
     SoftwareSerial gpsSerial;
     TinyGPSPlus gps;
     bool newLocation;
