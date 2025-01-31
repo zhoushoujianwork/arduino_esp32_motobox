@@ -20,6 +20,7 @@
         "ostream": "cpp",
         "sstream": "cpp",
         "cmath": "cpp",
-        "algorithm": "cpp"
+        "algorithm": "cpp",
+        "regex": "cpp"
     }
 }

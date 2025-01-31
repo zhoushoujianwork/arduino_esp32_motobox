@@ -5,6 +5,7 @@
 #include "device.h"
 #include "config.h"
 #include "tft/TFT.h"
+#include "wifi/WifiManager.h"
 // 定义任务句柄
 TaskHandle_t deviceTaskHandle = NULL;
 TaskHandle_t btnTaskHandle = NULL;
@@ -27,7 +28,6 @@ GPS gps(12, 11);
 BAT bat(7, 2900, 3300); // 电池电压 3.3V - 4.2V
 BTN button(39);
 LED led(8); // 假设LED连接在GPIO 8上
-
 TFT tft(3); // 创建TFT对象，rotation设为3
 
 void deviceTask(void *parameter)
@@ -150,12 +150,29 @@ void setup()
     ble.begin();
 #endif
 
+#if Enable_WIFI
+    setupWiFi();
+#endif
+
     delay(1000);
     Serial.println("setup end");
 }
 
 void loop()
 {
+    // 处理WiFi客户端
+    handleWiFi();
+
+    // 检查WiFi连接状态
+    if (isWiFiConnected())
+    {
+        // WiFi已连接，执行需要网络连接的操作
+    }
+    else
+    {
+        // WiFi未连接，执行离线操作或等待连接
+    }
+
     led.loop();
 
 #if Enable_IMU
@@ -164,7 +181,7 @@ void loop()
 #endif
 
 #if Enable_GPS
-    gps.printGpsData();
+    // gps.printGpsData();
 #endif
 
     // device.print_device_info();

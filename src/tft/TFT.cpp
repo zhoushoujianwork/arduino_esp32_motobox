@@ -193,6 +193,7 @@ void TFT::loop()
     lv_slider_set_value(ui_SliderBat, device.get_battery(), LV_ANIM_ON);
     lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
 
+#if Enable_IMU
     // Show Gyro
     float gyro = imu.get_imu_data()->pitch;
     lv_slider_set_value(ui_SliderGyro, gyro, LV_ANIM_ON);
@@ -219,6 +220,7 @@ void TFT::loop()
         if (gyro < -IMU_MAX_D)
             gyroTopLeft = -IMU_MAX_D;
     }
+#endif
     char gyroTextLeft[20];
     char gyroTextRight[20];
     snprintf(gyroTextLeft, sizeof(gyroTextLeft), "%.0f°", gyroTopLeft);

@@ -1,11 +1,11 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define Enable_IMU 1
+#define Enable_IMU 0
 #define Enable_GPS 1
 #define Enable_TFT 1
 #define Enable_BLE 0
-
+#define Enable_WIFI 1
 // BLE服务和特征值的UUID
 #define BLE_NAME "ESP32-MOTO"
 #define SERVICE_UUID "4FAFC201-1FB5-459E-8FCC-C5C9C331914B"
