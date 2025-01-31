@@ -26,7 +26,7 @@ GPS gps(12, 11);
 #endif
 
 BAT bat(7, 2900, 3300); // 电池电压 3.3V - 4.2V
-BTN button(39);
+BTN button(BTN_PIN);
 LED led(8); // 假设LED连接在GPIO 8上
 TFT tft(3); // 创建TFT对象，rotation设为3
 
@@ -72,6 +72,20 @@ void btnTask(void *parameter)
             device.get_device_state()->gpsHz = hzs[hz];
         }
 
+        // 检查长按重置
+        if (button.isLongPress())
+        {
+            if (!wifiManager.getConfigMode())
+            {
+                // Serial.println("检测到长按，重置配置");
+                // wifiManager.reset();
+            }
+            else
+            {
+                // 已经是 web 配置模式
+            }
+        }
+
         // 更新TFT
 #if Enable_TFT
         tft.loop();
@@ -109,11 +123,17 @@ void setup()
 
 #if Enable_GPS
     gps.begin();
+    // 设置GPS更新率为2Hz
+    gps.setGpsHz(2);
 #endif
     led.begin();
 
     led.setMode(LED::OFF);
     delay(1000);
+
+#if Enable_WIFI
+    wifiManager.begin();
+#endif
 
     xTaskCreatePinnedToCore(
         deviceTask,
@@ -144,35 +164,24 @@ void setup()
         1);
 #endif
 
-    device.print_device_info();
-
 #if Enable_BLE
     ble.begin();
 #endif
 
-#if Enable_WIFI
-    setupWiFi();
-#endif
-
     delay(1000);
     Serial.println("setup end");
+    device.print_device_info();
 }
 
 void loop()
 {
-    // 处理WiFi客户端
-    handleWiFi();
-
-    // 检查WiFi连接状态
-    if (isWiFiConnected())
+#if Enable_WIFI
+    if (wifiManager.getConfigMode())
     {
-        // WiFi已连接，执行需要网络连接的操作
+        // 处理WiFi客户端
+        wifiManager.handleClient();
     }
-    else
-    {
-        // WiFi未连接，执行离线操作或等待连接
-    }
-
+#endif
     led.loop();
 
 #if Enable_IMU

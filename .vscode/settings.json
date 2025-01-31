@@ -21,6 +21,8 @@
         "sstream": "cpp",
         "cmath": "cpp",
         "algorithm": "cpp",
-        "regex": "cpp"
+        "regex": "cpp",
+        "memory": "cpp",
+        "random": "cpp"
     }
 }

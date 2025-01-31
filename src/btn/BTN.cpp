@@ -1,11 +1,6 @@
 #include "BTN.h"
 #include <Arduino.h>
 
-// 定义一些常量
-const unsigned long DEBOUNCE_DELAY = 50;    // 消抖延时(毫秒)
-const unsigned long LONG_PRESS_TIME = 1000; // 长按时间阈值(毫秒)
-const unsigned long MULTI_CLICK_TIME = 300; // 多击间隔时间(毫秒)
-
 BTN::BTN(int pin)
 {
     this->pin = pin;
@@ -65,6 +60,44 @@ bool BTN::isLongPressed()
     {
         pressStartTime = 0;
         longPressDetected = false;
+    }
+    return false;
+}
+
+void BTN::loop()
+{
+    static unsigned long lastDebounceTime = 0;
+    static bool lastButtonState = HIGH;
+    static unsigned long pressStartTime = 0;
+
+    bool reading = digitalRead(pin);
+
+    if (reading != lastButtonState)
+    {
+        lastDebounceTime = millis();
+    }
+
+    if ((millis() - lastDebounceTime) > DEBOUNCE_DELAY)
+    {
+        if (reading != currentState)
+        {
+            currentState = reading;
+
+            if (currentState == LOW)
+            { // 按下
+                pressStartTime = millis();
+            }
+        }
+    }
+
+    lastButtonState = reading;
+}
+
+bool BTN::isLongPress()
+{
+    if (currentState == LOW)
+    {
+        return (millis() - pressStartTime) >= LONG_PRESS_TIME;
     }
     return false;
 }

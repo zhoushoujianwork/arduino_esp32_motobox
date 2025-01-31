@@ -9,13 +9,15 @@ void WiFiConfigManager::begin()
     if (!preferences.begin(PREF_NAMESPACE, false))
     {
         Serial.println("初始化配置存储失败");
+        Serial.println("进入配置模式");
         enterConfigMode();
         return;
     }
+    Serial.println("配置存储初始化成功");
 
     if (!tryConnectWithSavedCredentials())
     {
-        enterConfigMode();
+        // enterConfigMode();
     }
 }
 
@@ -23,10 +25,14 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
 {
     String ssid = preferences.getString("ssid", "");
     String password = preferences.getString("password", "");
+    Serial.printf("尝试连接WiFi: %s\n", ssid.c_str());
+    Serial.printf("尝试连接WiFi密码: %s\n", password.c_str());
 
     if (ssid.isEmpty())
     {
         Serial.println("未找到已保存的WiFi配置");
+        Serial.println("进入配置模式");
+        enterConfigMode();
         return false;
     }
 
@@ -61,7 +67,7 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
         if (millis() - startTime > CONNECT_TIMEOUT_MS)
         {
             Serial.println("WiFi连接超时");
-            WiFi.disconnect(true);
+            // WiFi.disconnect(true);
             return false;
         }
         delay(100); // 减少延时时间
@@ -164,6 +170,9 @@ void WiFiConfigManager::handleConfigSubmit()
 {
     String newSSID = server.arg("ssid");
     String newPassword = server.arg("password");
+
+    Serial.printf("接收到的SSID: %s\n", newSSID.c_str());
+    Serial.printf("接收到的密码: %s\n", newPassword.c_str());
 
     if (newSSID.isEmpty())
     {
@@ -275,30 +284,15 @@ String WiFiConfigManager::getConfigPage()
 void WiFiConfigManager::saveWiFiCredentials(const String &ssid, const String &password)
 {
     if (preferences.clear())
-    { // 清除旧数据
+    {
         preferences.putString("ssid", ssid);
         preferences.putString("password", password);
-        Serial.println("WiFi凭据保存成功");
+        Serial.printf("WiFi凭据保存成功: %s, %s\n", ssid.c_str(), password.c_str());
     }
     else
     {
-        Serial.println("保存WiFi凭据失败");
+        Serial.println("WiFi凭据保存失败");
     }
-}
-
-void setupWiFi()
-{
-    wifiManager.begin();
-}
-
-void handleWiFi()
-{
-    wifiManager.handleClient();
-}
-
-bool isWiFiConnected()
-{
-    return WiFi.status() == WL_CONNECTED;
 }
 
 bool WiFiConfigManager::checkInternetConnection()
@@ -370,4 +364,10 @@ bool WiFiConfigManager::isIp(String str)
         }
     }
     return true;
+}
+
+void WiFiConfigManager::reset()
+{
+    Serial.println("重置配置");
+    preferences.clear();
 }

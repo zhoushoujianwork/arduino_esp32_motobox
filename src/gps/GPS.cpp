@@ -117,13 +117,13 @@ bool GPS::setGpsHz(int hz)
 
     gpsSerial.print(cmd);
     delay(100); // 等待配置生效
-    gpsHz = hz;
+    device.get_device_state()->gpsHz = hz;
     return true;
 }
 
 int GPS::getGpsHz()
 {
-    return gpsHz;
+    return device.get_device_state()->gpsHz;
 }
 
 // 打印原始数据

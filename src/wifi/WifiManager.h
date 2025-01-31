@@ -43,15 +43,11 @@ public:
     void begin();
     void handleClient();
     bool isConnected() const { return WiFi.status() == WL_CONNECTED; }
+    void reset();
+    bool getConfigMode() const { return isConfigMode; }
 };
 
 // 全局实例和接口函数
 extern WiFiConfigManager wifiManager;
-void setupWiFi();
-void handleWiFi();
-bool isWiFiConnected();
-
-// 添加WiFi配置重置函数声明
-void resetWiFiConfig();
 
 #endif // WIFI_MANAGER_H

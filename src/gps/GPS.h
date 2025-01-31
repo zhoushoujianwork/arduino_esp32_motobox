@@ -115,7 +115,6 @@ public:
     bool checkGpsResponse();
 
 private:
-    int gpsHz;
     SoftwareSerial gpsSerial;
     TinyGPSPlus gps;
     bool newLocation;

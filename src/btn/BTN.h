@@ -9,9 +9,15 @@ public:
     bool isReleased();
     bool isClicked();
     bool isLongPressed();
+    bool isLongPress();
+    void loop();
 
 private:
     int pin;
+    bool currentState;
+    unsigned long pressStartTime;
+    static const unsigned long LONG_PRESS_TIME = 3000; // 3秒定义为长按
+    static const unsigned long DEBOUNCE_DELAY = 50;    // 添加消抖延时常量
 };
 
 #endif
