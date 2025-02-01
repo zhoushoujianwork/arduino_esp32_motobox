@@ -6,41 +6,49 @@
 #include "config.h"
 #include "tft/TFT.h"
 #include "wifi/WifiManager.h"
-// 定义任务句柄
-TaskHandle_t deviceTaskHandle = NULL;
-TaskHandle_t btnTaskHandle = NULL;
-TaskHandle_t gpsTaskHandle = NULL;
 
 Device device;
-#include "ble/ble.h"
 #if Enable_BLE
+#include "ble/ble.h"
 BLE ble;
 #endif
+
 #if Enable_IMU
 #include "QMI8658/imu.h"
 IMU imu(42, 2);
 #endif
+
 #if Enable_GPS
 #include "gps/GPS.h"
 GPS gps(12, 11);
+
+// gps无时间延迟的任务
+void gpsTask(void *parameter)
+{
+    while (true)
+    {
+        gps.loop();
+        // gps.printRawData();
+    }
+}
 #endif
 
-BAT bat(7, 2900, 3300); // 电池电压 3.3V - 4.2V
+#if Enable_BAT
+BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE); // 电池电压 3.3V - 4.2V
+#endif
+
 BTN button(BTN_PIN);
 LED led(8); // 假设LED连接在GPIO 8上
-TFT tft(3); // 创建TFT对象，rotation设为3
 
 void deviceTask(void *parameter)
 {
     while (true)
     {
+#if Enable_BAT
         bat.loop();
-
-#if Enable_BLE
-        ble.loop();
-#endif
-        // bat.print_voltage();
+        bat.print_voltage();
         device.set_battery(bat.getPercentage());
+#endif
         delay(2000);
     }
 }
@@ -55,9 +63,9 @@ void btnTask(void *parameter)
     {
         if (button.isClicked())
         {
+#if Enable_GPS
             // 循环切换更新率
             hz = (hz + 1) % 4;
-#if Enable_GPS
             // 暂停GPS任务
             vTaskSuspend(gpsTaskHandle);
             delay(100);
@@ -75,45 +83,28 @@ void btnTask(void *parameter)
         // 检查长按重置
         if (button.isLongPress())
         {
+#if Enable_WIFI
             if (!wifiManager.getConfigMode())
             {
-                // Serial.println("检测到长按，重置配置");
-                // wifiManager.reset();
+                Serial.println("检测到长按，重置配置");
+                wifiManager.reset();
             }
-            else
-            {
-                // 已经是 web 配置模式
-            }
+#endif
         }
 
-        // 更新TFT
-#if Enable_TFT
-        tft.loop();
-#endif
-
         delay(10);
-    }
-}
-
-// gps无时间延迟的任务
-void gpsTask(void *parameter)
-{
-    while (true)
-    {
-#if Enable_GPS
-        gps.loop();
-        // gps.printRawData();
-#endif
     }
 }
 
 void setup()
 {
     Serial.begin(115200);
+    led.begin();
+    led.setMode(LED::OFF);
 
 #if Enable_TFT
     // 初始化TFT
-    tft.begin();
+    tft_begin();
 #endif
 
 #if Enable_IMU
@@ -126,55 +117,65 @@ void setup()
     // 设置GPS更新率为2Hz
     gps.setGpsHz(2);
 #endif
-    led.begin();
-
-    led.setMode(LED::OFF);
-    delay(1000);
-
-#if Enable_WIFI
-    wifiManager.begin();
-#endif
-
-    xTaskCreatePinnedToCore(
-        deviceTask,
-        "Device Task",
-        4000,
-        NULL,
-        1,
-        &deviceTaskHandle,
-        0);
-
-    xTaskCreatePinnedToCore(
-        btnTask,
-        "Button Task",
-        4000,
-        NULL,
-        1,
-        &btnTaskHandle,
-        1);
-
-#if Enable_GPS
-    xTaskCreatePinnedToCore(
-        gpsTask,
-        "GPS Task",
-        4000,
-        NULL,
-        1,
-        &gpsTaskHandle,
-        1);
-#endif
 
 #if Enable_BLE
     ble.begin();
 #endif
 
-    delay(1000);
-    Serial.println("setup end");
+#if Enable_WIFI
+    wifiManager.begin();
+    // wifiManager.reset();
+#endif
+
+    xTaskCreate(
+        deviceTask,
+        "Device Task",
+        1024 * 10,
+        NULL,
+        1,
+        NULL);
+
+    xTaskCreate(
+        btnTask,
+        "Button Task",
+        1024 * 10,
+        NULL,
+        1,
+        NULL);
+
+#if Enable_GPS
+    xTaskCreate(
+        gpsTask,
+        "GPS Task",
+        1024 * 10,
+        NULL,
+        1,
+        NULL);
+#endif
+
+    Serial.println("main setup end");
     device.print_device_info();
 }
 
 void loop()
 {
+
+    // led.loop();
+    // // device.print_device_info();
+    // if (device.get_ble_connected())
+    // {
+    //     led.setMode(LED::BLINK_DUAL);
+    // }
+    // else
+    // {
+    //     led.setMode(LED::OFF);
+    // }
+
+#if Enable_IMU
+    // imu.printImuData();
+    imu.loop();
+#endif
+
 #if Enable_WIFI
     if (wifiManager.getConfigMode())
     {
@@ -182,25 +183,12 @@ void loop()
         wifiManager.handleClient();
     }
 #endif
-    led.loop();
 
-#if Enable_IMU
-    // imu.printImuData();
-    imu.loop();
+#if Enable_BLE
+    ble.loop();
 #endif
 
-#if Enable_GPS
-    // gps.printGpsData();
+#if Enable_TFT
+    tft_loop();
 #endif
-
-    // device.print_device_info();
-    if (device.get_ble_connected())
-    {
-        led.setMode(LED::BLINK_DUAL);
-    }
-    else
-    {
-        led.setMode(LED::OFF);
-    }
-    delay(200);
 }

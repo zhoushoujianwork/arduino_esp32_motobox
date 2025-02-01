@@ -181,7 +181,7 @@ void WiFiConfigManager::handleConfigSubmit()
     }
 
     saveWiFiCredentials(newSSID, newPassword);
-    server.send(200, "text/html", "配置已保存，设备将重启...");
+    server.send(200, "text/html", "success! restarting...");
     delay(1000);
     ESP.restart();
 }
