@@ -151,3 +151,17 @@ void IMU::printImuData()
 {
     Serial.println("imu_data: " + String(imu_data.accel_x) + ", " + String(imu_data.accel_y) + ", " + String(imu_data.accel_z) + ", " + String(imu_data.gyro_x) + ", " + String(imu_data.gyro_y) + ", " + String(imu_data.gyro_z) + ", " + String(imu_data.roll) + ", " + String(imu_data.pitch) + ", " + String(imu_data.yaw) + ", " + String(imu_data.temperature));
 }
+
+// 将imu_data_t结构体转换为JSON字符串
+String imu_data_to_json(imu_data_t imu_data)
+{
+    // 使用ArduinoJson库将imu_data转换为JSON字符串
+    StaticJsonDocument<200> doc;
+    doc["roll"] = imu_data.roll;
+    doc["pitch"] = imu_data.pitch;
+    doc["yaw"] = imu_data.yaw;
+    doc["temperature"] = imu_data.temperature;
+    String jsonString;
+    serializeJson(doc, jsonString);
+    return jsonString;
+}

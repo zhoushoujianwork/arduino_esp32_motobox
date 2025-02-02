@@ -40,4 +40,13 @@
 #define BAT_MIN_VOLTAGE 2900
 #define BAT_MAX_VOLTAGE 3300
 
+// MQTT Configuration
+#define MQTT_SERVER "your-emqx-server.com"
+#define MQTT_PORT 1883
+#define MQTT_USER "your-username"
+#define MQTT_PASSWORD "your-password"
+#define MQTT_CLIENT_ID "device-001" // 确保每个设备使用唯一的客户端ID
+#define MQTT_TOPIC_GPS "esp32/gps"
+#define MQTT_TOPIC_IMU "esp32/imu"
+
 #endif

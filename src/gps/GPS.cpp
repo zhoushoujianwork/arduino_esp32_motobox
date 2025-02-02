@@ -175,3 +175,25 @@ void GPS::resetGps()
     gps_data.heading = random(360);   // 生成 0-359 的随机数
     gps_data.satellites = random(10); // 生成 0-9 的随机数
 }
+
+// 将gps_data_t结构体转换为JSON字符串
+String gps_data_to_json(gps_data_t gps_data)
+{
+    // 使用ArduinoJson库将gps_data转换为JSON字符串
+    StaticJsonDocument<200> doc;
+    doc["lat"] = gps_data.latitude;
+    doc["lon"] = gps_data.longitude;
+    doc["alt"] = gps_data.altitude;
+    doc["speed"] = gps_data.speed;
+    doc["satellites"] = gps_data.satellites;
+    doc["heading"] = gps_data.heading;
+    doc["year"] = gps_data.year;
+    doc["month"] = gps_data.month;
+    doc["day"] = gps_data.day;
+    doc["hour"] = gps_data.hour;
+    doc["minute"] = gps_data.minute;
+    doc["second"] = gps_data.second;
+    String jsonString;
+    serializeJson(doc, jsonString);
+    return jsonString;
+}

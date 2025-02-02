@@ -5,6 +5,7 @@
 #include <SPI.h>
 #include "SensorQMI8658.hpp"
 #include "device.h"
+#include <ArduinoJson.h>
 
 #define ALPHA 0.98 // 互补滤波的系数，范围在0到1之间
 #define dt 0.01    // 时间间隔，单位是秒（假设采样率为100Hz）
@@ -28,6 +29,9 @@ typedef struct
 
     float temperature; // 温度，单位：摄氏度
 } imu_data_t;
+
+// 将imu_data_t结构体转换为JSON字符串
+String imu_data_to_json(imu_data_t imu_data);
 
 class IMU
 {

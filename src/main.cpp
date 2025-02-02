@@ -6,6 +6,7 @@
 #include "config.h"
 #include "tft/TFT.h"
 #include "wifi/WifiManager.h"
+#include "mqtt/MQTT.h"
 
 Device device;
 #if Enable_BLE
@@ -39,6 +40,9 @@ BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE); // 电池电压 3.3V - 4.2V
 
 BTN button(BTN_PIN);
 LED led(8); // 假设LED连接在GPIO 8上
+
+// 创建MQTT实例
+MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, MQTT_CLIENT_ID);
 
 void deviceTask(void *parameter)
 {
@@ -127,6 +131,9 @@ void setup()
     // wifiManager.reset();
 #endif
 
+    // 初始化MQTT
+    mqtt.begin();
+
     xTaskCreate(
         deviceTask,
         "Device Task",
@@ -191,4 +198,21 @@ void loop()
 #if Enable_TFT
     tft_loop();
 #endif
+
+    // MQTT保持连接
+    mqtt.loop();
+
+    // 获取GPS数据
+#if Enable_GPS
+    gps_data_t gps_data = gps.getData();
+    mqtt.publishGPS(gps_data);
+#endif
+
+    // 获取IMU数据
+#if Enable_IMU
+    imu_data_t imu_data = imu.getData(); // 使用getData()获取IMU数据结构
+    mqtt.publishIMU(imu_data);
+#endif
+    // 添加适当的延时
+    delay(1000); // 每秒发送一次数据
 }

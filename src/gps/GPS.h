@@ -4,6 +4,7 @@
 #include <SoftwareSerial.h>
 #include <TinyGPS++.h>
 #include "device.h"
+#include <ArduinoJson.h>
 
 // NMEA0183 配置
 // PCAS语句是由芯片供应商定义的NMEA专用语句
@@ -99,6 +100,9 @@ typedef struct
     double heading;     // 航向角，单位：度 (0°~360°)
     uint8_t satellites; // 可见卫星数量
 } gps_data_t;
+
+// 将gps_data_t结构体转换为JSON字符串
+String gps_data_to_json(gps_data_t gps_data);
 
 class GPS
 {
