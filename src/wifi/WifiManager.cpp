@@ -70,6 +70,7 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
         switch(event) {
             case SYSTEM_EVENT_STA_DISCONNECTED:
                 Serial.println("WiFi连接断开");
+                WiFi.disconnect(true);
                 device.get_device_state()->wifiConnected = false;
                 break;
             case SYSTEM_EVENT_STA_GOT_IP:
@@ -97,12 +98,12 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
         Serial.print(".");
     }
 
-    // // 验证互联网连接
-    // while (!checkInternetConnection())
-    // {
-    //     Serial.println("无法访问互联网,5秒后重试...");
-    //     delay(5000);
-    // }
+    // 验证互联网连接
+    while (!checkInternetConnection())
+    {
+        Serial.println("无法访问互联网,5秒后重试...");
+        delay(5000);
+    }
 
     return true;
 }
