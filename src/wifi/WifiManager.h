@@ -5,6 +5,8 @@
 #include <DNSServer.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include "device.h"
+#include "config.h"
 
 class WiFiConfigManager
 {
@@ -15,8 +17,8 @@ private:
 
     // 配置常量
     static constexpr const char *PREF_NAMESPACE = "wifi-config";
-    static constexpr const char *AP_PASSWORD = "motobox123";
-    static constexpr const char *AP_PREFIX = "motobox-";
+    static constexpr const char *AP_PASSWORD = "11111111";
+    static constexpr const char *AP_PREFIX = "MOTOBOX-";
     static constexpr uint16_t CONNECT_TIMEOUT_MS = 10000; // 10秒连接超时
 
     String apSSID;
@@ -26,6 +28,7 @@ private:
     bool tryConnectWithSavedCredentials();
     void enterConfigMode();
     bool checkInternetConnection();
+    void handleClient();
 
     // 配置模式相关方法
     void setupAP();
@@ -40,8 +43,9 @@ private:
     bool isIp(String str);
 
 public:
+    WiFiClient wifiClient;
     void begin();
-    void handleClient();
+    void loop();
     bool isConnected() const { return WiFi.status() == WL_CONNECTED; }
     void reset();
     bool getConfigMode() const { return isConfigMode; }

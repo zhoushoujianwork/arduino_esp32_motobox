@@ -1,5 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
+#define VERSION "2.0.0"
 
 #define BTN_PIN 39
 
@@ -9,7 +10,7 @@
 #define IMU_MAX_D 68 // 马奎斯 GP保持
 
 // GPS
-#define Enable_GPS 0
+#define Enable_GPS 1
 
 // BLE
 #define Enable_BLE 0 // BLE服务和特征值的UUID
@@ -41,12 +42,9 @@
 #define BAT_MAX_VOLTAGE 3300
 
 // MQTT Configuration
-#define MQTT_SERVER "your-emqx-server.com"
+#define MQTT_SERVER "192.168.0.5"
 #define MQTT_PORT 1883
-#define MQTT_USER "your-username"
-#define MQTT_PASSWORD "your-password"
-#define MQTT_CLIENT_ID "device-001" // 确保每个设备使用唯一的客户端ID
-#define MQTT_TOPIC_GPS "esp32/gps"
-#define MQTT_TOPIC_IMU "esp32/imu"
+#define MQTT_USER "user"
+#define MQTT_PASSWORD "password"
 
 #endif

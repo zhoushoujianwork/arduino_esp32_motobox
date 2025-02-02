@@ -4,6 +4,8 @@ WiFiConfigManager wifiManager;
 
 void WiFiConfigManager::begin()
 {
+#if Enable_WIFI
+    Serial.println("WiFiConfigManager::begin");
     delay(1000); // 添加启动延迟
 
     if (!preferences.begin(PREF_NAMESPACE, false))
@@ -14,17 +16,38 @@ void WiFiConfigManager::begin()
         return;
     }
     Serial.println("配置存储初始化成功");
-
-    if (!tryConnectWithSavedCredentials())
-    {
-        // enterConfigMode();
-    }
+#endif
 }
 
+void WiFiConfigManager::loop()
+{
+#if Enable_WIFI
+    if (isConfigMode)
+    {
+        // 处理WiFi客户端
+        handleClient();
+    }
+    else
+    {
+        if (WiFi.status() != WL_CONNECTED)
+        {
+            // 尝试连接
+            if (tryConnectWithSavedCredentials())
+            {
+                Serial.println("\nWiFi连接成功!");
+            }
+            else
+            {
+                Serial.println("\nWiFi连接失败,稍后重试");
+            }
+        }
+    }
+#endif
+}
 bool WiFiConfigManager::tryConnectWithSavedCredentials()
 {
-    String ssid = preferences.getString("ssid", "");
-    String password = preferences.getString("password", "");
+    String ssid = preferences.getString("ssid", "CMCC-aEu3");
+    String password = preferences.getString("password", "4ux9kxr7");
     Serial.printf("尝试连接WiFi: %s\n", ssid.c_str());
     Serial.printf("尝试连接WiFi密码: %s\n", password.c_str());
 
@@ -41,17 +64,17 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
     WiFi.disconnect(true);
     delay(100);
 
-    Serial.printf("尝试连接WiFi: %s\n", ssid.c_str());
-
     // 设置WiFi事件处理
     WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
                  {
         switch(event) {
             case SYSTEM_EVENT_STA_DISCONNECTED:
                 Serial.println("WiFi连接断开");
+                device.get_device_state()->wifiConnected = false;
                 break;
             case SYSTEM_EVENT_STA_GOT_IP:
                 Serial.printf("获取到IP地址: %s\n", WiFi.localIP().toString().c_str());
+                device.get_device_state()->wifiConnected = true;
                 break;
             default:
                 break;
@@ -67,21 +90,19 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
         if (millis() - startTime > CONNECT_TIMEOUT_MS)
         {
             Serial.println("WiFi连接超时");
-            // WiFi.disconnect(true);
+            WiFi.disconnect(true);
             return false;
         }
         delay(100); // 减少延时时间
         Serial.print(".");
     }
-    Serial.println("\nWiFi连接成功!");
 
-    // 验证互联网连接
-    if (!checkInternetConnection())
-    {
-        Serial.println("无法访问互联网");
-        WiFi.disconnect(true);
-        return false;
-    }
+    // // 验证互联网连接
+    // while (!checkInternetConnection())
+    // {
+    //     Serial.println("无法访问互联网,5秒后重试...");
+    //     delay(5000);
+    // }
 
     return true;
 }
@@ -102,9 +123,7 @@ void WiFiConfigManager::setupAP()
     WiFi.disconnect(true);
     delay(100);
 
-    uint8_t mac[6];
-    WiFi.macAddress(mac);
-    apSSID = String(AP_PREFIX) + String(mac[4], HEX) + String(mac[5], HEX);
+    apSSID = String(AP_PREFIX) + device.get_device_id();
 
     WiFi.mode(WIFI_AP);
     delay(100);

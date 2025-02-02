@@ -2,6 +2,7 @@
 #define DEVICE_H
 
 #include <Arduino.h>
+#include "esp_system.h"
 
 typedef struct
 {
@@ -10,6 +11,7 @@ typedef struct
     bool gpsReady;
     int gpsHz = 1; // 0-10HZ
     bool imuReady;
+    bool wifiConnected;
 } device_state_t;
 
 class Device
@@ -26,6 +28,7 @@ public:
     int get_battery();
 
     device_state_t *get_device_state();
+    String get_device_id();
 
 private:
     device_state_t device_state;

@@ -22,8 +22,8 @@ IMU imu(42, 2);
 #if Enable_GPS
 #include "gps/GPS.h"
 GPS gps(12, 11);
+TaskHandle_t gpsTaskHandle;
 
-// gps无时间延迟的任务
 void gpsTask(void *parameter)
 {
     while (true)
@@ -42,7 +42,7 @@ BTN button(BTN_PIN);
 LED led(8); // 假设LED连接在GPIO 8上
 
 // 创建MQTT实例
-MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD, MQTT_CLIENT_ID);
+MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
 
 void deviceTask(void *parameter)
 {
@@ -53,6 +53,7 @@ void deviceTask(void *parameter)
         bat.print_voltage();
         device.set_battery(bat.getPercentage());
 #endif
+
         delay(2000);
     }
 }
@@ -90,15 +91,41 @@ void btnTask(void *parameter)
 #if Enable_WIFI
             if (!wifiManager.getConfigMode())
             {
-                Serial.println("检测到长按，重置配置");
-                wifiManager.reset();
+                // Serial.println("检测到长按，重置配置");
+                // wifiManager.reset();
             }
 #endif
         }
 
+        led.loop();
+        // device.print_device_info();
+        if (device.get_ble_connected())
+        {
+            led.setMode(LED::BLINK_DUAL);
+        }
+        else
+        {
+            led.setMode(LED::OFF);
+        }
+
+#if Enable_TFT
+        tft_loop();
+#endif
         delay(10);
     }
 }
+
+#if Enable_WIFI
+// 阻塞的wifi任务
+void wifiTask(void *parameter)
+{
+    while (true)
+    {
+        wifiManager.loop();
+        delay(10);
+    }
+}
+#endif
 
 void setup()
 {
@@ -110,6 +137,8 @@ void setup()
     // 初始化TFT
     tft_begin();
 #endif
+
+    wifiManager.begin();
 
 #if Enable_IMU
     // 添加IMU初始化检查
@@ -125,14 +154,6 @@ void setup()
 #if Enable_BLE
     ble.begin();
 #endif
-
-#if Enable_WIFI
-    wifiManager.begin();
-    // wifiManager.reset();
-#endif
-
-    // 初始化MQTT
-    mqtt.begin();
 
     xTaskCreate(
         deviceTask,
@@ -150,6 +171,16 @@ void setup()
         1,
         NULL);
 
+#if Enable_WIFI
+    xTaskCreate(
+        wifiTask,
+        "WiFi Task",
+        1024 * 10,
+        NULL,
+        1,
+        NULL);
+#endif
+
 #if Enable_GPS
     xTaskCreate(
         gpsTask,
@@ -157,7 +188,7 @@ void setup()
         1024 * 10,
         NULL,
         1,
-        NULL);
+        &gpsTaskHandle);
 #endif
 
     Serial.println("main setup end");
@@ -167,51 +198,29 @@ void setup()
 void loop()
 {
 
-    // led.loop();
-    // // device.print_device_info();
-    // if (device.get_ble_connected())
-    // {
-    //     led.setMode(LED::BLINK_DUAL);
-    // }
-    // else
-    // {
-    //     led.setMode(LED::OFF);
-    // }
-
 #if Enable_IMU
     // imu.printImuData();
     imu.loop();
-#endif
-
-#if Enable_WIFI
-    if (wifiManager.getConfigMode())
-    {
-        // 处理WiFi客户端
-        wifiManager.handleClient();
-    }
 #endif
 
 #if Enable_BLE
     ble.loop();
 #endif
 
-#if Enable_TFT
-    tft_loop();
-#endif
-
-    // MQTT保持连接
+#if Enable_WIFI
     mqtt.loop();
+#endif
 
     // 获取GPS数据
 #if Enable_GPS
-    gps_data_t gps_data = gps.getData();
-    mqtt.publishGPS(gps_data);
+    gps_data_t *gps_data = gps.get_gps_data();
+    mqtt.publishGPS(*gps_data);
 #endif
 
     // 获取IMU数据
 #if Enable_IMU
-    imu_data_t imu_data = imu.getData(); // 使用getData()获取IMU数据结构
-    mqtt.publishIMU(imu_data);
+    imu_data_t *imu_data = imu.get_imu_data(); // 使用getData()获取IMU数据结构
+    mqtt.publishIMU(*imu_data);
 #endif
     // 添加适当的延时
     delay(1000); // 每秒发送一次数据

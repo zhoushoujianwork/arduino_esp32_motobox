@@ -60,7 +60,7 @@ void init_dashboard()
     for (int i = 0; i < UI_MAX_SPEED; i += 4)
     {
         lv_timer_handler(); // let the GUI do its work
-        delay(2);
+        // delay(2);
         lv_slider_set_value(ui_SliderSpeed, i, LV_ANIM_OFF);
         lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
         if (i <= UI_MAX_SPEED / 2)
@@ -77,7 +77,7 @@ void init_dashboard()
     for (int i = UI_MAX_SPEED; i >= 0; i -= 4)
     {
         lv_timer_handler(); // let the GUI do its work
-        delay(2);
+        // delay(2);
         lv_slider_set_value(ui_SliderSpeed, i, LV_ANIM_OFF);
         lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
         if (i >= UI_MAX_SPEED / 2)

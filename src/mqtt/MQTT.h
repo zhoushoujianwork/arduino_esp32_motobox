@@ -3,26 +3,25 @@
 
 #include <Arduino.h>
 #include <PubSubClient.h>
-#include <WiFiClient.h>
 #include "gps/GPS.h"
 #include "qmi8658/IMU.h"
+#include "wifi/WifiManager.h"
 
 class MQTT
 {
 private:
-    WiFiClient wifiClient;
     PubSubClient mqttClient;
     const char *mqtt_server;
     const int mqtt_port;
     const char *mqtt_user;
     const char *mqtt_password;
-    const char *client_id;
+    String mqtt_topic_gps;
+    String mqtt_topic_imu;
 
     void reconnect();
 
 public:
-    MQTT(const char *server, int port, const char *user, const char *password, const char *clientId);
-    void begin();
+    MQTT(const char *server, int port, const char *user, const char *password);
     void loop();
 
     // 发送GPS数据

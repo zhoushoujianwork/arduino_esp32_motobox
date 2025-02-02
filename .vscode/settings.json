@@ -23,6 +23,9 @@
         "algorithm": "cpp",
         "regex": "cpp",
         "memory": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "functional": "cpp",
+        "tuple": "cpp",
+        "utility": "cpp"
     }
 }

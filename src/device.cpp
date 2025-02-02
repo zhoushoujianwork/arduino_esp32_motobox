@@ -18,6 +18,16 @@ void Device::print_device_info()
     Serial.printf("IMU Ready: %d\n", device_state.imuReady);
 }
 
+String Device::get_device_id()
+{
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    char device_id[13];
+    snprintf(device_id, sizeof(device_id), "%02X%02X%02X%02X%02X%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    return String(device_id);
+}
+
 void Device::set_ble_connected(bool connected)
 {
     device_state.bleConnected = connected;
