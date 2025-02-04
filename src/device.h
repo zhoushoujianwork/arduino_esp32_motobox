@@ -7,20 +7,25 @@
 typedef struct
 {
     int battery;
+    bool mqttConnected;
+    bool wifiConnected;
     bool bleConnected;
     bool gpsReady;
     int gpsHz = 1; // 0-10HZ
     bool imuReady;
-    bool wifiConnected;
 } device_state_t;
 
 class Device
 {
 public:
     Device();
+    void set_mqtt_connected(bool connected);
+    void set_wifi_connected(bool connected);
     void set_ble_connected(bool connected);
     void set_gps_ready(bool ready);
     void set_imu_ready(bool ready);
+    bool get_mqtt_connected();
+    bool get_wifi_connected();
     bool get_ble_connected();
     void print_device_info();
 

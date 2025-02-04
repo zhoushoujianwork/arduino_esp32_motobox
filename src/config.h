@@ -5,7 +5,7 @@
 #define BTN_PIN 39
 
 // IMU
-#define Enable_IMU 0
+#define Enable_IMU 1
 #define IMU_PIN 33
 #define IMU_MAX_D 68 // 马奎斯 GP保持
 
@@ -42,9 +42,9 @@
 #define BAT_MAX_VOLTAGE 3300
 
 // MQTT Configuration
-#define MQTT_SERVER "192.168.0.5"
-#define MQTT_PORT 1883
-#define MQTT_USER "user"
-#define MQTT_PASSWORD "password"
+#define MQTT_SERVER "j2680ff4.ala.asia-southeast1.emqxsl.com"
+#define MQTT_PORT 8883
+#define MQTT_USER "moto"
+#define MQTT_PASSWORD "moto"
 
 #endif

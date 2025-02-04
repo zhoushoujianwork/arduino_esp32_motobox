@@ -5,6 +5,7 @@
 #include <DNSServer.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include "device.h"
 #include "config.h"
 
@@ -43,6 +44,7 @@ private:
     bool isIp(String str);
 
 public:
+    WiFiClientSecure wifiClientSecure;
     WiFiClient wifiClient;
     void begin();
     void loop();

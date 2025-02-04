@@ -12,4 +12,8 @@
 void tft_begin();
 void tft_loop();
 
+// 声明为类成员变量或全局变量
+extern float gyroTopLeft;
+extern float gyroTopRight;
+
 #endif // _TFT_H_

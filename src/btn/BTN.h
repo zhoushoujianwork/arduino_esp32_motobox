@@ -9,7 +9,6 @@ public:
     bool isReleased();
     bool isClicked();
     bool isLongPressed();
-    bool isLongPress();
     void loop();
 
 private:

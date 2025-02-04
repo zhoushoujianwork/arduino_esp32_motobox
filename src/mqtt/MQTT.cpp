@@ -7,7 +7,14 @@
 MQTT::MQTT(const char *server, int port, const char *user, const char *password)
     : mqtt_server(server), mqtt_port(port), mqtt_user(user), mqtt_password(password)
 {
-    mqttClient.setClient(wifiManager.wifiClient);
+    if (port == 8883)
+    {
+        mqttClient.setClient(wifiManager.wifiClientSecure);
+    }
+    else
+    {
+        mqttClient.setClient(wifiManager.wifiClient);
+    }
     mqttClient.setServer(mqtt_server, mqtt_port);
 
     // 修改主题构建方式
@@ -18,45 +25,40 @@ MQTT::MQTT(const char *server, int port, const char *user, const char *password)
 void MQTT::reconnect()
 {
     Serial.println("正在连接MQTT服务器...");
-    Serial.print("尝试连接到服务器: ");
+    Serial.print("尝试SSL连接到服务器: ");
     Serial.print(mqtt_server);
     Serial.print(":");
     Serial.println(mqtt_port);
 
-    // 检查服务器端口是否通
-    if (wifiManager.wifiClient.connect(mqtt_server, mqtt_port))
-    {
-        Serial.println("服务器端口连接成功,开始连接MQTT服务器...");
-        Serial.print("mqtt_user: ");
-        Serial.println(mqtt_user);
-        Serial.print("mqtt_password: ");
-        Serial.println(mqtt_password);
+    // 增加MQTT连接超时时间
+    mqttClient.setSocketTimeout(15); // 设置15秒超时
 
-        if (mqttClient.connect(device.get_device_id().c_str(), mqtt_user, mqtt_password))
-        {
-            Serial.println("MQTT连接成功");
-        }
-        else
-        {
-            Serial.print("连接失败，错误码=");
-            Serial.print(mqttClient.state());
-            // 释放mqttClient
-            mqttClient.disconnect();
-        }
+    if (mqttClient.connect(device.get_device_id().c_str(), mqtt_user, mqtt_password))
+    {
+        Serial.println("MQTT连接成功");
+        device.set_mqtt_connected(true);
     }
     else
     {
-        Serial.println("无法连接到服务器，端口可能不通");
+        Serial.print("连接失败，错误码=");
+        Serial.print(mqttClient.state());
+        Serial.println(" (提示:-4=连接超时,-2=连接被拒绝,-3=服务器不可达)");
+        mqttClient.disconnect();
+        device.set_mqtt_connected(false);
     }
 }
 
 void MQTT::loop()
 {
-    if (!mqttClient.connected())
+    // wifi重连后会自动恢复发送
+    if (!device.get_wifi_connected())
     {
-        if (wifiManager.isConnected())
-            reconnect();
+        // wifi断开后主动断开MQTT连接
+        mqttClient.disconnect();
+        device.set_mqtt_connected(false);
     }
+    if (!mqttClient.connected() && device.get_wifi_connected())
+        reconnect();
     else
     {
         if (!mqttClient.loop())

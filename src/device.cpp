@@ -2,7 +2,9 @@
 
 Device::Device()
 {
+    device_state.wifiConnected = false;
     device_state.bleConnected = false;
+    device_state.mqttConnected = false;
     device_state.battery = 1;
     device_state.gpsReady = false;
     device_state.imuReady = false;
@@ -11,6 +13,8 @@ Device::Device()
 void Device::print_device_info()
 {
     Serial.print("Device Info:");
+    Serial.printf("MQTT Connected: %d\t", device_state.mqttConnected);
+    Serial.printf("WiFi Connected: %d\t", device_state.wifiConnected);
     Serial.printf("BLE Connected: %d\t", device_state.bleConnected);
     Serial.printf("Battery: %d\t", device_state.battery);
     Serial.printf("GPS Ready: %d\t", device_state.gpsReady);
@@ -28,6 +32,16 @@ String Device::get_device_id()
     return String(device_id);
 }
 
+void Device::set_mqtt_connected(bool connected)
+{
+    device_state.mqttConnected = connected;
+}
+
+void Device::set_wifi_connected(bool connected)
+{
+    device_state.wifiConnected = connected;
+}
+
 void Device::set_ble_connected(bool connected)
 {
     device_state.bleConnected = connected;
@@ -41,6 +55,16 @@ void Device::set_gps_ready(bool ready)
 void Device::set_imu_ready(bool ready)
 {
     device_state.imuReady = ready;
+}
+
+bool Device::get_mqtt_connected()
+{
+    return device_state.mqttConnected;
+}
+
+bool Device::get_wifi_connected()
+{
+    return device_state.wifiConnected;
 }
 
 bool Device::get_ble_connected()

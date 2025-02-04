@@ -27,6 +27,8 @@ void GPS::begin()
     gpsSerial.begin(115200);
     delay(200);
 
+    // resetGps(); // 初始化数据
+
     // 检查是否能收到数据
     if (!checkGpsResponse())
     {

@@ -92,12 +92,3 @@ void BTN::loop()
 
     lastButtonState = reading;
 }
-
-bool BTN::isLongPress()
-{
-    if (currentState == LOW)
-    {
-        return (millis() - pressStartTime) >= LONG_PRESS_TIME;
-    }
-    return false;
-}

@@ -61,7 +61,7 @@ void deviceTask(void *parameter)
 // 按钮任务
 void btnTask(void *parameter)
 {
-    static int hzs[] = {1, 2, 5, 10}; // 支持的更新率
+    static int hzs[] = {2, 5, 10, 1}; // 支持的更新率
     static int hz = 0;                // 当前更新率索引
 
     while (true)
@@ -86,20 +86,22 @@ void btnTask(void *parameter)
         }
 
         // 检查长按重置
-        if (button.isLongPress())
+        if (button.isLongPressed())
         {
+            Serial.println("检测到长按");
 #if Enable_WIFI
             if (!wifiManager.getConfigMode())
             {
-                // Serial.println("检测到长按，重置配置");
-                // wifiManager.reset();
+                wifiManager.reset();
+                // 重启设备
+                ESP.restart();
             }
 #endif
         }
 
         led.loop();
         // device.print_device_info();
-        if (device.get_ble_connected())
+        if (device.get_mqtt_connected() && device.get_wifi_connected())
         {
             led.setMode(LED::BLINK_DUAL);
         }

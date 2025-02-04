@@ -8,6 +8,10 @@ void WiFiConfigManager::begin()
     Serial.println("WiFiConfigManager::begin");
     delay(1000); // 添加启动延迟
 
+    // 配置SSL客户端
+    wifiClientSecure.setInsecure();  // 允许自签名证书
+    wifiClientSecure.setTimeout(15); // 设置15秒超时
+
     if (!preferences.begin(PREF_NAMESPACE, false))
     {
         Serial.println("初始化配置存储失败");
@@ -35,10 +39,12 @@ void WiFiConfigManager::loop()
             if (tryConnectWithSavedCredentials())
             {
                 Serial.println("\nWiFi连接成功!");
+                device.set_wifi_connected(true);
             }
             else
             {
                 Serial.println("\nWiFi连接失败,稍后重试");
+                device.set_wifi_connected(false);
             }
         }
     }
@@ -46,8 +52,8 @@ void WiFiConfigManager::loop()
 }
 bool WiFiConfigManager::tryConnectWithSavedCredentials()
 {
-    String ssid = preferences.getString("ssid", "CMCC-aEu3");
-    String password = preferences.getString("password", "4ux9kxr7");
+    String ssid = preferences.getString("ssid", "");
+    String password = preferences.getString("password", "");
     Serial.printf("尝试连接WiFi: %s\n", ssid.c_str());
     Serial.printf("尝试连接WiFi密码: %s\n", password.c_str());
 
@@ -81,6 +87,7 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
                 break;
         } });
 
+    device.set_wifi_connected(false);
     // 开始连接
     WiFi.begin(ssid.c_str(), password.c_str());
 
@@ -104,6 +111,7 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
         Serial.println("无法访问互联网,5秒后重试...");
         delay(5000);
     }
+    device.set_wifi_connected(true);
 
     return true;
 }

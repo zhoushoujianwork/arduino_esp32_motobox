@@ -5,6 +5,9 @@ static lv_color_t buf[TFT_VER_RES * TFT_HOR_RES / 10];
 
 TFT_eSPI tft = TFT_eSPI(); /* TFT instance */
 
+float gyroTopLeft = 0;
+float gyroTopRight = 0;
+
 #if LV_USE_LOG != 0
 /* Serial debugging */
 void my_print(const char *buf)
@@ -230,7 +233,7 @@ void tft_loop()
 #endif
 
     // Show Ble ui_imgBle
-    if (device.get_ble_connected())
+    if (device.get_mqtt_connected())
     {
         lv_img_set_src(ui_imgBle, &ui_img_bluetooth_1_png);
     }
