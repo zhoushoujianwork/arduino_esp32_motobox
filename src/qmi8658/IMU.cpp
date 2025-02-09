@@ -123,7 +123,16 @@ void IMU::loop()
         float roll_acc = atan2(imu_data.accel_y, imu_data.accel_z) * 180 / M_PI;
         float pitch_acc = atan2(-imu_data.accel_x, sqrt(imu_data.accel_y * imu_data.accel_y + imu_data.accel_z * imu_data.accel_z)) * 180 / M_PI;
 
-// 使用陀螺仪数据和互补滤波更新姿态角
+        // 实现 roll翻转+180度
+        roll_acc += 180;
+        // 添加翻转适配逻辑
+        if (roll_acc > 180) {
+            roll_acc -= 360; // 将roll角翻转到[-180, 180]范围
+        } else if (roll_acc < -180) {
+            roll_acc += 360; // 将roll角翻转到[-180, 180]范围
+        }
+
+        // 使用陀螺仪数据和互补滤波更新姿态角
 #define ALPHA 0.7
         imu_data.roll = ALPHA * (imu_data.roll + imu_data.gyro_x * dt) + (1.0 - ALPHA) * roll_acc;
         imu_data.pitch = ALPHA * (imu_data.pitch + imu_data.gyro_y * dt) + (1.0 - ALPHA) * pitch_acc;
@@ -149,7 +158,9 @@ imu_data_t *IMU::get_imu_data()
 
 void IMU::printImuData()
 {
-    Serial.println("imu_data: " + String(imu_data.accel_x) + ", " + String(imu_data.accel_y) + ", " + String(imu_data.accel_z) + ", " + String(imu_data.gyro_x) + ", " + String(imu_data.gyro_y) + ", " + String(imu_data.gyro_z) + ", " + String(imu_data.roll) + ", " + String(imu_data.pitch) + ", " + String(imu_data.yaw) + ", " + String(imu_data.temperature));
+    // Serial.println("imu_data: " + String(imu_data.accel_x) + ", " + String(imu_data.accel_y) + ", " + String(imu_data.accel_z) + ", " + String(imu_data.gyro_x) + ", " + String(imu_data.gyro_y) + ", " + String(imu_data.gyro_z) + ", " + String(imu_data.roll) + ", " + String(imu_data.pitch) + ", " + String(imu_data.yaw) + ", " + String(imu_data.temperature));
+    // 只打印 pitch 和 roll
+    Serial.println("imu_data: pitch: " + String(imu_data.pitch) + ", roll: " + String(imu_data.roll));
 }
 
 // 将imu_data_t结构体转换为JSON字符串

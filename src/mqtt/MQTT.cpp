@@ -33,7 +33,7 @@ void MQTT::reconnect()
     // 增加MQTT连接超时时间
     mqttClient.setSocketTimeout(15); // 设置15秒超时
 
-    if (mqttClient.connect(device.get_device_id().c_str(), mqtt_user, mqtt_password))
+    if (device.get_wifi_connected() && mqttClient.connect(device.get_device_id().c_str(), mqtt_user, mqtt_password))
     {
         Serial.println("MQTT连接成功");
         device.set_mqtt_connected(true);
@@ -50,21 +50,20 @@ void MQTT::reconnect()
 
 void MQTT::loop()
 {
-    // wifi重连后会自动恢复发送
     if (!device.get_wifi_connected())
     {
-        // wifi断开后主动断开MQTT连接
-        mqttClient.disconnect();
-        device.set_mqtt_connected(false);
+        return;
     }
-    if (!mqttClient.connected() && device.get_wifi_connected())
-        reconnect();
-    else
+
+    if (!mqttClient.connected())
     {
-        if (!mqttClient.loop())
-        {
-            Serial.println("MQTT循环失败");
-        }
+        Serial.println("MQTT连接断开，尝试重新连接");
+        reconnect();
+    }
+
+    if (!mqttClient.loop())
+    {
+        Serial.println("MQTT循环失败");
     }
 }
 

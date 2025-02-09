@@ -30,6 +30,10 @@ void gpsTask(void *parameter)
     {
         gps.loop();
         // gps.printRawData();
+#if Enable_IMU
+        imu.printImuData();
+        imu.loop();
+#endif
     }
 }
 #endif
@@ -123,6 +127,7 @@ void wifiTask(void *parameter)
 {
     while (true)
     {
+
         wifiManager.loop();
         delay(10);
     }
@@ -149,8 +154,6 @@ void setup()
 
 #if Enable_GPS
     gps.begin();
-    // 设置GPS更新率为2Hz
-    gps.setGpsHz(2);
 #endif
 
 #if Enable_BLE
@@ -200,10 +203,7 @@ void setup()
 void loop()
 {
 
-#if Enable_IMU
-    // imu.printImuData();
-    imu.loop();
-#endif
+
 
 #if Enable_BLE
     ble.loop();
@@ -225,5 +225,5 @@ void loop()
     mqtt.publishIMU(*imu_data);
 #endif
     // 添加适当的延时
-    delay(1000); // 每秒发送一次数据
+    delay(500); // 每秒发送一次数据
 }

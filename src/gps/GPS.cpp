@@ -32,10 +32,12 @@ void GPS::begin()
     // 检查是否能收到数据
     if (!checkGpsResponse())
     {
+        Serial.println("GPS 115200 无响应");
         // 如果115200无响应，假设是9600波特率
         gpsSerial.begin(9600);
         delay(200);
 
+        Serial.println("尝试切换到115200波特率");
         // 发送切换到115200波特率的命令
         gpsSerial.print(UBX_CFG_PRT_115200);
         delay(100);
@@ -44,7 +46,7 @@ void GPS::begin()
         gpsSerial.begin(115200);
         delay(200);
     }
-
+    Serial.println("GPS 初始化完成");
     setGpsHz(2);
 }
 
