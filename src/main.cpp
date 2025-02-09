@@ -31,7 +31,7 @@ void gpsTask(void *parameter)
         gps.loop();
         // gps.printRawData();
 #if Enable_IMU
-        imu.printImuData();
+        // imu.printImuData();
         imu.loop();
 #endif
     }

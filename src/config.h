@@ -42,9 +42,9 @@
 #define BAT_MAX_VOLTAGE 3300
 
 // MQTT Configuration
-#define MQTT_SERVER "j2680ff4.ala.asia-southeast1.emqxsl.com"
-#define MQTT_PORT 8883
-#define MQTT_USER "moto"
-#define MQTT_PASSWORD "moto"
+#define MQTT_SERVER "139.224.216.194"
+#define MQTT_PORT 1883
+#define MQTT_USER ""
+#define MQTT_PASSWORD ""
 
 #endif

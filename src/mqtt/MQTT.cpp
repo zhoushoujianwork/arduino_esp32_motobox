@@ -76,6 +76,10 @@ void MQTT::publishGPS(gps_data_t gps_data)
             Serial.println("GPS数据发布失败");
         }
     }
+    else
+    {
+        Serial.println("GPS数据发布失败,WiFi未连接");
+    }
 }
 
 void MQTT::publishIMU(imu_data_t imu_data)
@@ -86,5 +90,9 @@ void MQTT::publishIMU(imu_data_t imu_data)
         {
             Serial.println("IMU数据发布失败");
         }
+    }
+    else
+    {
+        Serial.println("IMU数据发布失败,WiFi未连接");
     }
 }
