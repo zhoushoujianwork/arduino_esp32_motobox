@@ -34,6 +34,7 @@ void gpsTask(void *parameter)
         // imu.printImuData();
         imu.loop();
 #endif
+        delay(10);
     }
 }
 #endif
@@ -140,11 +141,6 @@ void setup()
     led.begin();
     led.setMode(LED::OFF);
 
-#if Enable_TFT
-    // 初始化TFT
-    tft_begin();
-#endif
-
     wifiManager.begin();
 
 #if Enable_IMU
@@ -158,6 +154,11 @@ void setup()
 
 #if Enable_BLE
     ble.begin();
+#endif
+
+#if Enable_TFT
+    // 初始化TFT
+    tft_begin();
 #endif
 
     xTaskCreate(
@@ -202,8 +203,6 @@ void setup()
 
 void loop()
 {
-
-
 
 #if Enable_BLE
     ble.loop();
