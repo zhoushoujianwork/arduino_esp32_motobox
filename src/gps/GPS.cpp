@@ -37,7 +37,6 @@ void GPS::begin()
             delay(1000);
         }
     }
-
     Serial.println("GPS 初始化完成");
     setGpsHz(1);
 }
@@ -79,6 +78,15 @@ void GPS::loop()
                 gps_data.speed = gps.speed.kmph();
                 gps_data.heading = gps.course.deg();
                 gps_data.satellites = gps.satellites.value();
+
+                // 新增里程计算逻辑
+                if (lastUpdateTime != 0)
+                {
+                    unsigned long currentTime = millis();
+                    float deltaTimeH = (currentTime - lastUpdateTime) / 3600000.0; // 转换为小时
+                    totalDistanceKm += gps_data.speed * deltaTimeH;                // 距离 = 速度 × 时间
+                }
+                lastUpdateTime = millis(); // 更新时间戳
             }
             // gps数量超过3颗星，则认为gpsReady为true
             if (gps_data.satellites > 3)
@@ -153,6 +161,11 @@ gps_data_t *GPS::get_gps_data()
     return &gps_data;
 }
 
+float GPS::getTotalDistanceKm()
+{
+    return totalDistanceKm;
+}
+
 void GPS::resetGps()
 {
     device.get_device_state()->gpsReady = false;
@@ -170,6 +183,8 @@ void GPS::resetGps()
     gps_data.speed = random(300);     // 生成 0-299 的随机数
     gps_data.heading = random(360);   // 生成 0-359 的随机数
     gps_data.satellites = random(10); // 生成 0-9 的随机数
+    totalDistanceKm = 0.00;           // 重置里程
+    lastUpdateTime = 0;               // 重置时间戳
 }
 
 // 将gps_data_t结构体转换为JSON字符串

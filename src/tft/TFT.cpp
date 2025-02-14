@@ -193,12 +193,8 @@ void tft_loop()
     float speedKmPerHour = currentSpeedValue;      // currentValue is the speed from the slider
     float timeHours = 1.0 / 60.0;                  // 1 minute in hours
     float distanceKm = speedKmPerHour * timeHours; // Distance traveled in 1 minute
-    // Add the distance traveled in this loop iteration to the total trip distance
-    static float totalDistanceKm = 0;
-    totalDistanceKm += distanceKm;
-    // Update the label with the total distance in kilometers
-    char tripText[20]; // Ensure this buffer is large enough for your number
-    snprintf(tripText, sizeof(tripText), "Trip:%.0f km", totalDistanceKm);
+    char tripText[20];                             // Ensure this buffer is large enough for your number
+    snprintf(tripText, sizeof(tripText), "Trip:%.0f km", gps.getTotalDistanceKm());
     lv_label_set_text(ui_textTrip, tripText);
 
     // 依据方向移动Compose
