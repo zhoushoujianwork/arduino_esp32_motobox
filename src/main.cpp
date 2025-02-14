@@ -66,7 +66,7 @@ void deviceTask(void *parameter)
 // 按钮任务
 void btnTask(void *parameter)
 {
-    static int hzs[] = {2, 5, 10, 1}; // 支持的更新率
+    static int hzs[] = {1, 2, 5, 10}; // 支持的更新率
     static int hz = 0;                // 当前更新率索引
 
     while (true)
@@ -141,6 +141,11 @@ void setup()
     led.begin();
     led.setMode(LED::OFF);
 
+#if Enable_TFT
+    // 初始化TFT
+    tft_begin();
+#endif
+
     wifiManager.begin();
 
 #if Enable_IMU
@@ -154,11 +159,6 @@ void setup()
 
 #if Enable_BLE
     ble.begin();
-#endif
-
-#if Enable_TFT
-    // 初始化TFT
-    tft_begin();
 #endif
 
     xTaskCreate(

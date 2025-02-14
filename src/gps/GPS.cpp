@@ -23,31 +23,23 @@ GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
 
 void GPS::begin()
 {
-    // 先尝试以115200波特率通信
-    gpsSerial.begin(115200);
+    // 直接使用9600波特率初始化
+    gpsSerial.begin(9600);
     delay(200);
-
-    // resetGps(); // 初始化数据
 
     // 检查是否能收到数据
     if (!checkGpsResponse())
     {
-        Serial.println("GPS 115200 无响应");
-        // 如果115200无响应，假设是9600波特率
-        gpsSerial.begin(9600);
-        delay(200);
-
-        Serial.println("尝试切换到115200波特率");
-        // 发送切换到115200波特率的命令
-        gpsSerial.print(UBX_CFG_PRT_115200);
-        delay(100);
-
-        // 重新以115200波特率初始化
-        gpsSerial.begin(115200);
-        delay(200);
+        Serial.println("GPS 9600 无响应");
+        while (true)
+        {
+            Serial.println("GPS 无响应, 请检查GPS模块连接");
+            delay(1000);
+        }
     }
+
     Serial.println("GPS 初始化完成");
-    setGpsHz(2);
+    setGpsHz(1);
 }
 
 // 添加新的辅助函数来检查GPS模块响应
