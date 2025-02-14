@@ -8,7 +8,9 @@ images/ui_img_mengban_png.c
 images/ui_img_weixing_disc_png.c
 images/ui_img_weixing_ok_png.c
 images/ui_img_bluetooth_1_png.c
-images/ui_img_wifi_1_png.c
+images/ui_img_wificon_png.c
+images/ui_img_wifiok_png.c
+images/ui_img_wifi_png.c
 images/ui_img_bluetooth_disconnect_png.c
 images/ui_img_bat_png.c
 images/ui_img_guage_bg_png.c

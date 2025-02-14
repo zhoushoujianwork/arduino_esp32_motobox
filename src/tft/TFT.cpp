@@ -147,6 +147,18 @@ void tft_loop()
     lv_timer_handler(); // let the GUI do its work
     delay(5);
 
+#if Enable_WIFI
+    // Show Wifi
+    if (device.get_wifi_connected())
+    {
+        lv_img_set_src(ui_imgWifi, &ui_img_wifiok_png);
+    }
+    else
+    {
+        lv_img_set_src(ui_imgWifi, &ui_img_wificon_png);
+    }
+#endif
+
 #if Enable_GPS
     // 处理GPS无数据的情况
     int currentSpeedValue = gps.get_gps_data()->speed;

@@ -39,7 +39,7 @@
 #define Enable_BAT 1
 #define BAT_PIN 20
 #define BAT_MIN_VOLTAGE 2900
-#define BAT_MAX_VOLTAGE 3300
+#define BAT_MAX_VOLTAGE 3250
 
 // MQTT Configuration
 #define MQTT_SERVER "139.224.216.194"

@@ -26,6 +26,8 @@ lv_obj_t *ui_textGpsHz;
 lv_obj_t *ui_textGpsNu;
 lv_obj_t *ui_topRight;
 lv_obj_t *ui_imgBle;
+lv_obj_t *ui_imgWificon;
+lv_obj_t *ui_imgWifiOk;
 lv_obj_t *ui_imgWifi;
 lv_obj_t *ui_imgBleDiscon;
 lv_obj_t *ui_textBatPercent;
@@ -56,7 +58,6 @@ lv_obj_t *ui_imgLocation;
 lv_obj_t *ui____initial_actions0;
 const lv_img_dsc_t *ui_imgset_frame_[1] = {&ui_img_frame_1_png};
 const lv_img_dsc_t *ui_imgset_42937250[1] = {&ui_img_1142323638};
-const lv_img_dsc_t *ui_imgset_wifi_[1] = {&ui_img_wifi_1_png};
 const lv_img_dsc_t *ui_imgset_bluetooth_[1] = {&ui_img_bluetooth_1_png};
 const lv_img_dsc_t *ui_imgset_dir_img_[1] = {&ui_img_dir_img_30_png};
 

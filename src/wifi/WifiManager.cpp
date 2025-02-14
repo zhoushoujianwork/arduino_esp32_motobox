@@ -75,7 +75,7 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
                  {
         switch(event) {
             case SYSTEM_EVENT_STA_DISCONNECTED:
-                Serial.println("WiFi连接断开");
+                // Serial.println("WiFi连接断开");
                 WiFi.disconnect(true);
                 device.get_device_state()->wifiConnected = false;
                 break;

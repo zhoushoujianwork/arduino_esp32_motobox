@@ -42,6 +42,8 @@ extern lv_obj_t *ui_textGpsHz;
 extern lv_obj_t *ui_textGpsNu;
 extern lv_obj_t *ui_topRight;
 extern lv_obj_t *ui_imgBle;
+extern lv_obj_t *ui_imgWificon;
+extern lv_obj_t *ui_imgWifiOk;
 extern lv_obj_t *ui_imgWifi;
 extern lv_obj_t *ui_imgBleDiscon;
 extern lv_obj_t *ui_textBatPercent;
@@ -77,7 +79,9 @@ LV_IMG_DECLARE( ui_img_mengban_png);   // assets/mengban.png
 LV_IMG_DECLARE( ui_img_weixing_disc_png);   // assets/weixing_disc.png
 LV_IMG_DECLARE( ui_img_weixing_ok_png);   // assets/weixing_ok.png
 LV_IMG_DECLARE( ui_img_bluetooth_1_png);   // assets/bluetooth 1.png
-LV_IMG_DECLARE( ui_img_wifi_1_png);   // assets/WIFI 1.png
+LV_IMG_DECLARE( ui_img_wificon_png);   // assets/wificon.png
+LV_IMG_DECLARE( ui_img_wifiok_png);   // assets/wifiok.png
+LV_IMG_DECLARE( ui_img_wifi_png);   // assets/wifi.png
 LV_IMG_DECLARE( ui_img_bluetooth_disconnect_png);   // assets/bluetooth_disconnect.png
 LV_IMG_DECLARE( ui_img_bat_png);   // assets/bat.png
 LV_IMG_DECLARE( ui_img_guage_bg_png);   // assets/guage bg.png
