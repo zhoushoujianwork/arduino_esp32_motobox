@@ -117,20 +117,28 @@ void IMU::loop()
     {
         device.get_device_state()->imuReady = true;
         qmi.getAccelerometer(imu_data.accel_x, imu_data.accel_y, imu_data.accel_z);
+
+        // 选择需要的旋转方式（取消注释其中一种）：
+
+        // 1. 顺时针旋转90度（适用于传感器侧装）
+        float temp = imu_data.accel_x;
+        imu_data.accel_x = imu_data.accel_y;
+        imu_data.accel_y = -temp;
+
+        // 2. 逆时针旋转90度
+        // float temp = imu_data.accel_x;
+        // imu_data.accel_x = -imu_data.accel_y;
+        // imu_data.accel_y = temp;
+
+        // 3. 旋转180度
+        // imu_data.accel_x = -imu_data.accel_x;
+        // imu_data.accel_y = -imu_data.accel_y;
+
         qmi.getGyroscope(imu_data.gyro_x, imu_data.gyro_y, imu_data.gyro_z);
 
         // 使用加速度计计算姿态角
         float roll_acc = atan2(imu_data.accel_y, imu_data.accel_z) * 180 / M_PI;
         float pitch_acc = atan2(-imu_data.accel_x, sqrt(imu_data.accel_y * imu_data.accel_y + imu_data.accel_z * imu_data.accel_z)) * 180 / M_PI;
-
-        // 实现 roll翻转+180度
-        roll_acc += 180;
-        // 添加翻转适配逻辑
-        if (roll_acc > 180) {
-            roll_acc -= 360; // 将roll角翻转到[-180, 180]范围
-        } else if (roll_acc < -180) {
-            roll_acc += 360; // 将roll角翻转到[-180, 180]范围
-        }
 
         // 使用陀螺仪数据和互补滤波更新姿态角
 #define ALPHA 0.7

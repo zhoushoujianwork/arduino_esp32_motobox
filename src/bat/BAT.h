@@ -5,6 +5,14 @@
 
 #define FILTER_WINDOW_SIZE 5 // 与cpp文件保持一致
 
+/*
+pitch 右手向内转动度数变化 90 0 -90
+90  0    -90
+-   -90  0   90
+
+roll 右手向内转动度数变化 -90 -180,180 90
+*/
+
 class BAT
 {
 public:

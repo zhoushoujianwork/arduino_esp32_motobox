@@ -31,7 +31,6 @@ void gpsTask(void *parameter)
         gps.loop();
         // gps.printRawData();
 #if Enable_IMU
-        // imu.printImuData();
         imu.loop();
 #endif
         delay(10);
@@ -222,6 +221,7 @@ void loop()
 #if Enable_IMU
     imu_data_t *imu_data = imu.get_imu_data(); // 使用getData()获取IMU数据结构
     mqtt.publishIMU(*imu_data);
+    // imu.printImuData();
 #endif
     // 添加适当的延时
     delay(500); // 每秒发送一次数据

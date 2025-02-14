@@ -211,7 +211,8 @@ void tft_loop()
 
 #if Enable_IMU
     // Show Gyro
-    float gyro = imu.get_imu_data()->roll;
+    float gyro = imu.get_imu_data()->pitch;
+    // float gyro = imu.get_imu_data()->roll;
     lv_slider_set_value(ui_SliderGyro, gyro, LV_ANIM_ON);
     lv_event_send(ui_SliderGyro, LV_EVENT_VALUE_CHANGED, NULL);
     // top值只保留 2 秒

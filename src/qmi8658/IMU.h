@@ -41,7 +41,6 @@ public:
     void loop();
     float getRoll();
     float getPitch();
-    bool isReady();
     imu_data_t *get_imu_data();
     void printImuData();
 
@@ -55,3 +54,5 @@ private:
 extern IMU imu;
 
 #endif
+
+// pitch 90 0   -90
