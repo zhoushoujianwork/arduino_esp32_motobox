@@ -97,6 +97,7 @@ void init_dashboard()
     // 最后速度设置为 0
     lv_slider_set_value(ui_SliderSpeed, 0, LV_ANIM_OFF);
     lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_timer_handler();
 }
 
 void tft_begin()

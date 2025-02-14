@@ -11,7 +11,7 @@ typedef struct
     bool wifiConnected;
     bool bleConnected;
     bool gpsReady;
-    int gpsHz = 1; // 0-10HZ
+    int gpsHz; // 0-10HZ
     bool imuReady;
 } device_state_t;
 

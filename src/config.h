@@ -36,8 +36,8 @@
 #define UI_MAX_SPEED 199 // 单位 km/h
 
 // 电池
-#define Enable_BAT 0
-#define BAT_PIN 7
+#define Enable_BAT 1
+#define BAT_PIN 20
 #define BAT_MIN_VOLTAGE 2900
 #define BAT_MAX_VOLTAGE 3300
 
