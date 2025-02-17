@@ -3,10 +3,12 @@
 
 #include <Arduino.h>
 #include "esp_system.h"
+#include <ArduinoJson.h>
 
 typedef struct
 {
-    int battery;
+    int battery_voltage;
+    int battery_percentage;
     bool mqttConnected;
     bool wifiConnected;
     bool bleConnected;
@@ -28,9 +30,7 @@ public:
     bool get_wifi_connected();
     bool get_ble_connected();
     void print_device_info();
-
-    void set_battery(uint8_t battery);
-    int get_battery();
+    String device_state_to_json();
 
     device_state_t *get_device_state();
     String get_device_id();

@@ -46,5 +46,8 @@
 #define MQTT_PORT 1883
 #define MQTT_USER ""
 #define MQTT_PASSWORD ""
+#define MQTT_TOPIC_DEVICE_INFO String("vehicle/v1/") + device.get_device_id() + "/device/info"
+#define MQTT_TOPIC_GPS String("vehicle/v1/") + device.get_device_id() + "/gps/position"
+#define MQTT_TOPIC_IMU String("vehicle/v1/") + device.get_device_id() + "/imu/gyro"
 
 #endif

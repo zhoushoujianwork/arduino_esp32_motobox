@@ -38,7 +38,7 @@ void GPS::begin()
         }
     }
     Serial.println("GPS 初始化完成");
-    setGpsHz(1);
+    // setGpsHz(1);
 }
 
 // 添加新的辅助函数来检查GPS模块响应

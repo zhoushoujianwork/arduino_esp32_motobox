@@ -5,7 +5,8 @@ Device::Device()
     device_state.wifiConnected = false;
     device_state.bleConnected = false;
     device_state.mqttConnected = false;
-    device_state.battery = 1;
+    device_state.battery_voltage = 0;
+    device_state.battery_percentage = 0;
     device_state.gpsReady = false;
     device_state.imuReady = false;
 }
@@ -16,7 +17,8 @@ void Device::print_device_info()
     Serial.printf("MQTT Connected: %d\t", device_state.mqttConnected);
     Serial.printf("WiFi Connected: %d\t", device_state.wifiConnected);
     Serial.printf("BLE Connected: %d\t", device_state.bleConnected);
-    Serial.printf("Battery: %d\t", device_state.battery);
+    Serial.printf("Battery Voltage: %d\t", device_state.battery_voltage);
+    Serial.printf("Battery Percentage: %d\t", device_state.battery_percentage);
     Serial.printf("GPS Ready: %d\t", device_state.gpsReady);
     Serial.printf("GPS Hz: %d\t", device_state.gpsHz);
     Serial.printf("IMU Ready: %d\n", device_state.imuReady);
@@ -72,17 +74,21 @@ bool Device::get_ble_connected()
     return device_state.bleConnected;
 }
 
-void Device::set_battery(uint8_t battery)
-{
-    this->device_state.battery = battery;
-}
-
-int Device::get_battery()
-{
-    return device_state.battery;
-}
-
 device_state_t *Device::get_device_state()
 {
     return &device_state;
+}
+
+String Device::device_state_to_json()
+{
+    StaticJsonDocument<200> doc;
+    doc["mqttConnected"] = device_state.mqttConnected;
+    doc["wifiConnected"] = device_state.wifiConnected;
+    doc["bleConnected"] = device_state.bleConnected;
+    doc["gpsReady"] = device_state.gpsReady;
+    doc["gpsHz"] = device_state.gpsHz;
+    doc["imuReady"] = device_state.imuReady;
+    doc["batteryVoltage"] = device_state.battery_voltage;
+    doc["batteryPercentage"] = device_state.battery_percentage;
+    return doc.as<String>();
 }

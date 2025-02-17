@@ -18,8 +18,9 @@ MQTT::MQTT(const char *server, int port, const char *user, const char *password)
     mqttClient.setServer(mqtt_server, mqtt_port);
 
     // 修改主题构建方式
-    mqtt_topic_gps = String("vehicle/v1/") + device.get_device_id() + "/gps/position";
-    mqtt_topic_imu = String("vehicle/v1/") + device.get_device_id() + "/imu/gyro";
+    mqtt_topic_gps = MQTT_TOPIC_GPS;
+    mqtt_topic_imu = MQTT_TOPIC_IMU;
+    mqtt_topic_device_info = MQTT_TOPIC_DEVICE_INFO;
 }
 
 void MQTT::reconnect()
@@ -94,5 +95,20 @@ void MQTT::publishIMU(imu_data_t imu_data)
     else
     {
         // Serial.println("IMU数据发布失败,WiFi未连接");
+    }
+}
+
+void MQTT::publishDeviceInfo(device_state_t device_state)
+{
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        if (!mqttClient.publish(mqtt_topic_device_info.c_str(), device.device_state_to_json().c_str()))
+        {
+            Serial.println("设备信息发布失败");
+        }
+    }
+    else
+    {
+        Serial.println("设备信息发布失败,WiFi未连接");
     }
 }

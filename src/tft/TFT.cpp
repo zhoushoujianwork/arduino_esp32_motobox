@@ -202,8 +202,10 @@ void tft_loop()
 #endif
 
     // Show battery level
-    lv_slider_set_value(ui_SliderBat, device.get_battery(), LV_ANIM_ON);
+#if Enable_BAT
+    lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
     lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
+#endif
 
 #if Enable_IMU
     // Show Gyro

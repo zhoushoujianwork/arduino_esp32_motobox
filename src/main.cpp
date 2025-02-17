@@ -52,10 +52,19 @@ void deviceTask(void *parameter)
 {
     while (true)
     {
+
+#if Enable_GPS
+        gps_data_t *gps_data = gps.get_gps_data();
+        mqtt.publishGPS(*gps_data);
+        gps.printGpsData();
+#endif
+
+        // 发送设备信息
+        mqtt.publishDeviceInfo(*device.get_device_state());
+
 #if Enable_BAT
         bat.loop();
         bat.print_voltage();
-        device.set_battery(bat.getPercentage());
 #endif
 
         delay(2000);
@@ -165,7 +174,7 @@ void setup()
         "Device Task",
         1024 * 10,
         NULL,
-        1,
+        0,
         NULL);
 
     xTaskCreate(
@@ -173,7 +182,7 @@ void setup()
         "Button Task",
         1024 * 10,
         NULL,
-        1,
+        0,
         NULL);
 
 #if Enable_WIFI
@@ -182,7 +191,7 @@ void setup()
         "WiFi Task",
         1024 * 10,
         NULL,
-        1,
+        0,
         NULL);
 #endif
 
@@ -212,10 +221,6 @@ void loop()
 #endif
 
     // 获取GPS数据
-#if Enable_GPS
-    gps_data_t *gps_data = gps.get_gps_data();
-    mqtt.publishGPS(*gps_data);
-#endif
 
     // 获取IMU数据
 #if Enable_IMU
@@ -224,5 +229,5 @@ void loop()
     // imu.printImuData();
 #endif
     // 添加适当的延时
-    delay(500); // 每秒发送一次数据
+    delay(1000); // 每秒发送一次数据
 }

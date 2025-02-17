@@ -2,58 +2,46 @@
 
 // 3300, 4200
 BAT::BAT(int pin, int min_voltage, int max_voltage)
+    : pin(pin),
+      min_voltage(min_voltage),
+      max_voltage(max_voltage),
+      buffer_index(0),
+      voltage(0)
 {
-    this->pin = pin;
-    this->min_voltage = min_voltage;
-    this->max_voltage = max_voltage;
-
-    // 初始化滤波缓冲区
-    for (int i = 0; i < FILTER_WINDOW_SIZE; i++)
-    {
-        this->voltage_buffer[i] = 0;
-    }
-    this->buffer_index = 0;
+    // 使用memset初始化缓冲区更高效
+    memset(voltage_buffer, 0, sizeof(voltage_buffer));
 }
 
 void BAT::loop()
 {
-    // int analogValue = analogRead(this->pin);
-    // Serial.printf("ADC analog value = %d volts = %d\n", analogValue, analogValue * 2.6 / 4095.0);
+    static constexpr float VOLTAGE_MULTIPLIER = 2.0f; // 电压倍数常量
+    static constexpr int ADC_MAX_VALUE = 4095;        // ADC最大值
 
     int analogVolts = analogReadMilliVolts(this->pin);
-    int current_voltage = analogVolts * 2;
+    int current_voltage = analogVolts * VOLTAGE_MULTIPLIER;
 
-    // 更新滤波缓冲区
-    this->voltage_buffer[this->buffer_index] = current_voltage;
-    this->buffer_index = (this->buffer_index + 1) % FILTER_WINDOW_SIZE;
+    // 使用运行总和优化滤波计算
+    static int running_sum = 0;
+    running_sum -= voltage_buffer[buffer_index]; // 减去旧值
+    running_sum += current_voltage;              // 加上新值
 
-    // 计算平均值
-    int sum = 0;
-    for (int i = 0; i < FILTER_WINDOW_SIZE; i++)
-    {
-        sum += this->voltage_buffer[i];
-    }
-    this->voltage = sum / FILTER_WINDOW_SIZE;
-}
+    voltage_buffer[buffer_index] = current_voltage;
+    buffer_index = (buffer_index + 1) % FILTER_WINDOW_SIZE;
 
-int BAT::getPercentage()
-{
-    int percentage = map(this->voltage, this->min_voltage, this->max_voltage, 0, 100);
-    if (percentage > 100)
-    {
-        percentage = 100;
-    }
-    else if (percentage < 0)
-    {
-        percentage = 0;
-    }
+    this->voltage = running_sum / FILTER_WINDOW_SIZE; // 直接使用预计算总和
 
-    return percentage;
+    // 计算电池百分比（添加范围限制）
+    int percentage = map(this->voltage, min_voltage, max_voltage, 0, 100);
+    percentage = constrain(percentage, 0, 100);
+
+    device.get_device_state()->battery_voltage = this->voltage;
+    device.get_device_state()->battery_percentage = percentage; // 修正百分比计算
 }
 
 void BAT::print_voltage()
 {
-    Serial.printf("voltage = %d\t", this->voltage);
-    Serial.printf("percentage = %d\t", this->getPercentage());
-    Serial.println();
+    // 添加单位并优化输出格式
+    Serial.printf("Battery: %dmV (%.1f%%)\n",
+                  this->voltage,
+                  device.get_device_state()->battery_percentage);
 }
