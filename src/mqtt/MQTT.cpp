@@ -28,21 +28,29 @@ bool MQTT::reconnect()
     Serial.print(":");
     Serial.println(mqtt_port);
 
-    // 增加MQTT连接超时时间
+    // 增加重试机制
+    int attempts = 0;
+    const int MAX_ATTEMPTS = 3;
+
     mqttClient.setSocketTimeout(15); // 设置15秒超时
 
-    if (device.get_device_state()->wifiConnected && mqttClient.connect(device.get_device_id().c_str(), mqtt_user, mqtt_password))
-    {
-        return true;
-    }
-    else
-    {
+    while (attempts < MAX_ATTEMPTS) {
+        if (device.get_device_state()->wifiConnected && mqttClient.connect(device.get_device_id().c_str(), mqtt_user, mqtt_password))
+        {
+            Serial.println("MQTT连接成功");
+            return true;
+        }
+        
         Serial.print("连接失败，错误码=");
         Serial.print(mqttClient.state());
         Serial.println(" (提示:-4=连接超时,-2=连接被拒绝,-3=服务器不可达)");
-        mqttClient.disconnect();
-        return false;
+        
+        attempts++;
+        delay(2000); // 每次重试间隔2秒
     }
+
+    mqttClient.disconnect();
+    return false;
 }
 
 void MQTT::loop()

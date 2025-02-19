@@ -41,14 +41,15 @@ void task0(void *parameter)
   while (true)
   {
     led.loop();
-    bat.loop();
-    // 优化电压打印频率
-    static uint32_t lastBatPrint = 0;
-    if (millis() - lastBatPrint > MQTT_BAT_PRINT_INTERVAL)
+    // 电池电压 当在 client 模式下，且蓝牙不连接的时候，记录电池电压
+    #ifdef MODE_CLIENT
+    if (!device.get_device_state()->bleConnected)
     {
-      bat.print_voltage();
-      lastBatPrint = millis();
+      bat.loop();
     }
+    #else
+    bat.loop();
+    #endif
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
 

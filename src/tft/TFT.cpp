@@ -147,102 +147,110 @@ void tft_loop()
     lv_timer_handler(); // let the GUI do its work
     delay(5);
 
-    // Show Wifi
-    if (device.get_device_state()->wifiConnected)
-    {
-        lv_img_set_src(ui_imgWifi, &ui_img_wifiok_png);
-    }
-    else
-    {
-        lv_img_set_src(ui_imgWifi, &ui_img_wificon_png);
-    }
-
-    // 处理GPS无数据的情况
-    int currentSpeedValue = device.get_gps_data()->speed;
-    if (device.get_gps_data()->satellites > 0)
-    {
-        lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_COVER, 0); // 完全不透明
-    }
-    else
-    {
-        currentSpeedValue = 0;
-        lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_TRANSP, 0); // 完全透明
-    }
-
-    // Show Gps
-    char gpsTextnu[4]; // 增加缓冲区大小以容纳两位数字和结束符
-    snprintf(gpsTextnu, sizeof(gpsTextnu), "%d", device.get_gps_data()->satellites);
-    lv_label_set_text(ui_textGpsNu, gpsTextnu);
-
-    char gpsTextHz[4]; // 增加缓冲区大小以容纳两位数字和结束符
-    snprintf(gpsTextHz, sizeof(gpsTextHz), "%d", device.get_device_state()->gpsHz);
-    lv_label_set_text(ui_textGpsHz, gpsTextHz);
-
-    char gpsTextTime[20]; // 2024-09-05 10:00:00
-    snprintf(gpsTextTime, sizeof(gpsTextTime), "%04d-%02d-%02d %02d:%02d:%02d", device.get_gps_data()->year, 
-    device.get_gps_data()->month, device.get_gps_data()->day, device.get_gps_data()->hour, 
-    device.get_gps_data()->minute, device.get_gps_data()->second);
-    lv_label_set_text(ui_textTIme, gpsTextTime);
-    char gpsTextLocation[20]; // 120'123456 / 21'654321
-    snprintf(gpsTextLocation, sizeof(gpsTextLocation), "%s / %s", String(device.get_gps_data()->latitude, 6), String(device.get_gps_data()->longitude, 6));
-    lv_label_set_text(ui_textLocation, gpsTextLocation);
-    lv_slider_set_value(ui_SliderSpeed, currentSpeedValue, LV_ANIM_OFF);
-    lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
-    // Assuming the speed is in km/h
-    float speedKmPerHour = currentSpeedValue;      // currentValue is the speed from the slider
-    float timeHours = 1.0 / 60.0;                  // 1 minute in hours
-    float distanceKm = speedKmPerHour * timeHours; // Distance traveled in 1 minute
-    char tripText[20];                             // Ensure this buffer is large enough for your number
-    snprintf(tripText, sizeof(tripText), "Trip:%.0f km", device.getTotalDistanceKm());
-    lv_label_set_text(ui_textTrip, tripText);
-
-    // 依据方向移动Compose
-    lv_obj_set_x(ui_compass, map(device.get_gps_data()->heading, 0, 360, 150, -195));
     // Show battery level
-    lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
-    lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
-    // Show Gyro
-    float gyro = device.get_imu_data()->pitch;
-    // float gyro = imu.get_imu_data()->roll;
-    lv_slider_set_value(ui_SliderGyro, gyro, LV_ANIM_ON);
-    lv_event_send(ui_SliderGyro, LV_EVENT_VALUE_CHANGED, NULL);
-    // top值只保留 2 秒
-    // unsigned long currentMillis = millis();
-    // if (currentMillis - previousMillis >= 2000)
-    // {
-    //     previousMillis = currentMillis;
-    //     gyroTopLeft = 0;
-    //     gyroTopRight = 0;
-    // }
-
-    // get top gyro value for show
-    if (gyro > gyroTopRight)
-    {
-        gyroTopRight = gyro;
-        if (gyro > IMU_MAX_D)
-            gyroTopRight = IMU_MAX_D;
-    }
-    if (gyro < gyroTopLeft)
-    {
-        gyroTopLeft = gyro;
-        if (gyro < -IMU_MAX_D)
-            gyroTopLeft = -IMU_MAX_D;
-    }
-    char gyroTextLeft[20];
-    char gyroTextRight[20];
-    snprintf(gyroTextLeft, sizeof(gyroTextLeft), "%.0f°", gyroTopLeft);
-    snprintf(gyroTextRight, sizeof(gyroTextRight), "%.0f°", gyroTopRight);
-    lv_label_set_text(ui_textGyroTopLeft, gyroTextLeft);
-    lv_label_set_text(ui_textGyroTopRight, gyroTextRight);
-
-
-    // Show Ble ui_imgBle
-    if (device.get_device_state()->bleConnected)
-    {
-        lv_img_set_src(ui_imgBle, &ui_img_bluetooth_1_png);
-    }
-    else
+    // 如果蓝牙没有连接则显示自己的电池电量！
+    if (!device.get_device_state()->bleConnected)
     {
         lv_img_set_src(ui_imgBle, &ui_img_bluetooth_disconnect_png);
+        lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
+        lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
+
+        // 其他归零
+        lv_obj_set_style_img_opa(ui_imgBle, LV_OPA_TRANSP, 0); // 完全透明
+        lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_TRANSP, 0); // 完全透明
+        lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_TRANSP, 0); // 完全透明
+    }
+    else
+    {
+        lv_img_set_src(ui_imgBle, &ui_img_bluetooth_1_png);
+
+        // Show Wifi
+        if (device.get_device_state()->wifiConnected)
+        {
+            lv_img_set_src(ui_imgWifi, &ui_img_wifiok_png);
+        }
+        else
+        {
+            lv_img_set_src(ui_imgWifi, &ui_img_wificon_png);
+        }
+
+        // 处理GPS无数据的情况
+        int currentSpeedValue = device.get_gps_data()->speed;
+        if (device.get_gps_data()->satellites > 0)
+        {
+            lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_COVER, 0); // 完全不透明
+        }
+        else
+        {
+            currentSpeedValue = 0;
+            lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_TRANSP, 0); // 完全透明
+        }
+
+        // Show Gps
+        char gpsTextnu[4]; // 增加缓冲区大小以容纳两位数字和结束符
+        snprintf(gpsTextnu, sizeof(gpsTextnu), "%d", device.get_gps_data()->satellites);
+        lv_label_set_text(ui_textGpsNu, gpsTextnu);
+
+        char gpsTextHz[4]; // 增加缓冲区大小以容纳两位数字和结束符
+        snprintf(gpsTextHz, sizeof(gpsTextHz), "%d", device.get_device_state()->gpsHz);
+        lv_label_set_text(ui_textGpsHz, gpsTextHz);
+
+        char gpsTextTime[20]; // 2024-09-05 10:00:00
+        snprintf(gpsTextTime, sizeof(gpsTextTime), "%04d-%02d-%02d %02d:%02d:%02d", device.get_gps_data()->year,
+                 device.get_gps_data()->month, device.get_gps_data()->day, device.get_gps_data()->hour,
+                 device.get_gps_data()->minute, device.get_gps_data()->second);
+        lv_label_set_text(ui_textTIme, gpsTextTime);
+        char gpsTextLocation[20]; // 120'123456 / 21'654321
+        snprintf(gpsTextLocation, sizeof(gpsTextLocation), "%s / %s", String(device.get_gps_data()->latitude, 6), String(device.get_gps_data()->longitude, 6));
+        lv_label_set_text(ui_textLocation, gpsTextLocation);
+        lv_slider_set_value(ui_SliderSpeed, currentSpeedValue, LV_ANIM_OFF);
+        lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
+        // Assuming the speed is in km/h
+        float speedKmPerHour = currentSpeedValue;      // currentValue is the speed from the slider
+        float timeHours = 1.0 / 60.0;                  // 1 minute in hours
+        float distanceKm = speedKmPerHour * timeHours; // Distance traveled in 1 minute
+        char tripText[20];                             // Ensure this buffer is large enough for your number
+        snprintf(tripText, sizeof(tripText), "Trip:%.0f km", device.getTotalDistanceKm());
+        lv_label_set_text(ui_textTrip, tripText);
+
+        // 依据方向移动Compose
+        lv_obj_set_x(ui_compass, map(device.get_gps_data()->heading, 0, 360, 150, -195));
+
+        lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
+        lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
+
+        // Show Gyro
+        float gyro = device.get_imu_data()->pitch;
+        // float gyro = imu.get_imu_data()->roll;
+        lv_slider_set_value(ui_SliderGyro, gyro, LV_ANIM_ON);
+        lv_event_send(ui_SliderGyro, LV_EVENT_VALUE_CHANGED, NULL);
+        // top值只保留 2 秒
+        // unsigned long currentMillis = millis();
+        // if (currentMillis - previousMillis >= 2000)
+        // {
+        //     previousMillis = currentMillis;
+        //     gyroTopLeft = 0;
+        //     gyroTopRight = 0;
+        // }
+
+        // get top gyro value for show
+        if (gyro > gyroTopRight)
+        {
+            gyroTopRight = gyro;
+            if (gyro > IMU_MAX_D)
+                gyroTopRight = IMU_MAX_D;
+        }
+        if (gyro < gyroTopLeft)
+        {
+            gyroTopLeft = gyro;
+            if (gyro < -IMU_MAX_D)
+                gyroTopLeft = -IMU_MAX_D;
+        }
+        char gyroTextLeft[20];
+        char gyroTextRight[20];
+        snprintf(gyroTextLeft, sizeof(gyroTextLeft), "%.0f°", gyroTopLeft);
+        snprintf(gyroTextRight, sizeof(gyroTextRight), "%.0f°", gyroTopRight);
+        lv_label_set_text(ui_textGyroTopLeft, gyroTextLeft);
+        lv_label_set_text(ui_textGyroTopRight, gyroTextRight);
     }
 }

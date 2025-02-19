@@ -5,6 +5,7 @@
 #include <TFT_eSPI.h>
 #include <lvgl.h>
 #include <ui.h>
+#include "bat/BAT.h"
 #include "config.h"
 #include "gps/GPS.h"
 #include "qmi8658/IMU.h"
