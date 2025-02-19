@@ -42,6 +42,7 @@ public:
     float getRoll();
     float getPitch();
     imu_data_t *get_imu_data();
+    void set_imu_data(imu_data_t *imu_data);
     void printImuData();
 
 private:

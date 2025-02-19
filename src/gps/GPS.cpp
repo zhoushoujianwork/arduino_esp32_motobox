@@ -161,6 +161,11 @@ gps_data_t *GPS::get_gps_data()
     return &gps_data;
 }
 
+void GPS::set_gps_data(gps_data_t *gps_data)
+{
+    this->gps_data = *gps_data;
+}
+
 float GPS::getTotalDistanceKm()
 {
     return totalDistanceKm;

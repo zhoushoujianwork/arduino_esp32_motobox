@@ -1,233 +1,143 @@
-#include <Arduino.h>
-#include "btn/BTN.h"
-#include "led/LED.h"
+#include "Arduino.h"
 #include "bat/BAT.h"
-#include "device.h"
+#include "ble/ble_server.h"
+#include "ble/ble_client.h"
+#include "btn/BTN.h"
 #include "config.h"
-#include "tft/TFT.h"
-#include "wifi/WifiManager.h"
+#include "device.h"
+#include "gps/GPS.h"
+#include "led/LED.h"
 #include "mqtt/MQTT.h"
+#include "tft/TFT.h"
+#include "qmi8658/IMU.h"
+#include "wifi/WifiManager.h"
 
 Device device;
-#if Enable_BLE
-#include "ble/ble.h"
-BLE ble;
-#endif
 
-#if Enable_IMU
-#include "QMI8658/imu.h"
-IMU imu(42, 2);
-#endif
-
-#if Enable_GPS
-#include "gps/GPS.h"
-GPS gps(12, 11);
-TaskHandle_t gpsTaskHandle;
-
-void gpsTask(void *parameter)
-{
-    while (true)
-    {
-        gps.loop();
-        // gps.printRawData();
-#if Enable_IMU
-        imu.loop();
-#endif
-        delay(10);
-    }
-}
-#endif
-
-#if Enable_BAT
+IMU imu(IMU_PIN, 2);
+GPS gps(GPS_RX_PIN, GPS_TX_PIN);
 BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE); // 电池电压 3.3V - 4.2V
-#endif
-
 BTN button(BTN_PIN);
-LED led(8); // 假设LED连接在GPIO 8上
-
-// 创建MQTT实例
+LED led(LED_PIN); // 假设LED连接在GPIO 8上
 MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
+BLES bs();
+BLEC bc();
 
-void deviceTask(void *parameter)
+void task0(void *parameter)
 {
-    while (true)
+  static int hzs[] = {1, 2, 5, 10};
+  static int hz = 0;
+
+  while (true)
+  {
+    led.loop();
+    bat.loop();
+    // 优化电压打印频率
+    static uint32_t lastBatPrint = 0;
+    if (millis() - lastBatPrint > MQTT_BAT_PRINT_INTERVAL)
     {
-
-#if Enable_GPS
-        gps_data_t *gps_data = gps.get_gps_data();
-        mqtt.publishGPS(*gps_data);
-        gps.printGpsData();
-#endif
-
-        // 发送设备信息
-        mqtt.publishDeviceInfo(*device.get_device_state());
-
-#if Enable_BAT
-        bat.loop();
-        bat.print_voltage();
-#endif
-
-        delay(2000);
+      bat.print_voltage();
+      lastBatPrint = millis();
     }
+
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+
+    gps.loop();
+    imu.loop();
+
+    // 优化状态判断逻辑
+    bool isConnected =
+        device.get_mqtt_connected() && device.get_wifi_connected();
+    led.setMode(isConnected ? LED::BLINK_DUAL : LED::OFF);
+
+    // 检查点击
+    if (button.isClicked())
+    {
+      hz = (hz + 1) % 4;
+      delay(100); // 保持短暂延时确保任务挂起
+      gps.setGpsHz(hzs[hz]);
+      Serial.printf("设置GPS更新率为%dHz\n", hzs[hz]);
+      device.get_device_state()->gpsHz = hzs[hz];
+    }
+
+    // 检查长按重置
+    if (button.isLongPressed())
+    {
+      Serial.println("检测到长按,重置WIFI");
+      if (!wifiManager.getConfigMode())
+      {
+        wifiManager.reset();
+        // 重启设备
+        ESP.restart();
+      }
+    }
+#endif
+
+#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+    tft_loop();
+#endif
+
+    delay(10); // 保持原有延时
+  }
 }
 
-// 按钮任务
-void btnTask(void *parameter)
+void task1(void *parameter)
 {
-    static int hzs[] = {1, 2, 5, 10}; // 支持的更新率
-    static int hz = 0;                // 当前更新率索引
+  const TickType_t xDelay = 1000 / portTICK_PERIOD_MS; // 添加任务周期控制
+  while (true)
+  {
 
-    while (true)
-    {
-        if (button.isClicked())
-        {
-#if Enable_GPS
-            // 循环切换更新率
-            hz = (hz + 1) % 4;
-            // 暂停GPS任务
-            vTaskSuspend(gpsTaskHandle);
-            delay(100);
-
-            // 循环切换更新率
-            gps.setGpsHz(hzs[hz]);
-            Serial.printf("设置GPS更新率为%dHz\n", hzs[hz]);
-
-            // 恢复GPS任务
-            vTaskResume(gpsTaskHandle);
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    wifiManager.loop();
 #endif
-            device.get_device_state()->gpsHz = hzs[hz];
-        }
 
-        // 检查长按重置
-        if (button.isLongPressed())
-        {
-            Serial.println("检测到长按");
-#if Enable_WIFI
-            if (!wifiManager.getConfigMode())
-            {
-                wifiManager.reset();
-                // 重启设备
-                ESP.restart();
-            }
+#ifdef MODE_CLIENT
+    bc.loop();
 #endif
-        }
 
-        led.loop();
-        // device.print_device_info();
-        if (device.get_mqtt_connected() && device.get_wifi_connected())
-        {
-            led.setMode(LED::BLINK_DUAL);
-        }
-        else
-        {
-            led.setMode(LED::OFF);
-        }
-
-#if Enable_TFT
-        tft_loop();
+#ifdef MODE_SERVER
+    bs.loop();
 #endif
-        delay(10);
-    }
+
+    vTaskDelay(xDelay); // 重要！添加任务延时防止阻塞
+  }
 }
-
-#if Enable_WIFI
-// 阻塞的wifi任务
-void wifiTask(void *parameter)
-{
-    while (true)
-    {
-
-        wifiManager.loop();
-        delay(10);
-    }
-}
-#endif
 
 void setup()
 {
-    Serial.begin(115200);
-    led.begin();
-    led.setMode(LED::OFF);
+  Serial.begin(115200);
+  led.begin();
+  led.setMode(LED::OFF);
 
-#if Enable_TFT
-    // 初始化TFT
-    tft_begin();
+  // 初始化设备
+  device.init();
+
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  gps.begin();
+  imu.begin();
+  wifiManager.begin();
 #endif
 
-    wifiManager.begin();
-
-#if Enable_IMU
-    // 添加IMU初始化检查
-    imu.begin();
+#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+  tft_begin();
 #endif
 
-#if Enable_GPS
-    gps.begin();
+#ifdef MODE_SERVER
+  bs.begin();
 #endif
 
-#if Enable_BLE
-    ble.begin();
+#ifdef MODE_CLIENT
+  bc.begin();
 #endif
 
-    xTaskCreate(
-        deviceTask,
-        "Device Task",
-        1024 * 10,
-        NULL,
-        0,
-        NULL);
+  // esp双核任务
+  xTaskCreate(task0, "Task0", 1024 * 10, NULL, 0, NULL);
+  xTaskCreate(task1, "Task1", 1024 * 10, NULL, 1, NULL);
 
-    xTaskCreate(
-        btnTask,
-        "Button Task",
-        1024 * 10,
-        NULL,
-        0,
-        NULL);
-
-#if Enable_WIFI
-    xTaskCreate(
-        wifiTask,
-        "WiFi Task",
-        1024 * 10,
-        NULL,
-        0,
-        NULL);
-#endif
-
-#if Enable_GPS
-    xTaskCreate(
-        gpsTask,
-        "GPS Task",
-        1024 * 10,
-        NULL,
-        1,
-        &gpsTaskHandle);
-#endif
-
-    Serial.println("main setup end");
-    device.print_device_info();
+  Serial.println("main setup end");
 }
 
 void loop()
 {
-
-#if Enable_BLE
-    ble.loop();
-#endif
-
-#if Enable_WIFI
-    mqtt.loop();
-#endif
-
-    // 获取GPS数据
-
-    // 获取IMU数据
-#if Enable_IMU
-    imu_data_t *imu_data = imu.get_imu_data(); // 使用getData()获取IMU数据结构
-    mqtt.publishIMU(*imu_data);
-    // imu.printImuData();
-#endif
-    // 添加适当的延时
-    delay(1000); // 每秒发送一次数据
+  // debug的信息
 }

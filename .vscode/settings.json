@@ -27,5 +27,6 @@
         "functional": "cpp",
         "tuple": "cpp",
         "utility": "cpp"
-    }
+    },
+    "idf.pythonInstallPath": "/usr/local/bin/python"
 }

@@ -35,7 +35,7 @@ void LED::loop()
         digitalWrite(_pin, HIGH);
         break;
 
-    case BLINK:
+    case BLINK_SINGLE:
         if (currentMillis - _lastToggle >= PATTERN_INTERVAL)
         {
             _state = true;

@@ -1,4 +1,4 @@
-#include "ble.h"
+#include "ble_server.h"
 
 class ServerCallbacks : public NimBLEServerCallbacks
 {
@@ -36,7 +36,7 @@ class ImuCharacteristicCallbacks : public NimBLECharacteristicCallbacks
     }
 };
 
-BLE::BLE()
+BLES::BLES()
 {
     pServer = NULL;
     pCharacteristic = NULL;
@@ -44,7 +44,7 @@ BLE::BLE()
     pIMUCharacteristic = NULL;
 }
 
-void BLE::begin()
+void BLES::setup()
 {
     Serial.println("初始化BLE服务器...");
 
@@ -92,7 +92,7 @@ void BLE::begin()
     Serial.println("BLE服务器已启动");
 }
 
-void BLE::loop()
+void BLES::loop()
 {
     if (pServer == nullptr)
     {

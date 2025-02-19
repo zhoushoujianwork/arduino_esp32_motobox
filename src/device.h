@@ -17,10 +17,13 @@ typedef struct
     bool imuReady;
 } device_state_t;
 
+
+
 class Device
 {
 public:
     Device();
+    void init();
     void set_mqtt_connected(bool connected);
     void set_wifi_connected(bool connected);
     void set_ble_connected(bool connected);
@@ -33,6 +36,7 @@ public:
     String device_state_to_json();
 
     device_state_t *get_device_state();
+    void set_device_state(device_state_t *state);
     String get_device_id();
 
 private:

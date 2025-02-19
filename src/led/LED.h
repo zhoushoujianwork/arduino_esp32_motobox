@@ -10,7 +10,7 @@ public:
     {
         OFF,       // 关闭
         ON,        // 常亮
-        BLINK,     // 单闪
+        BLINK_SINGLE, // 单闪
         BLINK_DUAL // 双闪
     };
 

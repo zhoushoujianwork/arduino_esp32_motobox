@@ -2,29 +2,45 @@
 #define CONFIG_H
 #define VERSION "2.0.0"
 
-#define BTN_PIN 39
+// 设置服务运行模式，目前支持 3 种配置
+// 1. allinOne的方式，不需要用到蓝牙，直接自己采集数据渲染到屏幕；
+// 2.
+// server模式，作为主机方式负责采集传感器数据并通过蓝牙发送给从机屏幕，主机还能通过WIFI
+// 配置将后台数据实时 mqtt发送到服务器；
+// 3. client模式，作为从机方式负责接收主机蓝牙发送过来的数据，并渲染到屏幕上；
 
-// IMU
-#define Enable_IMU 1
+#define MODE_ALLINONE
+// #define MODE_SERVER
+// #define MODE_CLIENT
+
+#ifdef MODE_ALLINONE
+#define BTN_PIN 39
+#define BAT_PIN 20
+#define BAT_MIN_VOLTAGE 2900
+#define BAT_MAX_VOLTAGE 3250
+#endif
+
+#ifdef MODE_SERVER
+#define BLE_SERVER // 启用服务端模式
+
+#define BTN_PIN 39
+#define BAT_PIN 20
+#define BAT_MIN_VOLTAGE 2900
+#define BAT_MAX_VOLTAGE 3250
+#endif
+
+#ifdef MODE_CLIENT
+#define BLE_CLIENT // 启用客户端模式
+#endif
+
 #define IMU_PIN 33
 #define IMU_MAX_D 68 // 马奎斯 GP保持
-
-// GPS
-#define Enable_GPS 1
-
-// BLE
-#define Enable_BLE 0 // BLE服务和特征值的UUID
 #define BLE_NAME "ESP32-MOTO"
 #define SERVICE_UUID "4FAFC201-1FB5-459E-8FCC-C5C9C331914B"
 #define DEVICE_CHAR_UUID "BEB5483A-36E1-4688-B7F5-EA07361B26A8"
 #define GPS_CHAR_UUID "BEB5483E-36E1-4688-B7F5-EA07361B26A8"
 #define IMU_CHAR_UUID "BEB5483F-36E1-4688-B7F5-EA07361B26A8"
 
-// WIFI
-#define Enable_WIFI 1
-
-// TFT
-#define Enable_TFT 1
 #define TFT_CS 15
 #define TFT_DC 2
 #define TFT_MOSI 19
@@ -33,21 +49,40 @@
 #define TFT_BL 5
 #define TFT_HOR_RES 172
 #define TFT_VER_RES 320
-#define UI_MAX_SPEED 199 // 单位 km/h
 
-// 电池
-#define Enable_BAT 1
-#define BAT_PIN 20
-#define BAT_MIN_VOLTAGE 2900
-#define BAT_MAX_VOLTAGE 3250
+#define UI_MAX_SPEED 199 // 单位 km/h
 
 // MQTT Configuration
 #define MQTT_SERVER "139.224.216.194"
 #define MQTT_PORT 1883
 #define MQTT_USER ""
 #define MQTT_PASSWORD ""
-#define MQTT_TOPIC_DEVICE_INFO String("vehicle/v1/") + device.get_device_id() + "/device/info"
-#define MQTT_TOPIC_GPS String("vehicle/v1/") + device.get_device_id() + "/gps/position"
-#define MQTT_TOPIC_IMU String("vehicle/v1/") + device.get_device_id() + "/imu/gyro"
+#define MQTT_TOPIC_DEVICE_INFO                                                 \
+  String("vehicle/v1/") + device.get_device_id() + "/device/info"
+#define MQTT_TOPIC_GPS                                                         \
+  String("vehicle/v1/") + device.get_device_id() + "/gps/position"
+#define MQTT_TOPIC_IMU                                                         \
+  String("vehicle/v1/") + device.get_device_id() + "/imu/gyro"
+
+// 添加LED配置
+#define LED_PIN 8
+#define LED_BLINK_INTERVAL 100
+
+// 添加GPS配置
+#define GPS_RX_PIN 12
+#define GPS_TX_PIN 11
+#define GPS_DEFAULT_BAUDRATE 9600
+#define GPS_UPDATE_INTERVAL 1000
+
+// 添加任务配置
+#define TASK_STACK_SIZE (1024 * 10)
+#define TASK_PRIORITY_LOW 0
+#define TASK_PRIORITY_MEDIUM 1
+#define TASK_PRIORITY_HIGH 2
+
+// 添加MQTT发布间隔配置
+#define MQTT_DEVICE_INFO_INTERVAL 5000
+#define MQTT_IMU_PUBLISH_INTERVAL 200
+#define MQTT_BAT_PRINT_INTERVAL 10000
 
 #endif

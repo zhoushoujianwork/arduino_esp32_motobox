@@ -2,6 +2,10 @@
 
 Device::Device()
 {
+}
+
+void Device::init()
+{
     device_state.wifiConnected = false;
     device_state.bleConnected = false;
     device_state.mqttConnected = false;
@@ -9,6 +13,7 @@ Device::Device()
     device_state.battery_percentage = 0;
     device_state.gpsReady = false;
     device_state.imuReady = false;
+    device_state.gpsHz = 1;
 }
 
 void Device::print_device_info()
@@ -77,6 +82,11 @@ bool Device::get_ble_connected()
 device_state_t *Device::get_device_state()
 {
     return &device_state;
+}
+
+void Device::set_device_state(device_state_t *state)
+{
+    device_state = *state;
 }
 
 String Device::device_state_to_json()

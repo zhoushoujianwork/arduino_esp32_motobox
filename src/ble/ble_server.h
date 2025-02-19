@@ -1,5 +1,5 @@
-#ifndef BLE_H
-#define BLE_H
+#ifndef BLE_SERVER_H
+#define BLE_SERVER_H
 
 #include <NimBLEDevice.h>
 #include "device.h"
@@ -7,11 +7,11 @@
 #include "gps/GPS.h"
 #include "qmi8658/IMU.h"
 
-class BLE
+class BLES
 {
 public:
-    BLE();
-    void begin();
+    BLES();
+    void setup();
     void loop();
 
 private:

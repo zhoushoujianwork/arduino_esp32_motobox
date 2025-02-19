@@ -115,6 +115,7 @@ public:
     void printRawData();
     void printGpsData();
     gps_data_t *get_gps_data();
+    void set_gps_data(gps_data_t *gps_data);
     void resetGps();
     bool checkGpsResponse();
     float getTotalDistanceKm();
