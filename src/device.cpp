@@ -41,27 +41,42 @@ String Device::get_device_id()
 
 void Device::set_mqtt_connected(bool connected)
 {
-    device_state.mqttConnected = connected;
+    if (device_state.mqttConnected != connected) {
+        Serial.printf("MQTT状态变更: %d -> %d\n", device_state.mqttConnected, connected);
+        device_state.mqttConnected = connected;
+    }
 }
 
 void Device::set_wifi_connected(bool connected)
 {
-    device_state.wifiConnected = connected;
+    if (device_state.wifiConnected != connected) {
+        Serial.printf("WiFi状态变更: %d -> %d\n", device_state.wifiConnected, connected);
+        device_state.wifiConnected = connected;
+    }
 }
 
 void Device::set_ble_connected(bool connected)
 {
-    device_state.bleConnected = connected;
+    if (device_state.bleConnected != connected) {
+        Serial.printf("BLE状态变更: %d -> %d\n", device_state.bleConnected, connected);
+        device_state.bleConnected = connected;
+    }
 }
 
 void Device::set_gps_ready(bool ready)
 {
-    device_state.gpsReady = ready;
+    if (device_state.gpsReady != ready) {
+        Serial.printf("GPS状态变更: %d -> %d\n", device_state.gpsReady, ready);
+        device_state.gpsReady = ready;
+    }
 }
 
 void Device::set_imu_ready(bool ready)
 {
-    device_state.imuReady = ready;
+    if (device_state.imuReady != ready) {
+        Serial.printf("IMU状态变更: %d -> %d\n", device_state.imuReady, ready);
+        device_state.imuReady = ready;
+    }
 }
 
 bool Device::get_mqtt_connected()

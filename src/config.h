@@ -9,8 +9,8 @@
 // 配置将后台数据实时 mqtt发送到服务器；
 // 3. client模式，作为从机方式负责接收主机蓝牙发送过来的数据，并渲染到屏幕上；
 
-#define MODE_ALLINONE
-// #define MODE_SERVER
+// #define MODE_ALLINONE
+#define MODE_SERVER
 // #define MODE_CLIENT
 
 #ifdef MODE_ALLINONE
@@ -18,13 +18,18 @@
 #define BAT_PIN 20
 #define BAT_MIN_VOLTAGE 2900
 #define BAT_MAX_VOLTAGE 3250
+#define IMU_SDA_PIN 33
+#define IMU_SCL_PIN 2
+
 #endif
 
 #ifdef MODE_SERVER
 #define BLE_SERVER // 启用服务端模式
 
+#define IMU_SDA_PIN 42
+#define IMU_SCL_PIN 2
 #define BTN_PIN 39
-#define BAT_PIN 20
+#define BAT_PIN 7
 #define BAT_MIN_VOLTAGE 2900
 #define BAT_MAX_VOLTAGE 3250
 #endif
@@ -33,7 +38,6 @@
 #define BLE_CLIENT // 启用客户端模式
 #endif
 
-#define IMU_PIN 33
 #define IMU_MAX_D 68 // 马奎斯 GP保持
 #define BLE_NAME "ESP32-MOTO"
 #define SERVICE_UUID "4FAFC201-1FB5-459E-8FCC-C5C9C331914B"
@@ -73,12 +77,6 @@
 #define GPS_TX_PIN 11
 #define GPS_DEFAULT_BAUDRATE 9600
 #define GPS_UPDATE_INTERVAL 1000
-
-// 添加任务配置
-#define TASK_STACK_SIZE (1024 * 10)
-#define TASK_PRIORITY_LOW 0
-#define TASK_PRIORITY_MEDIUM 1
-#define TASK_PRIORITY_HIGH 2
 
 // 添加MQTT发布间隔配置
 #define MQTT_DEVICE_INFO_INTERVAL 5000

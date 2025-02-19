@@ -147,7 +147,6 @@ void tft_loop()
     lv_timer_handler(); // let the GUI do its work
     delay(5);
 
-#if Enable_WIFI
     // Show Wifi
     if (device.get_wifi_connected())
     {
@@ -157,9 +156,7 @@ void tft_loop()
     {
         lv_img_set_src(ui_imgWifi, &ui_img_wificon_png);
     }
-#endif
 
-#if Enable_GPS
     // 处理GPS无数据的情况
     int currentSpeedValue = gps.get_gps_data()->speed;
     if (gps.get_gps_data()->satellites > 0)
@@ -199,15 +196,9 @@ void tft_loop()
 
     // 依据方向移动Compose
     lv_obj_set_x(ui_compass, map(gps.get_gps_data()->heading, 0, 360, 150, -195));
-#endif
-
     // Show battery level
-#if Enable_BAT
     lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
     lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
-#endif
-
-#if Enable_IMU
     // Show Gyro
     float gyro = imu.get_imu_data()->pitch;
     // float gyro = imu.get_imu_data()->roll;
@@ -242,7 +233,6 @@ void tft_loop()
     lv_label_set_text(ui_textGyroTopLeft, gyroTextLeft);
     lv_label_set_text(ui_textGyroTopRight, gyroTextRight);
 
-#endif
 
     // Show Ble ui_imgBle
     if (device.get_mqtt_connected())

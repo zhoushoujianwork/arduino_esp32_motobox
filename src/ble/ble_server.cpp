@@ -18,10 +18,7 @@ class GpsCharacteristicCallbacks : public NimBLECharacteristicCallbacks
 {
     void onRead(NimBLECharacteristic *pGPSCharacteristic)
     {
-#if Enable_GPS
-        // Serial.println("Enable_GPS");
         pGPSCharacteristic->setValue((uint8_t *)gps.get_gps_data(), sizeof(gps_data_t));
-#endif
     }
 };
 
@@ -29,10 +26,7 @@ class ImuCharacteristicCallbacks : public NimBLECharacteristicCallbacks
 {
     void onRead(NimBLECharacteristic *pIMUCharacteristic)
     {
-#if Enable_IMU
-        // Serial.println("Enable_IMU");
         pIMUCharacteristic->setValue((uint8_t *)imu.get_imu_data(), sizeof(imu_data_t));
-#endif
     }
 };
 

@@ -14,14 +14,14 @@
 
 Device device;
 
-IMU imu(IMU_PIN, 2);
+IMU imu(IMU_SDA_PIN, IMU_SCL_PIN);
 GPS gps(GPS_RX_PIN, GPS_TX_PIN);
 BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE); // 电池电压 3.3V - 4.2V
 BTN button(BTN_PIN);
 LED led(LED_PIN); // 假设LED连接在GPIO 8上
 MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
-BLES bs();
-BLEC bc();
+BLES bs;
+BLEC bc;
 
 void task0(void *parameter)
 {
@@ -89,6 +89,7 @@ void task1(void *parameter)
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     wifiManager.loop();
+    mqtt.loop();
 #endif
 
 #ifdef MODE_CLIENT
@@ -123,11 +124,11 @@ void setup()
 #endif
 
 #ifdef MODE_SERVER
-  bs.begin();
+  bs.setup();
 #endif
 
 #ifdef MODE_CLIENT
-  bc.begin();
+  bc.setup();
 #endif
 
   // esp双核任务
@@ -140,4 +141,13 @@ void setup()
 void loop()
 {
   // debug的信息
+  Serial.printf("free heap: %d\n", ESP.getFreeHeap());
+
+  imu.printImuData();
+
+  gps.printGpsData();
+
+  device.print_device_info();
+
+  delay(1000);
 }

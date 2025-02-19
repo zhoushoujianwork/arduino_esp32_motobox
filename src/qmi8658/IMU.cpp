@@ -18,7 +18,9 @@ void IMU::begin()
         Serial.println("IMU init failed");
         while (1)
         {
-            delay(1000);
+            delay(5000);
+            Serial.println("IMU init failed, restart");
+            esp_restart();
         }
     }
 #else
@@ -27,7 +29,9 @@ void IMU::begin()
         Serial.println("Failed to find QMI8658 - check your wiring!");
         while (1)
         {
+            Serial.println("IMU init failed, restart");
             delay(1000);
+            esp_restart();
         }
     }
 #endif
@@ -173,7 +177,7 @@ void IMU::printImuData()
 {
     // Serial.println("imu_data: " + String(imu_data.accel_x) + ", " + String(imu_data.accel_y) + ", " + String(imu_data.accel_z) + ", " + String(imu_data.gyro_x) + ", " + String(imu_data.gyro_y) + ", " + String(imu_data.gyro_z) + ", " + String(imu_data.roll) + ", " + String(imu_data.pitch) + ", " + String(imu_data.yaw) + ", " + String(imu_data.temperature));
     // 只打印 pitch 和 roll
-    Serial.println("imu_data: pitch: " + String(imu_data.pitch) + ", roll: " + String(imu_data.roll));
+    Serial.println("imu_data: pitch: " + String(imu_data.pitch) + ", roll: " + String(imu_data.roll) + ", temperature: " + String(imu_data.temperature));
 }
 
 // 将imu_data_t结构体转换为JSON字符串

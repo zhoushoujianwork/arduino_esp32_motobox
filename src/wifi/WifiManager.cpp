@@ -4,7 +4,6 @@ WiFiConfigManager wifiManager;
 
 void WiFiConfigManager::begin()
 {
-#if Enable_WIFI
     Serial.println("WiFiConfigManager::begin");
     delay(1000); // 添加启动延迟
 
@@ -20,12 +19,10 @@ void WiFiConfigManager::begin()
         return;
     }
     Serial.println("配置存储初始化成功");
-#endif
 }
 
 void WiFiConfigManager::loop()
 {
-#if Enable_WIFI
     if (isConfigMode)
     {
         // 处理WiFi客户端
@@ -48,7 +45,6 @@ void WiFiConfigManager::loop()
             }
         }
     }
-#endif
 }
 bool WiFiConfigManager::tryConnectWithSavedCredentials()
 {

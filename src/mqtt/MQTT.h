@@ -19,7 +19,7 @@ private:
     String mqtt_topic_gps;
     String mqtt_topic_imu;
     String mqtt_topic_device_info;
-    void reconnect();
+    bool reconnect();
 
 public:
     MQTT(const char *server, int port, const char *user, const char *password);
