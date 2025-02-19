@@ -330,16 +330,18 @@ void BLEC::loop()
             Serial.println("Success! we should now be getting notifications, scanning for more!");
             connected = true;
             doConnect = false;
+            device.get_device_state()->bleConnected = true;
         }
         else
         {
+            device.get_device_state()->bleConnected = false;
             Serial.println("Failed to connect, starting scan");
             doScan = true;
             connected = false;
         }
     }
 
-    Serial.printf("connected: %d\n", connected);
+    // Serial.printf("connected: %d\n", connected);
     if (connected)
     {
         // 添加额外的空指针检查
@@ -383,5 +385,6 @@ void BLEC::loop()
         Serial.println("Starting scan");
         NimBLEDevice::getScan()->start(scanTime, scanEndedCB);
         doScan = false;
+        device.get_device_state()->bleConnected = false;
     }
 }

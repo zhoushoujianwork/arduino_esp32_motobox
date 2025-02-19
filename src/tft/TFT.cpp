@@ -163,6 +163,9 @@ void tft_loop()
     else
     {
         lv_img_set_src(ui_imgBle, &ui_img_bluetooth_1_png);
+        lv_obj_set_style_img_opa(ui_imgBle, LV_OPA_COVER, 0); // 完全不透明
+        lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0); // 完全不透明
+        lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_COVER, 0); // 完全不透明
 
         // Show Wifi
         if (device.get_device_state()->wifiConnected)
