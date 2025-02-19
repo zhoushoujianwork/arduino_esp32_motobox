@@ -57,7 +57,7 @@ void MQTT::loop()
 {
     if (!device.get_device_state()->wifiConnected)
     {
-        Serial.println("WiFi未连接，MQTT连接失败");
+        // Serial.println("WiFi未连接，MQTT连接失败");
         device.set_mqtt_connected(false);
         return;
     }

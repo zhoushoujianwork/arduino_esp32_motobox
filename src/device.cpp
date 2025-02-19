@@ -7,7 +7,11 @@ Device::Device()
 void Device::init()
 {
     device_state.wifiConnected = false;
+#ifdef MODE_CLIENT
     device_state.bleConnected = false;
+#else
+    device_state.bleConnected = true; // 如果定义了MODE_CLIENT，则默认蓝牙连接 因为这个开关控制 TFT 的显示
+#endif
     device_state.mqttConnected = false;
     device_state.battery_voltage = 0;
     device_state.battery_percentage = 0;

@@ -10,8 +10,8 @@
 // 配置将后台数据实时 mqtt发送到服务器；
 // 3. client模式，作为从机方式负责接收主机蓝牙发送过来的数据，并渲染到屏幕上；
 
-#define MODE_ALLINONE
-// #define MODE_SERVER
+// #define MODE_ALLINONE
+#define MODE_SERVER
 // #define MODE_CLIENT
 
 #ifdef MODE_ALLINONE
@@ -19,9 +19,16 @@
 #define BAT_PIN 20
 #define BAT_MIN_VOLTAGE 2900
 #define BAT_MAX_VOLTAGE 3250
-#define IMU_SDA_PIN 33
+#define IMU_SDA_PIN 42
 #define IMU_SCL_PIN 2
 #define LED_PIN 8
+
+#define TFT_CS 6
+#define TFT_DC 4
+#define TFT_MOSI 15
+#define TFT_SCLK 5
+#define TFT_RST 7
+#define TFT_BL 16
 
 #endif
 
@@ -45,6 +52,13 @@
 #define BAT_MIN_VOLTAGE 2900
 #define BAT_MAX_VOLTAGE 3250
 #define LED_PIN 3
+
+#define TFT_CS 15
+#define TFT_DC 2
+#define TFT_MOSI 19
+#define TFT_SCLK 18
+#define TFT_RST 4
+#define TFT_BL 5
 #endif
 
 #define IMU_MAX_D 68 // 马奎斯 GP保持
@@ -54,12 +68,7 @@
 #define GPS_CHAR_UUID "BEB5483E-36E1-4688-B7F5-EA07361B26A8"
 #define IMU_CHAR_UUID "BEB5483F-36E1-4688-B7F5-EA07361B26A8"
 
-#define TFT_CS 15
-#define TFT_DC 2
-#define TFT_MOSI 19
-#define TFT_SCLK 18
-#define TFT_RST 4
-#define TFT_BL 5
+
 #define TFT_HOR_RES 172
 #define TFT_VER_RES 320
 

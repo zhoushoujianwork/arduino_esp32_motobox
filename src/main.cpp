@@ -29,9 +29,12 @@ BLEC bc;
 BLES bs;
 #endif
 
-
 BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE); // 电池电压 3.3V - 4.2V
-LED led(LED_PIN); // 假设LED连接在GPIO 8上
+LED led(LED_PIN);                                   // 假设LED连接在GPIO 8上
+
+// 在头部添加全局变量声明
+unsigned long lastGpsPublishTime = 0;
+unsigned long lastImuPublishTime = 0;
 
 void task0(void *parameter)
 {
@@ -41,20 +44,17 @@ void task0(void *parameter)
   while (true)
   {
     led.loop();
-    // 电池电压 当在 client 模式下，且蓝牙不连接的时候，记录电池电压
-    #ifdef MODE_CLIENT
+// 电池电压 当在 client 模式下，且蓝牙不连接的时候，记录电池电压
+#ifdef MODE_CLIENT
     if (!device.get_device_state()->bleConnected)
     {
       bat.loop();
     }
-    #else
+#else
     bat.loop();
-    #endif
+#endif
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-
-    gps.loop();
-    imu.loop();
 
     // 优化状态判断逻辑
     bool isConnected =
@@ -84,22 +84,31 @@ void task0(void *parameter)
     }
 #endif
 
-#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
-    tft_loop();
-#endif
-
     delay(10); // 保持原有延时
   }
 }
 
 void task1(void *parameter)
 {
+  
   while (true)
   {
-
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     wifiManager.loop();
     mqtt.loop();
+// mqtt数据发布，gps数据 1 秒一个，imu数据 500 毫秒一个
+    if (millis() - lastGpsPublishTime >= 1000)
+    {
+      mqtt.publishGPS(*device.get_gps_data());
+      lastGpsPublishTime = millis();
+    }
+    if (millis() - lastImuPublishTime >= 500)
+    {
+      mqtt.publishIMU(*device.get_imu_data());
+      lastImuPublishTime = millis();
+    }
+    
+    
 #endif
 
 #ifdef MODE_CLIENT
@@ -110,7 +119,8 @@ void task1(void *parameter)
     bs.loop();
 #endif
 
-    delay(10); 
+
+    delay(10);
   }
 }
 
@@ -150,17 +160,12 @@ void setup()
 
 void loop()
 {
-  // debug的信息
-  Serial.printf("free heap: %d\n", ESP.getFreeHeap());
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  gps.loop();
+  imu.loop();
+#endif
 
-  device.printImuData();
-
-  device.printGpsData();
-
-  device.print_device_info();
-
-  // 打印自己的电池电压信息
-  // bat.print_voltage();
-
-  delay(1000);
+#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+  tft_loop();
+#endif
 }
