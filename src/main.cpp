@@ -14,14 +14,24 @@
 
 Device device;
 
-IMU imu(IMU_SDA_PIN, IMU_SCL_PIN);
-GPS gps(GPS_RX_PIN, GPS_TX_PIN);
-BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE); // 电池电压 3.3V - 4.2V
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+
 BTN button(BTN_PIN);
-LED led(LED_PIN); // 假设LED连接在GPIO 8上
 MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
-BLES bs;
+#endif
+
+#ifdef MODE_CLIENT
 BLEC bc;
+#endif
+
+#ifdef MODE_SERVER
+BLES bs;
+#endif
+
+GPS gps(GPS_RX_PIN, GPS_TX_PIN);
+IMU imu(IMU_SDA_PIN, IMU_SCL_PIN);
+BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE); // 电池电压 3.3V - 4.2V
+LED led(LED_PIN); // 假设LED连接在GPIO 8上
 
 void task0(void *parameter)
 {
@@ -143,11 +153,14 @@ void loop()
   // debug的信息
   Serial.printf("free heap: %d\n", ESP.getFreeHeap());
 
-  imu.printImuData();
+  device.printImuData();
 
-  gps.printGpsData();
+  device.printGpsData();
 
   device.print_device_info();
+
+  // 打印自己的电池电压信息
+  bat.print_voltage();
 
   delay(1000);
 }

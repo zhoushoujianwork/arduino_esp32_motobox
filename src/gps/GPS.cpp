@@ -65,31 +65,31 @@ void GPS::loop()
             if (gps.location.isUpdated())
             {
                 newLocation = true;
-                gps_data.year = gps.date.year();
-                gps_data.month = gps.date.month();
-                gps_data.day = gps.date.day();
-                gps_data.hour = gps.time.hour();
-                gps_data.minute = gps.time.minute();
-                gps_data.second = gps.time.second();
-                gps_data.centisecond = gps.time.centisecond();
-                gps_data.latitude = gps.location.lat();
-                gps_data.longitude = gps.location.lng();
-                gps_data.altitude = gps.altitude.meters();
-                gps_data.speed = gps.speed.kmph();
-                gps_data.heading = gps.course.deg();
-                gps_data.satellites = gps.satellites.value();
+                device.get_gps_data()->year = gps.date.year();
+                device.get_gps_data()->month = gps.date.month();
+                device.get_gps_data()->day = gps.date.day();
+                device.get_gps_data()->hour = gps.time.hour();
+                device.get_gps_data()->minute = gps.time.minute();
+                device.get_gps_data()->second = gps.time.second();
+                device.get_gps_data()->centisecond = gps.time.centisecond();
+                device.get_gps_data()->latitude = gps.location.lat();
+                device.get_gps_data()->longitude = gps.location.lng();
+                device.get_gps_data()->altitude = gps.altitude.meters();
+                device.get_gps_data()->speed = gps.speed.kmph();
+                device.get_gps_data()->heading = gps.course.deg();
+                device.get_gps_data()->satellites = gps.satellites.value();
 
                 // 新增里程计算逻辑
                 if (lastUpdateTime != 0)
                 {
                     unsigned long currentTime = millis();
                     float deltaTimeH = (currentTime - lastUpdateTime) / 3600000.0; // 转换为小时
-                    totalDistanceKm += gps_data.speed * deltaTimeH;                // 距离 = 速度 × 时间
+                    totalDistanceKm += device.get_gps_data()->speed * deltaTimeH;                // 距离 = 速度 × 时间
                 }
                 lastUpdateTime = millis(); // 更新时间戳
             }
             // gps数量超过3颗星，则认为gpsReady为true
-            if (gps_data.satellites > 3)
+            if (device.get_gps_data()->satellites > 3)
                 device.set_gps_ready(true);
             else
                 device.set_gps_ready(false);
@@ -125,10 +125,6 @@ bool GPS::setGpsHz(int hz)
     return true;
 }
 
-int GPS::getGpsHz()
-{
-    return device.get_device_state()->gpsHz;
-}
 
 // 打印原始数据
 void GPS::printRawData()
@@ -138,78 +134,4 @@ void GPS::printRawData()
         char c = (char)gpsSerial.read();
         Serial.print(c);
     }
-}
-
-// 打印GPS数据
-void GPS::printGpsData()
-{
-    char timeStr[30];
-    sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d",
-            gps_data.year, gps_data.month, gps_data.day,
-            gps_data.hour, gps_data.minute, gps_data.second);
-
-    Serial.println("gps_data: " + String(timeStr) + ", " +
-                   String(gps_data.latitude) + ", " +
-                   String(gps_data.longitude) + ", " +
-                   String(gps_data.altitude) + ", " +
-                   String(gps_data.speed) + ", " +
-                   String(gps_data.heading) + ", " +
-                   String(gps_data.satellites));
-}
-gps_data_t *GPS::get_gps_data()
-{
-    return &gps_data;
-}
-
-void GPS::set_gps_data(gps_data_t *gps_data)
-{
-    this->gps_data = *gps_data;
-}
-
-float GPS::getTotalDistanceKm()
-{
-    return totalDistanceKm;
-}
-
-void GPS::resetGps()
-{
-    device.get_device_state()->gpsReady = false;
-    newLocation = false;
-    gps_data.year = 2025;
-    gps_data.month = 1;
-    gps_data.day = 22;
-    gps_data.hour = 15;
-    gps_data.minute = 41;
-    gps_data.second = 00;
-    gps_data.centisecond = 0;
-    gps_data.latitude = 39;
-    gps_data.longitude = 116;
-    gps_data.altitude = random(100);
-    gps_data.speed = random(300);     // 生成 0-299 的随机数
-    gps_data.heading = random(360);   // 生成 0-359 的随机数
-    gps_data.satellites = random(10); // 生成 0-9 的随机数
-    totalDistanceKm = 0.00;           // 重置里程
-    lastUpdateTime = 0;               // 重置时间戳
-}
-
-// 将gps_data_t结构体转换为JSON字符串
-String gps_data_to_json(gps_data_t gps_data)
-{
-    // 使用ArduinoJson库将gps_data转换为JSON字符串
-    StaticJsonDocument<200> doc;
-    doc["lat"] = gps_data.latitude;
-    doc["lon"] = gps_data.longitude;
-    doc["alt"] = gps_data.altitude;
-    doc["speed"] = gps_data.speed;
-    doc["satellites"] = gps_data.satellites;
-    doc["heading"] = gps_data.heading;
-    doc["year"] = gps_data.year;
-    doc["month"] = gps_data.month;
-    doc["day"] = gps_data.day;
-    doc["hour"] = gps_data.hour;
-    doc["minute"] = gps_data.minute;
-    doc["second"] = gps_data.second;
-    String jsonString;
-    serializeJson(doc, jsonString);
-    return jsonString;
 }

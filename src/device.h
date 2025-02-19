@@ -7,6 +7,48 @@
 
 typedef struct
 {
+    // 时间信息
+    uint16_t year;       // 年份
+    uint8_t month;       // 月份 (1-12)
+    uint8_t day;         // 日期 (1-31)
+    uint8_t hour;        // 小时 (0-23)
+    uint8_t minute;      // 分钟 (0-59)
+    uint8_t second;      // 秒钟 (0-59)
+    uint8_t centisecond; // 百分之一秒 (0-99)
+
+    // 位置信息
+    double latitude;  // 纬度 (-90°~90°)
+    double longitude; // 经度 (-180°~180°)
+    double altitude;  // 海拔高度，单位：米
+
+    // 运动信息
+    double speed;       // 速度，单位：千米/小时
+    double heading;     // 航向角，单位：度 (0°~360°)
+    uint8_t satellites; // 可见卫星数量
+} gps_data_t;
+
+typedef struct
+{
+    // 加速度计数据，单位：g
+    float accel_x; // X轴加速度
+    float accel_y; // Y轴加速度
+    float accel_z; // Z轴加速度
+
+    // 陀螺仪数据，单位：°/s
+    float gyro_x; // X轴角速度
+    float gyro_y; // Y轴角速度
+    float gyro_z; // Z轴角速度
+
+    // 姿态角，单位：度
+    float roll;  // 横滚角
+    float pitch; // 俯仰角
+    float yaw;   // 偏航角
+
+    float temperature; // 温度，单位：摄氏度
+} imu_data_t;
+
+typedef struct
+{
     int battery_voltage;
     int battery_percentage;
     bool mqttConnected;
@@ -15,8 +57,9 @@ typedef struct
     bool gpsReady;
     int gpsHz; // 0-10HZ
     bool imuReady;
+    gps_data_t gpsData;
+    imu_data_t imuData;
 } device_state_t;
-
 
 
 class Device
@@ -29,18 +72,31 @@ public:
     void set_ble_connected(bool connected);
     void set_gps_ready(bool ready);
     void set_imu_ready(bool ready);
-    bool get_mqtt_connected();
-    bool get_wifi_connected();
-    bool get_ble_connected();
     void print_device_info();
-    String device_state_to_json();
-
-    device_state_t *get_device_state();
     void set_device_state(device_state_t *state);
     String get_device_id();
+    String device_state_to_json();
+    
+    device_state_t *get_device_state();
+
+    // gps
+    gps_data_t *get_gps_data();
+    void set_gps_data(gps_data_t *data);
+    float getTotalDistanceKm();
+    String gps_data_to_json();
+    void printGpsData();
+
+    // imu
+    imu_data_t *get_imu_data();
+    void set_imu_data(imu_data_t *data);
+    String imu_data_to_json();
+    void printImuData();
 
 private:
     device_state_t device_state;
+    gps_data_t gps_data;
+    imu_data_t imu_data;
+    float totalDistanceKm;
 };
 
 extern Device device;

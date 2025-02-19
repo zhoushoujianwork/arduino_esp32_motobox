@@ -79,21 +79,6 @@ void Device::set_imu_ready(bool ready)
     }
 }
 
-bool Device::get_mqtt_connected()
-{
-    return device_state.mqttConnected;
-}
-
-bool Device::get_wifi_connected()
-{
-    return device_state.wifiConnected;
-}
-
-bool Device::get_ble_connected()
-{
-    return device_state.bleConnected;
-}
-
 device_state_t *Device::get_device_state()
 {
     return &device_state;
@@ -117,3 +102,86 @@ String Device::device_state_to_json()
     doc["batteryPercentage"] = device_state.battery_percentage;
     return doc.as<String>();
 }
+
+// 将gps_data_t结构体转换为JSON字符串
+String Device::gps_data_to_json()
+{
+    // 使用ArduinoJson库将gps_data转换为JSON字符串
+    StaticJsonDocument<200> doc;
+    doc["lat"] = gps_data.latitude;
+    doc["lon"] = gps_data.longitude;
+    doc["alt"] = gps_data.altitude;
+    doc["speed"] = gps_data.speed;
+    doc["satellites"] = gps_data.satellites;
+    doc["heading"] = gps_data.heading;
+    doc["year"] = gps_data.year;
+    doc["month"] = gps_data.month;
+    doc["day"] = gps_data.day;
+    doc["hour"] = gps_data.hour;
+    doc["minute"] = gps_data.minute;
+    doc["second"] = gps_data.second;
+    String jsonString;
+    serializeJson(doc, jsonString);
+    return jsonString;
+}
+
+// 将imu_data_t结构体转换为JSON字符串
+String Device::imu_data_to_json()
+{
+    // 使用ArduinoJson库将imu_data转换为JSON字符串
+    StaticJsonDocument<200> doc;
+    doc["roll"] = imu_data.roll;
+    doc["pitch"] = imu_data.pitch;
+    doc["yaw"] = imu_data.yaw;
+    doc["temperature"] = imu_data.temperature;
+    String jsonString;
+    serializeJson(doc, jsonString);
+    return jsonString;
+}
+
+void Device::printGpsData()
+{
+    char timeStr[30];
+    sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d",
+            gps_data.year, gps_data.month, gps_data.day,
+            gps_data.hour, gps_data.minute, gps_data.second);
+
+    Serial.println("gps_data: " + String(timeStr) + ", " +
+                   String(gps_data.latitude) + ", " +
+                   String(gps_data.longitude) + ", " +
+                   String(gps_data.altitude) + ", " +
+                   String(gps_data.speed) + ", " +
+                   String(gps_data.heading) + ", " +
+                   String(gps_data.satellites));
+}
+
+void Device::printImuData()
+{
+    Serial.println("imu_data: " + String(imu_data.roll) + ", " + String(imu_data.pitch) + ", " + String(imu_data.yaw) + ", " + String(imu_data.temperature));
+}
+
+float Device::getTotalDistanceKm()
+{
+    return totalDistanceKm;
+}
+
+gps_data_t *Device::get_gps_data()
+{
+    return &gps_data;
+}
+
+void Device::set_gps_data(gps_data_t *data)
+{
+    gps_data = *data;
+}
+
+imu_data_t *Device::get_imu_data()
+{
+    return &imu_data;
+}
+
+void Device::set_imu_data(imu_data_t *data)
+{
+    imu_data = *data;
+}
+

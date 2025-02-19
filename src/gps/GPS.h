@@ -79,27 +79,6 @@ $PCAS10,3*1F 出厂启动
 $PCAS12,60*28 接收机进入待机模式，持续 60 秒后自动开机
 */
 
-typedef struct
-{
-    // 时间信息
-    uint16_t year;       // 年份
-    uint8_t month;       // 月份 (1-12)
-    uint8_t day;         // 日期 (1-31)
-    uint8_t hour;        // 小时 (0-23)
-    uint8_t minute;      // 分钟 (0-59)
-    uint8_t second;      // 秒钟 (0-59)
-    uint8_t centisecond; // 百分之一秒 (0-99)
-
-    // 位置信息
-    double latitude;  // 纬度 (-90°~90°)
-    double longitude; // 经度 (-180°~180°)
-    double altitude;  // 海拔高度，单位：米
-
-    // 运动信息
-    double speed;       // 速度，单位：千米/小时
-    double heading;     // 航向角，单位：度 (0°~360°)
-    uint8_t satellites; // 可见卫星数量
-} gps_data_t;
 
 // 将gps_data_t结构体转换为JSON字符串
 String gps_data_to_json(gps_data_t gps_data);
@@ -111,20 +90,14 @@ public:
     void begin();
     void loop();
     bool setGpsHz(int hz);
-    int getGpsHz();
+
     void printRawData();
-    void printGpsData();
-    gps_data_t *get_gps_data();
-    void set_gps_data(gps_data_t *gps_data);
-    void resetGps();
     bool checkGpsResponse();
-    float getTotalDistanceKm();
 
 private:
     SoftwareSerial gpsSerial;
     TinyGPSPlus gps;
     bool newLocation;
-    gps_data_t gps_data;
     float totalDistanceKm = 0.00;
     unsigned long lastUpdateTime = 0; // 新增成员变量
 };

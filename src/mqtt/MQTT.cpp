@@ -31,7 +31,7 @@ bool MQTT::reconnect()
     // 增加MQTT连接超时时间
     mqttClient.setSocketTimeout(15); // 设置15秒超时
 
-    if (device.get_wifi_connected() && mqttClient.connect(device.get_device_id().c_str(), mqtt_user, mqtt_password))
+    if (device.get_device_state()->wifiConnected && mqttClient.connect(device.get_device_id().c_str(), mqtt_user, mqtt_password))
     {
         return true;
     }
@@ -47,7 +47,7 @@ bool MQTT::reconnect()
 
 void MQTT::loop()
 {
-    if (!device.get_wifi_connected())
+    if (!device.get_device_state()->wifiConnected)
     {
         Serial.println("WiFi未连接，MQTT连接失败");
         device.set_mqtt_connected(false);
@@ -81,7 +81,7 @@ void MQTT::publishGPS(gps_data_t gps_data)
 {
     if (WiFi.status() == WL_CONNECTED)
     {
-        if (!mqttClient.publish(mqtt_topic_gps.c_str(), gps_data_to_json(gps_data).c_str()))
+        if (!mqttClient.publish(mqtt_topic_gps.c_str(), device.gps_data_to_json().c_str()))
         {
             Serial.println("GPS数据发布失败");
         }
@@ -96,7 +96,7 @@ void MQTT::publishIMU(imu_data_t imu_data)
 {
     if (WiFi.status() == WL_CONNECTED)
     {
-        if (!mqttClient.publish(mqtt_topic_imu.c_str(), imu_data_to_json(imu_data).c_str()))
+        if (!mqttClient.publish(mqtt_topic_imu.c_str(), device.imu_data_to_json().c_str()))
         {
             Serial.println("IMU数据发布失败");
         }

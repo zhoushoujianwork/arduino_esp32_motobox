@@ -18,7 +18,7 @@ class GpsCharacteristicCallbacks : public NimBLECharacteristicCallbacks
 {
     void onRead(NimBLECharacteristic *pGPSCharacteristic)
     {
-        pGPSCharacteristic->setValue((uint8_t *)gps.get_gps_data(), sizeof(gps_data_t));
+        pGPSCharacteristic->setValue((uint8_t *)device.get_gps_data(), sizeof(gps_data_t));
     }
 };
 
@@ -26,7 +26,7 @@ class ImuCharacteristicCallbacks : public NimBLECharacteristicCallbacks
 {
     void onRead(NimBLECharacteristic *pIMUCharacteristic)
     {
-        pIMUCharacteristic->setValue((uint8_t *)imu.get_imu_data(), sizeof(imu_data_t));
+        pIMUCharacteristic->setValue((uint8_t *)device.get_imu_data(), sizeof(imu_data_t));
     }
 };
 

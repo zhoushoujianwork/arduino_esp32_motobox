@@ -343,7 +343,7 @@ void BLEC::loop()
             if (value.length() == sizeof(gps_data_t))
             {
                 gps_data_t *gpsData = (gps_data_t *)value.data();
-                gps.set_gps_data(gpsData);
+                device.set_gps_data(gpsData);
                 // print_gps_data();
             }
         }
@@ -353,7 +353,7 @@ void BLEC::loop()
             if (value.length() == sizeof(imu_data_t))
             {
                 imu_data_t *imuData = (imu_data_t *)value.data();
-                imu.set_imu_data(imuData);
+                device.set_imu_data(imuData);
                 // print_imu_data();
             }
         }

@@ -120,14 +120,14 @@ void IMU::loop()
     if (qmi.getDataReady())
     {
         device.get_device_state()->imuReady = true;
-        qmi.getAccelerometer(imu_data.accel_x, imu_data.accel_y, imu_data.accel_z);
+        qmi.getAccelerometer(device.get_imu_data()->accel_x, device.get_imu_data()->accel_y, device.get_imu_data()->accel_z);
 
         // 选择需要的旋转方式（取消注释其中一种）：
 
         // 1. 顺时针旋转90度（适用于传感器侧装）
-        float temp = imu_data.accel_x;
-        imu_data.accel_x = imu_data.accel_y;
-        imu_data.accel_y = -temp;
+        float temp = device.get_imu_data()->accel_x;
+        device.get_imu_data()->accel_x = device.get_imu_data()->accel_y;
+        device.get_imu_data()->accel_y = -temp;
 
         // 2. 逆时针旋转90度
         // float temp = imu_data.accel_x;
@@ -138,58 +138,17 @@ void IMU::loop()
         // imu_data.accel_x = -imu_data.accel_x;
         // imu_data.accel_y = -imu_data.accel_y;
 
-        qmi.getGyroscope(imu_data.gyro_x, imu_data.gyro_y, imu_data.gyro_z);
+        qmi.getGyroscope(device.get_imu_data()->gyro_x, device.get_imu_data()->gyro_y, device.get_imu_data()->gyro_z);
 
         // 使用加速度计计算姿态角
-        float roll_acc = atan2(imu_data.accel_y, imu_data.accel_z) * 180 / M_PI;
-        float pitch_acc = atan2(-imu_data.accel_x, sqrt(imu_data.accel_y * imu_data.accel_y + imu_data.accel_z * imu_data.accel_z)) * 180 / M_PI;
+        float roll_acc = atan2(device.get_imu_data()->accel_y, device.get_imu_data()->accel_z) * 180 / M_PI;
+        float pitch_acc = atan2(-device.get_imu_data()->accel_x, sqrt(device.get_imu_data()->accel_y * device.get_imu_data()->accel_y + device.get_imu_data()->accel_z * device.get_imu_data()->accel_z)) * 180 / M_PI;
 
         // 使用陀螺仪数据和互补滤波更新姿态角
 #define ALPHA 0.7
-        imu_data.roll = ALPHA * (imu_data.roll + imu_data.gyro_x * dt) + (1.0 - ALPHA) * roll_acc;
-        imu_data.pitch = ALPHA * (imu_data.pitch + imu_data.gyro_y * dt) + (1.0 - ALPHA) * pitch_acc;
+        device.get_imu_data()->roll = ALPHA * (device.get_imu_data()->roll + device.get_imu_data()->gyro_x * dt) + (1.0 - ALPHA) * roll_acc;
+        device.get_imu_data()->pitch = ALPHA * (device.get_imu_data()->pitch + device.get_imu_data()->gyro_y * dt) + (1.0 - ALPHA) * pitch_acc;
 
-        get_imu_data()->temperature = qmi.getTemperature_C();
+        device.get_imu_data()->temperature = qmi.getTemperature_C();
     }
-}
-
-float IMU::getRoll()
-{
-    return imu_data.roll;
-}
-
-float IMU::getPitch()
-{
-    return imu_data.pitch;
-}
-
-imu_data_t *IMU::get_imu_data()
-{
-    return &imu_data;
-}
-
-void IMU::set_imu_data(imu_data_t *imu_data)
-{
-    this->imu_data = *imu_data;
-}
-
-void IMU::printImuData()
-{
-    // Serial.println("imu_data: " + String(imu_data.accel_x) + ", " + String(imu_data.accel_y) + ", " + String(imu_data.accel_z) + ", " + String(imu_data.gyro_x) + ", " + String(imu_data.gyro_y) + ", " + String(imu_data.gyro_z) + ", " + String(imu_data.roll) + ", " + String(imu_data.pitch) + ", " + String(imu_data.yaw) + ", " + String(imu_data.temperature));
-    // 只打印 pitch 和 roll
-    Serial.println("imu_data: pitch: " + String(imu_data.pitch) + ", roll: " + String(imu_data.roll) + ", temperature: " + String(imu_data.temperature));
-}
-
-// 将imu_data_t结构体转换为JSON字符串
-String imu_data_to_json(imu_data_t imu_data)
-{
-    // 使用ArduinoJson库将imu_data转换为JSON字符串
-    StaticJsonDocument<200> doc;
-    doc["roll"] = imu_data.roll;
-    doc["pitch"] = imu_data.pitch;
-    doc["yaw"] = imu_data.yaw;
-    doc["temperature"] = imu_data.temperature;
-    String jsonString;
-    serializeJson(doc, jsonString);
-    return jsonString;
 }

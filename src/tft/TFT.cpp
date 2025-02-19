@@ -148,7 +148,7 @@ void tft_loop()
     delay(5);
 
     // Show Wifi
-    if (device.get_wifi_connected())
+    if (device.get_device_state()->wifiConnected)
     {
         lv_img_set_src(ui_imgWifi, &ui_img_wifiok_png);
     }
@@ -158,8 +158,8 @@ void tft_loop()
     }
 
     // 处理GPS无数据的情况
-    int currentSpeedValue = gps.get_gps_data()->speed;
-    if (gps.get_gps_data()->satellites > 0)
+    int currentSpeedValue = device.get_gps_data()->speed;
+    if (device.get_gps_data()->satellites > 0)
     {
         lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_COVER, 0); // 完全不透明
     }
@@ -171,18 +171,20 @@ void tft_loop()
 
     // Show Gps
     char gpsTextnu[4]; // 增加缓冲区大小以容纳两位数字和结束符
-    snprintf(gpsTextnu, sizeof(gpsTextnu), "%d", gps.get_gps_data()->satellites);
+    snprintf(gpsTextnu, sizeof(gpsTextnu), "%d", device.get_gps_data()->satellites);
     lv_label_set_text(ui_textGpsNu, gpsTextnu);
 
     char gpsTextHz[4]; // 增加缓冲区大小以容纳两位数字和结束符
-    snprintf(gpsTextHz, sizeof(gpsTextHz), "%d", gps.getGpsHz());
+    snprintf(gpsTextHz, sizeof(gpsTextHz), "%d", device.get_device_state()->gpsHz);
     lv_label_set_text(ui_textGpsHz, gpsTextHz);
 
     char gpsTextTime[20]; // 2024-09-05 10:00:00
-    snprintf(gpsTextTime, sizeof(gpsTextTime), "%04d-%02d-%02d %02d:%02d:%02d", gps.get_gps_data()->year, gps.get_gps_data()->month, gps.get_gps_data()->day, gps.get_gps_data()->hour, gps.get_gps_data()->minute, gps.get_gps_data()->second);
+    snprintf(gpsTextTime, sizeof(gpsTextTime), "%04d-%02d-%02d %02d:%02d:%02d", device.get_gps_data()->year, 
+    device.get_gps_data()->month, device.get_gps_data()->day, device.get_gps_data()->hour, 
+    device.get_gps_data()->minute, device.get_gps_data()->second);
     lv_label_set_text(ui_textTIme, gpsTextTime);
     char gpsTextLocation[20]; // 120'123456 / 21'654321
-    snprintf(gpsTextLocation, sizeof(gpsTextLocation), "%s / %s", String(gps.get_gps_data()->latitude, 6), String(gps.get_gps_data()->longitude, 6));
+    snprintf(gpsTextLocation, sizeof(gpsTextLocation), "%s / %s", String(device.get_gps_data()->latitude, 6), String(device.get_gps_data()->longitude, 6));
     lv_label_set_text(ui_textLocation, gpsTextLocation);
     lv_slider_set_value(ui_SliderSpeed, currentSpeedValue, LV_ANIM_OFF);
     lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
@@ -191,16 +193,16 @@ void tft_loop()
     float timeHours = 1.0 / 60.0;                  // 1 minute in hours
     float distanceKm = speedKmPerHour * timeHours; // Distance traveled in 1 minute
     char tripText[20];                             // Ensure this buffer is large enough for your number
-    snprintf(tripText, sizeof(tripText), "Trip:%.0f km", gps.getTotalDistanceKm());
+    snprintf(tripText, sizeof(tripText), "Trip:%.0f km", device.getTotalDistanceKm());
     lv_label_set_text(ui_textTrip, tripText);
 
     // 依据方向移动Compose
-    lv_obj_set_x(ui_compass, map(gps.get_gps_data()->heading, 0, 360, 150, -195));
+    lv_obj_set_x(ui_compass, map(device.get_gps_data()->heading, 0, 360, 150, -195));
     // Show battery level
     lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
     lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
     // Show Gyro
-    float gyro = imu.get_imu_data()->pitch;
+    float gyro = device.get_imu_data()->pitch;
     // float gyro = imu.get_imu_data()->roll;
     lv_slider_set_value(ui_SliderGyro, gyro, LV_ANIM_ON);
     lv_event_send(ui_SliderGyro, LV_EVENT_VALUE_CHANGED, NULL);
@@ -235,7 +237,7 @@ void tft_loop()
 
 
     // Show Ble ui_imgBle
-    if (device.get_mqtt_connected())
+    if (device.get_device_state()->bleConnected)
     {
         lv_img_set_src(ui_imgBle, &ui_img_bluetooth_1_png);
     }

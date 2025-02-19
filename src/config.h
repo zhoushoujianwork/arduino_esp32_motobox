@@ -10,8 +10,8 @@
 // 3. client模式，作为从机方式负责接收主机蓝牙发送过来的数据，并渲染到屏幕上；
 
 // #define MODE_ALLINONE
-#define MODE_SERVER
-// #define MODE_CLIENT
+// #define MODE_SERVER
+#define MODE_CLIENT
 
 #ifdef MODE_ALLINONE
 #define BTN_PIN 39
@@ -20,6 +20,7 @@
 #define BAT_MAX_VOLTAGE 3250
 #define IMU_SDA_PIN 33
 #define IMU_SCL_PIN 2
+#define LED_PIN 8
 
 #endif
 
@@ -32,10 +33,17 @@
 #define BAT_PIN 7
 #define BAT_MIN_VOLTAGE 2900
 #define BAT_MAX_VOLTAGE 3250
+// 添加LED配置
+#define LED_PIN 8
 #endif
 
 #ifdef MODE_CLIENT
 #define BLE_CLIENT // 启用客户端模式
+
+#define BAT_PIN 14
+#define BAT_MIN_VOLTAGE 2900
+#define BAT_MAX_VOLTAGE 3250
+#define LED_PIN 3
 #endif
 
 #define IMU_MAX_D 68 // 马奎斯 GP保持
@@ -55,6 +63,7 @@
 #define TFT_VER_RES 320
 
 #define UI_MAX_SPEED 199 // 单位 km/h
+#define LED_BLINK_INTERVAL 100
 
 // MQTT Configuration
 #define MQTT_SERVER "139.224.216.194"
@@ -68,15 +77,17 @@
 #define MQTT_TOPIC_IMU                                                         \
   String("vehicle/v1/") + device.get_device_id() + "/imu/gyro"
 
-// 添加LED配置
-#define LED_PIN 8
-#define LED_BLINK_INTERVAL 100
+
 
 // 添加GPS配置
 #define GPS_RX_PIN 12
 #define GPS_TX_PIN 11
 #define GPS_DEFAULT_BAUDRATE 9600
 #define GPS_UPDATE_INTERVAL 1000
+
+
+#define IMU_SDA_PIN -1
+#define IMU_SCL_PIN -1
 
 // 添加MQTT发布间隔配置
 #define MQTT_DEVICE_INFO_INTERVAL 5000
