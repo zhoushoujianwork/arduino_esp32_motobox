@@ -15,7 +15,8 @@
 Device device;
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-
+GPS gps(GPS_RX_PIN, GPS_TX_PIN);
+IMU imu(IMU_SDA_PIN, IMU_SCL_PIN);
 BTN button(BTN_PIN);
 MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
 #endif
@@ -28,8 +29,7 @@ BLEC bc;
 BLES bs;
 #endif
 
-GPS gps(GPS_RX_PIN, GPS_TX_PIN);
-IMU imu(IMU_SDA_PIN, IMU_SCL_PIN);
+
 BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE); // 电池电压 3.3V - 4.2V
 LED led(LED_PIN); // 假设LED连接在GPIO 8上
 
@@ -94,7 +94,6 @@ void task0(void *parameter)
 
 void task1(void *parameter)
 {
-  const TickType_t xDelay = 1000 / portTICK_PERIOD_MS; // 添加任务周期控制
   while (true)
   {
 
@@ -111,7 +110,7 @@ void task1(void *parameter)
     bs.loop();
 #endif
 
-    vTaskDelay(xDelay); // 重要！添加任务延时防止阻塞
+    delay(10); 
   }
 }
 

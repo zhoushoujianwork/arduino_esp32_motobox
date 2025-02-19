@@ -3,15 +3,17 @@
 
 void scanEndedCB(NimBLEScanResults results);
 
-NimBLEAdvertisedDevice *myDevice;
-NimBLERemoteCharacteristic *pRemoteCharacteristic;
-NimBLERemoteCharacteristic *pRemoteIMUCharacteristic;
-NimBLERemoteCharacteristic *pRemoteGPSCharacteristic;
+static NimBLEAdvertisedDevice *myDevice;
+static NimBLERemoteCharacteristic *pRemoteCharacteristic;
+static NimBLERemoteCharacteristic *pRemoteIMUCharacteristic;
+static NimBLERemoteCharacteristic *pRemoteGPSCharacteristic;
 
-bool doConnect = false;
-bool connected = false;
-bool doScan = false;
-uint32_t scanTime = 0;
+static bool doConnect = false;
+static bool connected = false;
+static boolean doScan = false;
+
+static uint32_t scanTime = 0; /** 0 = scan forever */
+
 
 /** Define a class to handle the callbacks when advertisments are received */
 class AdvertisedDeviceCallbacks : public NimBLEAdvertisedDeviceCallbacks
@@ -257,10 +259,6 @@ bool connectToServer()
 
 BLEC::BLEC()
 {
-    myDevice = nullptr;
-    pRemoteCharacteristic = nullptr;
-    pRemoteIMUCharacteristic = nullptr;
-    pRemoteGPSCharacteristic = nullptr;
     connected = false;
     doConnect = false;
     doScan = false;
@@ -341,10 +339,11 @@ void BLEC::loop()
         }
     }
 
+    Serial.printf("connected: %d\n", connected);
     if (connected)
     {
         // 添加额外的空指针检查
-        if (pRemoteGPSCharacteristic != nullptr && pRemoteGPSCharacteristic->canRead())
+        if (pRemoteGPSCharacteristic->canRead())
         {
             try {
                 std::string value = pRemoteGPSCharacteristic->readValue();
@@ -359,7 +358,7 @@ void BLEC::loop()
             }
         }
 
-        if (pRemoteIMUCharacteristic != nullptr && pRemoteIMUCharacteristic->canRead())
+        if (pRemoteIMUCharacteristic->canRead())
         {
             try {
                 std::string value = pRemoteIMUCharacteristic->readValue();
@@ -368,6 +367,10 @@ void BLEC::loop()
                     imu_data_t imuData;
                     memcpy(&imuData, value.data(), sizeof(imu_data_t));
                     device.set_imu_data(&imuData);
+                }
+                else
+                {
+                    Serial.printf("IMU data length error: %d\n", value.length());
                 }
             } catch (const std::exception& e) {
                 Serial.printf("Error reading IMU characteristic: %s\n", e.what());

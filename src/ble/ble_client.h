@@ -13,12 +13,6 @@ public:
     void setup();
     void loop();
 
-private:
-    NimBLEAdvertisedDevice *myDevice;
-    NimBLERemoteCharacteristic *pRemoteCharacteristic;
-    NimBLERemoteCharacteristic *pRemoteIMUCharacteristic;
-    NimBLERemoteCharacteristic *pRemoteGPSCharacteristic;
-    uint32_t scanTime;
 };
 
 #endif

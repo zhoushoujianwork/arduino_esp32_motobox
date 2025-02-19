@@ -2,6 +2,7 @@
 #define CONFIG_H
 #define VERSION "2.0.0"
 
+
 // 设置服务运行模式，目前支持 3 种配置
 // 1. allinOne的方式，不需要用到蓝牙，直接自己采集数据渲染到屏幕；
 // 2.
@@ -10,8 +11,8 @@
 // 3. client模式，作为从机方式负责接收主机蓝牙发送过来的数据，并渲染到屏幕上；
 
 // #define MODE_ALLINONE
-#define MODE_SERVER
-// #define MODE_CLIENT
+// #define MODE_SERVER
+#define MODE_CLIENT
 
 #ifdef MODE_ALLINONE
 #define BTN_PIN 39
@@ -86,8 +87,6 @@
 #define GPS_UPDATE_INTERVAL 1000
 
 
-#define IMU_SDA_PIN -1
-#define IMU_SCL_PIN -1
 
 // 添加MQTT发布间隔配置
 #define MQTT_DEVICE_INFO_INTERVAL 5000
