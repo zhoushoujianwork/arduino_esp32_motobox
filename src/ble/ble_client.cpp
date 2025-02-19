@@ -37,6 +37,11 @@ class AdvertisedDeviceCallbacks : public NimBLEAdvertisedDeviceCallbacks
 /** Notification / Indication receiving handler callback */
 void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify)
 {
+    if (pRemoteCharacteristic == nullptr || pData == nullptr) {
+        Serial.println("Invalid notification data or characteristic");
+        return;
+    }
+
     // 获取特征值的UUID并转换为大写
     std::string charUUID = pRemoteCharacteristic->getUUID().toString();
     // 转换为大写
@@ -48,8 +53,10 @@ void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData,
         // 确保数据长度正确
         if (length == sizeof(device_state_t))
         {
-            device_state_t *deviceState = (device_state_t *)pData;
-            device.set_device_state(deviceState);
+            // 使用安全的内存拷贝
+            device_state_t deviceState;
+            memcpy(&deviceState, pData, sizeof(device_state_t));
+            device.set_device_state(&deviceState);
             device.print_device_info();
         }
     }
@@ -336,25 +343,34 @@ void BLEC::loop()
 
     if (connected)
     {
-        // Serial.println("Already connected, do something");
-        if (pRemoteGPSCharacteristic->canRead())
+        // 添加额外的空指针检查
+        if (pRemoteGPSCharacteristic != nullptr && pRemoteGPSCharacteristic->canRead())
         {
-            std::string value = pRemoteGPSCharacteristic->readValue();
-            if (value.length() == sizeof(gps_data_t))
-            {
-                gps_data_t *gpsData = (gps_data_t *)value.data();
-                device.set_gps_data(gpsData);
-                // print_gps_data();
+            try {
+                std::string value = pRemoteGPSCharacteristic->readValue();
+                if (value.length() == sizeof(gps_data_t))
+                {
+                    gps_data_t gpsData;
+                    memcpy(&gpsData, value.data(), sizeof(gps_data_t));
+                    device.set_gps_data(&gpsData);
+                }
+            } catch (const std::exception& e) {
+                Serial.printf("Error reading GPS characteristic: %s\n", e.what());
             }
         }
-        if (pRemoteIMUCharacteristic->canRead())
+
+        if (pRemoteIMUCharacteristic != nullptr && pRemoteIMUCharacteristic->canRead())
         {
-            std::string value = pRemoteIMUCharacteristic->readValue();
-            if (value.length() == sizeof(imu_data_t))
-            {
-                imu_data_t *imuData = (imu_data_t *)value.data();
-                device.set_imu_data(imuData);
-                // print_imu_data();
+            try {
+                std::string value = pRemoteIMUCharacteristic->readValue();
+                if (value.length() == sizeof(imu_data_t))
+                {
+                    imu_data_t imuData;
+                    memcpy(&imuData, value.data(), sizeof(imu_data_t));
+                    device.set_imu_data(&imuData);
+                }
+            } catch (const std::exception& e) {
+                Serial.printf("Error reading IMU characteristic: %s\n", e.what());
             }
         }
         doConnect = false;

@@ -58,7 +58,7 @@ void task0(void *parameter)
 
     // 优化状态判断逻辑
     bool isConnected =
-        device.get_mqtt_connected() && device.get_wifi_connected();
+        device.get_device_state()->mqttConnected && device.get_device_state()->wifiConnected;
     led.setMode(isConnected ? LED::BLINK_DUAL : LED::OFF);
 
     // 检查点击
@@ -161,7 +161,7 @@ void loop()
   device.print_device_info();
 
   // 打印自己的电池电压信息
-  bat.print_voltage();
+  // bat.print_voltage();
 
   delay(1000);
 }
