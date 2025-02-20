@@ -164,11 +164,6 @@ void Device::printImuData()
     Serial.println("imu_data: " + String(imu_data.roll) + ", " + String(imu_data.pitch) + ", " + String(imu_data.yaw) + ", " + String(imu_data.temperature));
 }
 
-float Device::getTotalDistanceKm()
-{
-    return totalDistanceKm;
-}
-
 gps_data_t *Device::get_gps_data()
 {
     return &gps_data;
@@ -188,4 +183,39 @@ void Device::set_imu_data(imu_data_t *data)
 {
     imu_data = *data;
 }
+
+// getTotalDistanceKm
+float Device::getTotalDistanceKm() {
+    // 获取当前GPS数据
+    gps_data_t* currentGpsData = get_gps_data();
+    
+    // 如果没有有效的GPS数据或卫星数量不足，返回当前累积距离
+    if (currentGpsData->satellites < 3) {
+        return totalDistanceKm;
+    }
+
+    // 获取当前时间
+    unsigned long currentTime = millis();
+
+    // 如果是第一次计算，初始化lastDistanceTime
+    if (lastDistanceTime == 0) {
+        lastDistanceTime = currentTime;
+        return totalDistanceKm;
+    }
+
+    // 计算时间间隔（秒）
+    float timeInterval = (currentTime - lastDistanceTime) / 1000.0;
+
+    // 计算距离增量
+    float distanceIncrement = (currentGpsData->speed / 3600.0) * timeInterval;
+
+    // 累加距离
+    totalDistanceKm += distanceIncrement;
+
+    // 更新最后计算时间
+    lastDistanceTime = currentTime;
+
+    return totalDistanceKm;
+}
+
 

@@ -98,8 +98,6 @@ private:
     SoftwareSerial gpsSerial;
     TinyGPSPlus gps;
     bool newLocation;
-    float totalDistanceKm = 0.00;
-    unsigned long lastUpdateTime = 0; // 新增成员变量
 };
 
 extern GPS gps;

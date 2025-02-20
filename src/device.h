@@ -97,6 +97,7 @@ private:
     gps_data_t gps_data;
     imu_data_t imu_data;
     float totalDistanceKm;
+    long lastDistanceTime;
 };
 
 extern Device device;

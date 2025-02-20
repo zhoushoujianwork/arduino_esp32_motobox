@@ -78,15 +78,6 @@ void GPS::loop()
                 device.get_gps_data()->speed = gps.speed.kmph();
                 device.get_gps_data()->heading = gps.course.deg();
                 device.get_gps_data()->satellites = gps.satellites.value();
-
-                // 新增里程计算逻辑
-                if (lastUpdateTime != 0)
-                {
-                    unsigned long currentTime = millis();
-                    float deltaTimeH = (currentTime - lastUpdateTime) / 3600000.0; // 转换为小时
-                    totalDistanceKm += device.get_gps_data()->speed * deltaTimeH;                // 距离 = 速度 × 时间
-                }
-                lastUpdateTime = millis(); // 更新时间戳
             }
             // gps数量超过3颗星，则认为gpsReady为true
             if (device.get_gps_data()->satellites > 3)

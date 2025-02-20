@@ -170,5 +170,8 @@ void setup()
 void loop()
 {
   // device.printImuData();
-  delay(10);
+  // delay(10);
+  
+  device.printGpsData();
+  delay(500);
 }
