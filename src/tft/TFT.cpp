@@ -176,17 +176,7 @@ void tft_loop()
             lv_img_set_src(ui_imgWifi, &ui_img_wificon_png);
         }
 
-        // 处理GPS无数据的情况
-        int currentSpeedValue = device.get_gps_data()->speed;
-        if (device.get_gps_data()->satellites > 0)
-        {
-            lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_COVER, 0); // 完全不透明
-        }
-        else
-        {
-            currentSpeedValue = 0;
-            lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_TRANSP, 0); // 完全透明
-        }
+        
 
         // Show Gps
         char gpsTextnu[4]; // 增加缓冲区大小以容纳两位数字和结束符
@@ -205,17 +195,25 @@ void tft_loop()
         char gpsTextLocation[20]; // 120'123456 / 21'654321
         snprintf(gpsTextLocation, sizeof(gpsTextLocation), "%s / %s", String(device.get_gps_data()->latitude, 6), String(device.get_gps_data()->longitude, 6));
         lv_label_set_text(ui_textLocation, gpsTextLocation);
+
+        // 处理GPS无数据的情况
+        int currentSpeedValue = device.get_gps_data()->speed;
+        if (device.get_device_state()->gpsReady)
+        {
+            lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_COVER, 0); // 完全不透明
+        }
+        else
+        {
+            currentSpeedValue = 0;
+            lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_TRANSP, 0); // 完全透明
+        }
         lv_slider_set_value(ui_SliderSpeed, currentSpeedValue, LV_ANIM_OFF);
         lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
-        // Assuming the speed is in km/h
-        float speedKmPerHour = currentSpeedValue;      // currentValue is the speed from the slider
-        float timeHours = 1.0 / 60.0;                  // 1 minute in hours
-        float distanceKm = speedKmPerHour * timeHours; // Distance traveled in 1 minute
         char tripText[20];                             // Ensure this buffer is large enough for your number
         snprintf(tripText, sizeof(tripText), "Trip:%.0f km", device.getTotalDistanceKm());
         lv_label_set_text(ui_textTrip, tripText);
 
-        // 依据方向移动Compose
+        // 依据方向移动Compose TODO: 优化这块图片准确性
         lv_obj_set_x(ui_compass, map(device.get_gps_data()->heading, 0, 360, 150, -195));
 
         lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
