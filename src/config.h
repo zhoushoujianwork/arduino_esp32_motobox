@@ -76,7 +76,7 @@
 #define LED_BLINK_INTERVAL 100
 
 // MQTT Configuration
-#define MQTT_SERVER "139.224.216.194"
+#define MQTT_SERVER "mq-hub.daboluo.cc"
 #define MQTT_PORT 1883
 #define MQTT_USER ""
 #define MQTT_PASSWORD ""

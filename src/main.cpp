@@ -119,7 +119,6 @@ void task1(void *parameter)
     bs.loop();
 #endif
 
-
     delay(10);
   }
 }
