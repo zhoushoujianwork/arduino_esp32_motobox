@@ -145,7 +145,6 @@ void tft_loop()
 {
 
     lv_timer_handler(); // let the GUI do its work
-    delay(5);
 
     // Show battery level
     // 如果蓝牙没有连接则显示自己的电池电量！

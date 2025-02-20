@@ -35,6 +35,7 @@ LED led(LED_PIN);                                   // 假设LED连接在GPIO 8�
 // 在头部添加全局变量声明
 unsigned long lastGpsPublishTime = 0;
 unsigned long lastImuPublishTime = 0;
+unsigned long lastBlePublishTime = 0;
 
 void task0(void *parameter)
 {
@@ -55,7 +56,7 @@ void task0(void *parameter)
 #endif
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-
+    wifiManager.loop();
     // 优化状态判断逻辑
     bool isConnected =
         device.get_device_state()->mqttConnected && device.get_device_state()->wifiConnected;
@@ -84,19 +85,20 @@ void task0(void *parameter)
     }
 #endif
 
-    delay(10); // 保持原有延时
+    delay(5);
   }
 }
 
 void task1(void *parameter)
 {
-  
+
   while (true)
   {
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    wifiManager.loop();
+    gps.loop();
+    imu.loop();
     mqtt.loop();
-// mqtt数据发布，gps数据 1 秒一个，imu数据 500 毫秒一个
+    // mqtt数据发布，gps数据 1 秒一个，imu数据 500 毫秒一个
     if (millis() - lastGpsPublishTime >= 1000)
     {
       mqtt.publishGPS(*device.get_gps_data());
@@ -107,19 +109,27 @@ void task1(void *parameter)
       mqtt.publishIMU(*device.get_imu_data());
       lastImuPublishTime = millis();
     }
-    
-    
+
 #endif
 
 #ifdef MODE_CLIENT
     bc.loop();
 #endif
 
-#ifdef MODE_SERVER
-    bs.loop();
+#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+    tft_loop();
 #endif
 
-    delay(10);
+#ifdef MODE_SERVER
+    // 3000ms 执行一次
+    if (millis() - lastBlePublishTime >= 3000)  
+    {
+      bs.loop();
+      lastBlePublishTime = millis();
+    }
+#endif
+
+    delay(5);
   }
 }
 
@@ -159,12 +169,6 @@ void setup()
 
 void loop()
 {
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-  gps.loop();
-  imu.loop();
-#endif
-
-#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
-  tft_loop();
-#endif
+  // device.printImuData();
+  delay(10);
 }
