@@ -2,7 +2,7 @@
 
 ## 项目简介
 
-MotoBox 是一个基于 ESP32-S3 的多功能车载信息系统，提供实时 GPS 定位、IMU 数据采集、蓝牙通信和 MQTT 数据传输等功能。
+MotoBox（大菠萝车机） 是一个基于 ESP32-S3 的多功能车载信息系统，提供实时 GPS 定位、IMU 数据采集、蓝牙通信和 MQTT 数据传输等功能。
 
 ## 硬件配置
 
@@ -46,6 +46,8 @@ MotoBox 是一个基于 ESP32-S3 的多功能车载信息系统，提供实时 G
 3. `MODE_CLIENT`：从机模式，接收蓝牙数据并渲染
 
 ### MQTT 配置
+
+Server 端数据上传后可以在网站登录绑定设备 ID 后查看信息；网址：https://daboluo.cc/
 
 - 服务器：mq-hub.daboluo.cc
 - 端口：1883
