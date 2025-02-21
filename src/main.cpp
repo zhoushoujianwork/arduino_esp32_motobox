@@ -132,8 +132,8 @@ void task1(void *parameter)
 #endif
 
 #ifdef MODE_SERVER
-    // 3000ms 执行一次
-    if (millis() - lastBlePublishTime >= 3000)  
+    // 1000ms 执行一次 主动广播
+    if (millis() - lastBlePublishTime >= 1000)  
     {
       bs.loop();
       lastBlePublishTime = millis();
