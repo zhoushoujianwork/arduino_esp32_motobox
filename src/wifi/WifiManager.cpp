@@ -57,59 +57,61 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
     if (ssid.isEmpty())
     {
         Serial.println("未找到已保存的WiFi配置");
-        Serial.println("进入配置模式");
         enterConfigMode();
         return false;
     }
 
-    // 确保WiFi模式正确
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect(true);
-    delay(100);
+    // 增加WiFi连接的健壮性
+    WiFi.disconnect(true);  // 确保断开之前的连接
+    delay(200);  // 短暂延迟
 
-    // 设置WiFi事件处理
-    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info)
-                 {
-        switch(event) {
-            case SYSTEM_EVENT_STA_DISCONNECTED:
-                // Serial.println("WiFi连接断开");
-                WiFi.disconnect(true);
-                device.get_device_state()->wifiConnected = false;
-                break;
-            case SYSTEM_EVENT_STA_GOT_IP:
-                Serial.printf("获取到IP地址: %s\n", WiFi.localIP().toString().c_str());
-                device.get_device_state()->wifiConnected = true;
-                break;
-            default:
-                break;
-        } });
+    WiFi.mode(WIFI_STA);  // 设置为站点模式
+    WiFi.setAutoReconnect(true);  // 启用自动重连
+    
+    // 配置更长的连接超时
+    WiFi.waitForConnectResult(15000);  // 15秒超时
 
-    device.set_wifi_connected(false);
-    // 开始连接
+    Serial.println("开始连接WiFi...");
     WiFi.begin(ssid.c_str(), password.c_str());
 
-    // 等待连接
-    unsigned long startTime = millis();
-    while (WiFi.status() != WL_CONNECTED)
+    unsigned long startAttemptTime = millis();
+    
+    // 使用更复杂的连接等待逻辑
+    while (WiFi.status() != WL_CONNECTED) 
     {
-        if (millis() - startTime > CONNECT_TIMEOUT_MS)
-        {
-            Serial.println("WiFi连接超时");
+        if (millis() - startAttemptTime > 20000) {  // 20秒总超时
+            Serial.println("WiFi连接失败");
             WiFi.disconnect(true);
             return false;
         }
-        delay(100); // 减少延时时间
-        Serial.print(".");
+
+        // 打印连接状态
+        switch(WiFi.status()) {
+            case WL_DISCONNECTED:
+                Serial.print(".");
+                break;
+            case WL_CONNECT_FAILED:
+                Serial.println("\n连接失败，可能是密码错误");
+                WiFi.disconnect(true);
+                return false;
+            case WL_NO_SSID_AVAIL:
+                Serial.println("\n未找到指定的WiFi网络");
+                return false;
+        }
+
+        delay(500);  // 减少CPU负载
     }
 
+    Serial.printf("\nWiFi连接成功，IP地址: %s\n", WiFi.localIP().toString().c_str());
+    
     // 验证互联网连接
-    while (!checkInternetConnection())
-    {
-        Serial.println("无法访问互联网,5秒后重试...");
-        delay(5000);
+    if (!checkInternetConnection()) {
+        Serial.println("互联网连接验证失败");
+        WiFi.disconnect(true);
+        return false;
     }
-    device.set_wifi_connected(true);
 
+    device.set_wifi_connected(true);
     return true;
 }
 
