@@ -157,6 +157,8 @@ void setup()
   gps.begin();
   imu.begin();
   wifiManager.begin();
+
+  xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 0, NULL);
 #endif
 
 #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
@@ -171,10 +173,10 @@ void setup()
   bc.setup();
 #endif
 
-  // esp双核任务
+// esp双核任务
   xTaskCreate(task0, "Task0", 1024 * 10, NULL, 0, NULL);
   xTaskCreate(task1, "Task1", 1024 * 10, NULL, 1, NULL);
-  xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 0, NULL);
+  
   
   Serial.println("main setup end");
 }
