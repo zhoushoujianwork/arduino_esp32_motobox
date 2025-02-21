@@ -37,6 +37,17 @@ unsigned long lastGpsPublishTime = 0;
 unsigned long lastImuPublishTime = 0;
 unsigned long lastBlePublishTime = 0;
 
+void taskWifi(void *parameter)
+{
+  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    while (true)
+    {
+      wifiManager.loop();
+      delay(5);
+    }
+  #endif
+}
+
 void task0(void *parameter)
 {
   static int hzs[] = {1, 2, 5, 10};
@@ -56,7 +67,6 @@ void task0(void *parameter)
 #endif
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    wifiManager.loop();
     // 优化状态判断逻辑
     bool isConnected =
         device.get_device_state()->mqttConnected && device.get_device_state()->wifiConnected;
@@ -65,6 +75,7 @@ void task0(void *parameter)
     // 检查点击
     if (button.isClicked())
     {
+      Serial.println("检测到点击");
       hz = (hz + 1) % 4;
       delay(100); // 保持短暂延时确保任务挂起
       gps.setGpsHz(hzs[hz]);
@@ -163,7 +174,8 @@ void setup()
   // esp双核任务
   xTaskCreate(task0, "Task0", 1024 * 10, NULL, 0, NULL);
   xTaskCreate(task1, "Task1", 1024 * 10, NULL, 1, NULL);
-
+  xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 0, NULL);
+  
   Serial.println("main setup end");
 }
 
@@ -172,6 +184,6 @@ void loop()
   // device.printImuData();
   // delay(10);
   
-  device.printGpsData();
+  // device.printGpsData();
   delay(500);
 }

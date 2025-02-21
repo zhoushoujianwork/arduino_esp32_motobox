@@ -21,6 +21,7 @@ void WiFiConfigManager::begin()
     Serial.println("配置存储初始化成功");
 }
 
+// 阻塞的
 void WiFiConfigManager::loop()
 {
     if (isConfigMode)

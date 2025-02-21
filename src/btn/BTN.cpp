@@ -5,6 +5,7 @@ BTN::BTN(int pin)
 {
     this->pin = pin;
     pinMode(pin, INPUT_PULLUP); // 设置为上拉输入模式
+    currentState = digitalRead(pin); // 初始化 currentState
 }
 
 bool BTN::isPressed()
@@ -19,47 +20,37 @@ bool BTN::isReleased()
 
 bool BTN::isClicked()
 {
-    static unsigned long lastPressTime = 0;
-    static bool lastState = true;
-    bool currentState = digitalRead(pin);
+    static bool lastState = HIGH;
+    bool reading = digitalRead(pin);
 
-    if (lastState && !currentState)
-    { // 按下瞬间
-        lastPressTime = millis();
+    // 检测从高到低的瞬间变化（按下）
+    if (lastState == HIGH && reading == LOW)
+    {
+        lastState = reading;
+        return true;
     }
-    else if (!lastState && currentState)
-    { // 释放瞬间
-        if (millis() - lastPressTime < LONG_PRESS_TIME)
-        {
-            lastState = currentState;
-            return true;
-        }
-    }
-    lastState = currentState;
+
+    lastState = reading;
     return false;
 }
 
 bool BTN::isLongPressed()
 {
-    static unsigned long pressStartTime = 0;
-    static bool longPressDetected = false;
-
     if (isPressed())
     {
         if (pressStartTime == 0)
         {
             pressStartTime = millis();
         }
-        if (!longPressDetected && (millis() - pressStartTime >= LONG_PRESS_TIME))
+
+        if (millis() - pressStartTime >= LONG_PRESS_TIME)
         {
-            longPressDetected = true;
             return true;
         }
     }
     else
     {
         pressStartTime = 0;
-        longPressDetected = false;
     }
     return false;
 }
@@ -68,7 +59,6 @@ void BTN::loop()
 {
     static unsigned long lastDebounceTime = 0;
     static bool lastButtonState = HIGH;
-    static unsigned long pressStartTime = 0;
 
     bool reading = digitalRead(pin);
 
@@ -82,11 +72,6 @@ void BTN::loop()
         if (reading != currentState)
         {
             currentState = reading;
-
-            if (currentState == LOW)
-            { // 按下
-                pressStartTime = millis();
-            }
         }
     }
 
