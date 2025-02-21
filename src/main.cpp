@@ -48,6 +48,20 @@ void taskWifi(void *parameter)
   #endif
 }
 
+// gps task 句柄
+TaskHandle_t gpsTaskHandle = NULL;
+void taskGps(void *parameter)
+{
+  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    while (true)
+    {
+      // gps.loop();
+      gps.printRawData();
+      delay(5);
+    }
+  #endif
+}
+
 void task0(void *parameter)
 {
   static int hzs[] = {1, 2, 5, 10};
@@ -77,10 +91,13 @@ void task0(void *parameter)
     {
       Serial.println("检测到点击");
       hz = (hz + 1) % 4;
-      delay(100); // 保持短暂延时确保任务挂起
+      // 挂起gps task
+      vTaskSuspend(gpsTaskHandle);
       gps.setGpsHz(hzs[hz]);
       Serial.printf("设置GPS更新率为%dHz\n", hzs[hz]);
       device.get_device_state()->gpsHz = hzs[hz];
+      // 恢复gps task
+      vTaskResume(gpsTaskHandle);
     }
 
     // 检查长按重置
@@ -106,7 +123,6 @@ void task1(void *parameter)
   while (true)
   {
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    gps.loop();
     imu.loop();
     mqtt.loop();
     // mqtt数据发布，gps数据 1 秒一个，imu数据 500 毫秒一个
@@ -159,6 +175,7 @@ void setup()
   wifiManager.begin();
 
   xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 0, NULL);
+  xTaskCreate(taskGps, "TaskGps", 1024 * 10, NULL, 1, &gpsTaskHandle);
 #endif
 
 #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
