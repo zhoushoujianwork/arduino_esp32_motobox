@@ -90,11 +90,16 @@ public:
     void begin();
     void loop();
     bool setGpsHz(int hz);
-
+    // 打印原始数据
     void printRawData();
+    // 检查GPS响应
     bool checkGpsResponse();
+    // 打印GPS响应
+    void printGpsResponse(const char* context);
 
 private:
+
+    bool setGpsBaudRate(int baudRate);
     SoftwareSerial gpsSerial;
     TinyGPSPlus gps;
     bool newLocation;

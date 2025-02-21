@@ -39,27 +39,26 @@ unsigned long lastBlePublishTime = 0;
 
 void taskWifi(void *parameter)
 {
-  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    while (true)
-    {
-      wifiManager.loop();
-      delay(5);
-    }
-  #endif
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  while (true)
+  {
+    wifiManager.loop();
+    delay(5);
+  }
+#endif
 }
 
 // gps task 句柄
-TaskHandle_t gpsTaskHandle = NULL;
 void taskGps(void *parameter)
 {
-  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    while (true)
-    {
-      // gps.loop();
-      gps.printRawData();
-      delay(5);
-    }
-  #endif
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  while (true)
+  {
+    gps.loop();
+    // gps.printRawData();
+    delay(5);
+  }
+#endif
 }
 
 void task0(void *parameter)
@@ -91,13 +90,18 @@ void task0(void *parameter)
     {
       Serial.println("检测到点击");
       hz = (hz + 1) % 4;
-      // 挂起gps task
-      vTaskSuspend(gpsTaskHandle);
-      gps.setGpsHz(hzs[hz]);
-      Serial.printf("设置GPS更新率为%dHz\n", hzs[hz]);
-      device.get_device_state()->gpsHz = hzs[hz];
+      // vTaskSuspend(gpsTaskHandle);
+      delay(1000); // 等待1秒, 确保挂起成功
+      if (gps.setGpsHz(hzs[hz]))
+      {
+        Serial.printf("设置GPS更新率为%dHz\n", hzs[hz]);
+      }
+      else
+      {
+        Serial.println("设置GPS更新率失败");
+      }
       // 恢复gps task
-      vTaskResume(gpsTaskHandle);
+      // vTaskResume(gpsTaskHandle);
     }
 
     // 检查长按重置
@@ -130,6 +134,12 @@ void task1(void *parameter)
     {
       mqtt.publishGPS(*device.get_gps_data());
       lastGpsPublishTime = millis();
+      // device.print_device_info();
+      // gps数量超过3颗星，则认为gpsReady为true
+      if (device.get_gps_data()->satellites > 3)
+        device.set_gps_ready(true);
+      else
+        device.set_gps_ready(false);
     }
     if (millis() - lastImuPublishTime >= 500)
     {
@@ -149,7 +159,7 @@ void task1(void *parameter)
 
 #ifdef MODE_SERVER
     // 1000ms 执行一次 主动广播
-    if (millis() - lastBlePublishTime >= 1000)  
+    if (millis() - lastBlePublishTime >= 1000)
     {
       bs.loop();
       lastBlePublishTime = millis();
@@ -175,7 +185,7 @@ void setup()
   wifiManager.begin();
 
   xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 0, NULL);
-  xTaskCreate(taskGps, "TaskGps", 1024 * 10, NULL, 1, &gpsTaskHandle);
+  xTaskCreate(taskGps, "TaskGps", 1024 * 10, NULL, 1, NULL);
 #endif
 
 #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
@@ -190,11 +200,10 @@ void setup()
   bc.setup();
 #endif
 
-// esp双核任务
+  // esp双核任务
   xTaskCreate(task0, "Task0", 1024 * 10, NULL, 0, NULL);
   xTaskCreate(task1, "Task1", 1024 * 10, NULL, 1, NULL);
-  
-  
+
   Serial.println("main setup end");
 }
 
@@ -202,7 +211,7 @@ void loop()
 {
   // device.printImuData();
   // delay(10);
-  
+
   // device.printGpsData();
   delay(500);
 }
