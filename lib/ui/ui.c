@@ -19,7 +19,7 @@ lv_obj_t *ui_ContainerDIr;
 lv_obj_t *ui_compass;
 lv_obj_t *ui_imgDirZ;
 lv_obj_t *ui_topLeft;
-lv_obj_t *ui_textTIme;
+lv_obj_t *ui_textTime;
 lv_obj_t *ui_ImageGpsDisc;
 lv_obj_t *ui_imgGps;
 lv_obj_t *ui_textGpsHz;

@@ -35,7 +35,7 @@ extern lv_obj_t *ui_ContainerDIr;
 extern lv_obj_t *ui_compass;
 extern lv_obj_t *ui_imgDirZ;
 extern lv_obj_t *ui_topLeft;
-extern lv_obj_t *ui_textTIme;
+extern lv_obj_t *ui_textTime;
 extern lv_obj_t *ui_ImageGpsDisc;
 extern lv_obj_t *ui_imgGps;
 extern lv_obj_t *ui_textGpsHz;

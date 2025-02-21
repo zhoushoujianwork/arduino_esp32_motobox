@@ -158,6 +158,17 @@ void tft_loop()
         lv_obj_set_style_img_opa(ui_imgBle, LV_OPA_TRANSP, 0); // 完全透明
         lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_TRANSP, 0); // 完全透明
         lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_TRANSP, 0); // 完全透明
+
+        // 数据归零
+        lv_label_set_text(ui_textGpsNu, "-");
+        lv_label_set_text(ui_textGpsHz, "-");
+        lv_label_set_text(ui_textTime, "1970-01-01 00:00:00");
+        lv_label_set_text(ui_textLocation, "0.000000 / 0.000000");
+        lv_label_set_text(ui_textTrip, "Trip:--- km");
+        lv_slider_set_value(ui_SliderSpeed, 0, LV_ANIM_OFF);
+        lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
+        lv_slider_set_value(ui_SliderGyro, 0, LV_ANIM_OFF);
+        lv_event_send(ui_SliderGyro, LV_EVENT_VALUE_CHANGED, NULL);
     }
     else
     {
@@ -191,7 +202,7 @@ void tft_loop()
         snprintf(gpsTextTime, sizeof(gpsTextTime), "%04d-%02d-%02d %02d:%02d:%02d", device.get_gps_data()->year,
                  device.get_gps_data()->month, device.get_gps_data()->day, device.get_gps_data()->hour,
                  device.get_gps_data()->minute, device.get_gps_data()->second);
-        lv_label_set_text(ui_textTIme, gpsTextTime);
+        lv_label_set_text(ui_textTime, gpsTextTime);
         char gpsTextLocation[20]; // 120'123456 / 21'654321
         snprintf(gpsTextLocation, sizeof(gpsTextLocation), "%s / %s", String(device.get_gps_data()->latitude, 6), String(device.get_gps_data()->longitude, 6));
         lv_label_set_text(ui_textLocation, gpsTextLocation);
