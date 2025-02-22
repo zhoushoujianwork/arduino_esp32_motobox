@@ -2,6 +2,8 @@
 #define CONFIG_H
 #define VERSION "2.0.0"
 
+#define GPS_DEBUG
+
 
 // 设置服务运行模式，目前支持 3 种配置
 // 1. allinOne的方式，不需要用到蓝牙，直接自己采集数据渲染到屏幕；

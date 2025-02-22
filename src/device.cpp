@@ -157,6 +157,15 @@ void Device::printGpsData()
                    String(gps_data.speed) + ", " +
                    String(gps_data.heading) + ", " +
                    String(gps_data.satellites));
+
+    // 添加HDOP状态显示
+    const char* hdopStatus = "";
+    if(gps_data.hdop < 1.0) hdopStatus = "优秀";
+    else if(gps_data.hdop < 2.0) hdopStatus = "良好";
+    else if(gps_data.hdop < 5.0) hdopStatus = "一般";
+    else hdopStatus = "较差";
+    
+    Serial.println("HDOP: " + String(gps_data.hdop, 1) + " (" + hdopStatus + ")");
 }
 
 void Device::printImuData()

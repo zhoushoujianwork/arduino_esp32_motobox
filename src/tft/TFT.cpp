@@ -263,5 +263,17 @@ void tft_loop()
         snprintf(gyroTextRight, sizeof(gyroTextRight), "%.0f°", gyroTopRight);
         lv_label_set_text(ui_textGyroTopLeft, gyroTextLeft);
         lv_label_set_text(ui_textGyroTopRight, gyroTextRight);
+
+        // 添加HDOP状态显示
+        // char hdopText[20];
+        // float hdop = device.get_gps_data()->hdop;
+        // const char* status = "";
+        // if(hdop < 1.0) status = "优秀";
+        // else if(hdop < 2.0) status = "良好";
+        // else if(hdop < 5.0) status = "一般";
+        // else status = "较差";
+        
+        // snprintf(hdopText, sizeof(hdopText), "精度:%.1f(%s)", hdop, status);
+        // lv_label_set_text(ui_textHdopStatus, hdopText);
     }
 }

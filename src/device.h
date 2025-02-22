@@ -21,6 +21,12 @@ typedef struct
     double longitude; // 经度 (-180°~180°)
     double altitude;  // 海拔高度，单位：米
 
+/*
+表示卫星几何分布对水平定位精度的影响
+数值范围：0.5（最佳）~ 50（最差）
+理想值 < 1.0，实际应用建议 < 2.0
+*/
+    double hdop; // 水平精度因子
     // 运动信息
     double speed;       // 速度，单位：千米/小时
     double heading;     // 航向角，单位：度 (0°~360°)

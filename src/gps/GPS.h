@@ -4,6 +4,7 @@
 #include <SoftwareSerial.h>
 #include <TinyGPS++.h>
 #include "device.h"
+#include "config.h"
 #include <ArduinoJson.h>
 
 // NMEA0183 配置
@@ -92,8 +93,6 @@ public:
     bool setGpsHz(int hz);
     // 打印原始数据
     void printRawData();
-    // 检查GPS响应
-    bool checkGpsResponse();
     // 打印GPS响应
     void printGpsResponse(const char* context);
 
@@ -102,9 +101,8 @@ private:
     bool setGpsBaudRate(int baudRate);
     SoftwareSerial gpsSerial;
     TinyGPSPlus gps;
-    bool newLocation;
 };
 
 extern GPS gps;
 
-#endif // GPSMODULE_H
+#endif // GPS_H
