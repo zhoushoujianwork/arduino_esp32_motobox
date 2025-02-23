@@ -57,7 +57,7 @@ void taskGps(void *parameter)
   {
     gps.loop();
     // gps.printRawData();
-    delay(10);
+    delay(5);
   }
 #endif
 }
@@ -209,11 +209,10 @@ void setup()
 
 void loop()
 {
+  Serial.println("");
   // device.printImuData();
-  // delay(10);
-  // device.printGpsData();
+  device.printGpsData();
   // device.print_device_info();
-  // Serial.println("");
-  // Serial.println("");
+  Serial.println("");
   delay(1000);
 }

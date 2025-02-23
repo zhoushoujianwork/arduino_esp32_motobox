@@ -160,10 +160,17 @@ void Device::printGpsData()
 
     // 添加HDOP状态显示
     const char* hdopStatus = "";
-    if(gps_data.hdop < 1.0) hdopStatus = "优秀";
-    else if(gps_data.hdop < 2.0) hdopStatus = "良好";
-    else if(gps_data.hdop < 5.0) hdopStatus = "一般";
-    else hdopStatus = "较差";
+    if (gps_data.hdop == 0) {
+        hdopStatus = "无数据";
+    } else if(gps_data.hdop < 1.0) {
+        hdopStatus = "优秀";
+    } else if(gps_data.hdop < 2.0) {
+        hdopStatus = "良好";
+    } else if(gps_data.hdop < 5.0) {
+        hdopStatus = "一般";
+    } else {
+        hdopStatus = "较差";
+    }
     
     Serial.println("HDOP: " + String(gps_data.hdop, 1) + " (" + hdopStatus + ")");
 }

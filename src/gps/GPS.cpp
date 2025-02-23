@@ -22,7 +22,7 @@ const char *UBX_CFG_MSG_GGA_OFF = "$PCAS04,0*1D\r\n";  // 关闭GGA
 const char *UBX_CFG_MSG_GSA_OFF = "$PCAS04,1*1C\r\n";  // 关闭GSA  
 const char *UBX_CFG_MSG_GSV_OFF = "$PCAS04,2*1F\r\n";  // 关闭GSV
 const char *UBX_CFG_MSG_RMC_ON  = "$PCAS04,4,1*21\r\n"; // 开启RMC
-
+const char *UBX_CFG_MSG_ZDA_ON = "$PCAS04,6,1*21\r\n"; // 开启ZDA
 
 GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
 {
@@ -56,12 +56,12 @@ $PCAS04,2*1B\r\n
     // delay(100);
 
     // 切换到GPS
-    gpsSerial.print("$PCAS04,1*18\r\n");
-    delay(100);
+    // gpsSerial.print("$PCAS04,1*18\r\n");
+    // delay(100);
 
     // 切换到北斗+GPS
-    // gpsSerial.print("$PCAS04,3*1A\r\n");
-    // delay(100);
+    gpsSerial.print("$PCAS04,3*1A\r\n");
+    delay(100);
 
     
     // $GPGSV 卫星信息
@@ -75,12 +75,14 @@ $PCAS04,2*1B\r\n
     gpsSerial.print(UBX_CFG_MSG_GGA_OFF); // 关闭GGA 保留 RMC
     gpsSerial.print(UBX_CFG_MSG_RMC_ON);  
 
+    // 开启时间
+    gpsSerial.print(UBX_CFG_MSG_ZDA_ON);
     // 关闭GSV
     gpsSerial.print(UBX_CFG_MSG_GSV_OFF);
     
     delay(150);  // 增加等待时间确保配置生效
 
-    setGpsHz(5);  // 初始设置为2Hz
+    setGpsHz(1); // 目前 1HZ 最稳定，其他频率还要调优
 
 }
 
@@ -145,9 +147,6 @@ void GPS::loop()
     while (gpsSerial.available() > 0)
     {
         char c = (char)gpsSerial.read();
-        #ifdef GPS_DEBUG
-        Serial.print(c);
-        #endif
         if (gps.encode(c))
         {
             if (gps.location.isUpdated())
@@ -200,7 +199,7 @@ void GPS::loop()
                 device.get_gps_data()->satellites = satellites.value();
             }
             
-            if (gps.speed.isUpdated())
+            // if (gps.speed.isUpdated())
             {
                 auto speed = gps.speed;
                 device.get_gps_data()->speed = speed.kmph();
