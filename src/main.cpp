@@ -59,7 +59,7 @@ void taskGps(void *parameter)
     // gps.printRawData();
     delay(5);
   }
-#endif
+#endif 
 }
 
 void task0(void *parameter)

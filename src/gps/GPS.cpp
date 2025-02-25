@@ -28,11 +28,19 @@ GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
 {
 }
 
+void GPS::configGps(const char *configCmd)
+{
+    for (int i = 0; i < 3; i++) {
+        gpsSerial.print(configCmd);
+        delay(100);
+    }
+}
+
 void GPS::begin()
 {
     Serial.println(TinyGPSPlus::libraryVersion());
     gpsSerial.begin(9600);  // 初始默认波特率
-    setMode1();
+    setMode2();
     Serial.println("GPS 初始化完成");
 }
 
@@ -43,25 +51,16 @@ void GPS::setMode1()
     // 1000ms 输出一次 RMC 消息
     configGps("$PCAS03,0,0,0,0,1,1,1,0,0,0,,,0,0,,,,0*33\r\n");
     // 1HZ
-    setGpsHz(2);
-}
-
-void GPS::configGps(const char *configCmd)
-{
-    for (int i = 0; i < 3; i++) {
-        gpsSerial.print(configCmd);
-        delay(100);
-    }
+    setGpsHz(1);
 }
 
 void GPS::setMode2()
 {
     // 双模式
     configGps("$PCAS04,3*1A\r\n");
-    // 1000ms 输出一次 RMC 消息
-    configGps("$PCAS03,0,0,0,0,1,1,1,0,0,0,,,0,0,,,,0*33\r\n");
+    configGps("$PCAS03,0,0,0,0,0,0,1,0,0,0,,,0,0,,,,0*33\r\n");
     // 1HZ
-    setGpsHz(2);
+    setGpsHz(1);
 }
 
 /*
@@ -167,7 +166,7 @@ void GPS::loop()
                 device.get_gps_data()->satellites = satellites.value();
             }
             
-            // if (gps.speed.isUpdated())
+            if (gps.speed.isUpdated())
             {
                 auto speed = gps.speed;
                 device.get_gps_data()->speed = speed.kmph();

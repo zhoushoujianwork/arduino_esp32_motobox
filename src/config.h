@@ -9,8 +9,8 @@
 // 配置将后台数据实时 mqtt发送到服务器；
 // 3. client模式，作为从机方式负责接收主机蓝牙发送过来的数据，并渲染到屏幕上；
 
-// #define MODE_ALLINONE
-#define MODE_SERVER
+#define MODE_ALLINONE
+// #define MODE_SERVER
 // #define MODE_CLIENT
 
 #ifdef MODE_ALLINONE
