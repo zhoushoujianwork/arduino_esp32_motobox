@@ -6,23 +6,23 @@
 // 在串行通信中,\r\n的组合是标准的行结束符
 // NMEA协议规定每条GPS语句都必须以\r\n结尾
 
-const char *UBX_CFG_PRT_4800 = "$PCAS01,0*1C\r\n";  
-const char *UBX_CFG_PRT_9600 = "$PCAS01,1*1D\r\n";
-const char *UBX_CFG_PRT_19200 = "$PCAS01,3*1B\r\n";
-const char *UBX_CFG_PRT_38400 = "$PCAS01,2*1A\r\n";
-const char *UBX_CFG_PRT_57600 = "$PCAS01,4*1E\r\n";
-const char *UBX_CFG_PRT_115200 = "$PCAS01,5*19\r\n";
+/*
+GGA：时间、位置、卫星数量 
+GSA：GPS接收机操作模式，定位使用的卫星，DOP值，定位状态
+GSV：可见GPS卫星信息、仰角、方位角、信噪比
+RMC：时间、日期、位置、速度
+VTG：地面速度信息
 
-const char *UBX_CFG_RATE_1HZ  = "$PCAS02,1000*2E\r\n";  // 1000ms
-const char *UBX_CFG_RATE_2HZ  = "$PCAS02,500*1A\r\n";   // 500ms  
-const char *UBX_CFG_RATE_5HZ  = "$PCAS02,200*1D\r\n";   // 200ms
-const char *UBX_CFG_RATE_10HZ = "$PCAS02,100*1E\r\n";   // 100ms
+$PCAS04,3*1A 北斗和 GPS 双模 
+$PCAS04,1*18 单 GPS 工作模式 
+$PCAS04,2*1B 单北斗工作模式
 
-const char *UBX_CFG_MSG_GGA_OFF = "$PCAS04,0*1D\r\n";  // 关闭GGA
-const char *UBX_CFG_MSG_GSA_OFF = "$PCAS04,1*1C\r\n";  // 关闭GSA  
-const char *UBX_CFG_MSG_GSV_OFF = "$PCAS04,2*1F\r\n";  // 关闭GSV
-const char *UBX_CFG_MSG_RMC_ON  = "$PCAS04,4,1*21\r\n"; // 开启RMC
-const char *UBX_CFG_MSG_ZDA_ON = "$PCAS04,6,1*21\r\n"; // 开启ZDA
+// $PCAS03,nGGA,nGLL,nGSA,nGSV,nRMC,nVTG,nZDA,nANT,nDHV,nLPS,res1,res2,nUTC,nGST,res3,res4,res5,nTIM*CS<CR><LF>
+// GGA 输出频率，语句输出频率是以定位更新率为基准的，n（0~9）表示每 n 次定位输出一次，0 表示不输出该语句，空则保持原有配置。
+// $PCAS03,1,1,1,1,1,1,1,1,0,0,,,1,1,,,,1*33
+// RMC,ZDA,nVTG 打开其他都关闭 $PCAS03,0,0,0,0,1,1,1,0,0,0,,,0,0,,,,0*33
+// $PCAS06,0*1B 查询产品信息
+*/
 
 GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
 {
@@ -32,68 +32,51 @@ void GPS::begin()
 {
     Serial.println(TinyGPSPlus::libraryVersion());
     gpsSerial.begin(9600);  // 初始默认波特率
-
-    // 优化设备信息查询
-    gpsSerial.print("$PCAS06,1*1A\r\n");
-    delay(100);
-    while(gpsSerial.available()) {
-        Serial.write(gpsSerial.read());
-    }
-
-    // 切换到 115200
-    gpsSerial.begin(9600);
-    delay(100);
-/*
-// 切换到GPS+北斗
-$PCAS04,3*1A\r\n
-// 切换到单GPS
-$PCAS04,1*18\r\n
-// 切换到单北斗
-$PCAS04,2*1B\r\n
-*/
-    // 切换到北斗
-    // gpsSerial.print("$PCAS04,2*1B\r\n");
-    // delay(100);
-
-    // 切换到GPS
-    // gpsSerial.print("$PCAS04,1*18\r\n");
-    // delay(100);
-
-    // 切换到北斗+GPS
-    gpsSerial.print("$PCAS04,3*1A\r\n");
-    delay(100);
-
-    
-    // $GPGSV 卫星信息
-    // $GPRMC 位置信息
-    // $GPGGA 位置信息
-    // $GPGSA 卫星信息
-    // $GPVTG 速度信息
-    // $GPZDA 时间信息
-
-    // 增强NMEA输出过滤（只保留RMC）
-    gpsSerial.print(UBX_CFG_MSG_GGA_OFF); // 关闭GGA 保留 RMC
-    gpsSerial.print(UBX_CFG_MSG_RMC_ON);  
-
-    // 开启时间
-    gpsSerial.print(UBX_CFG_MSG_ZDA_ON);
-    // 关闭GSV
-    gpsSerial.print(UBX_CFG_MSG_GSV_OFF);
-    
-    delay(150);  // 增加等待时间确保配置生效
-
-    setGpsHz(1); // 目前 1HZ 最稳定，其他频率还要调优
-
+    setMode1();
+    Serial.println("GPS 初始化完成");
 }
 
-// 新增响应打印函数
-void GPS::printGpsResponse(const char* context)
+void GPS::setMode1()
 {
-    Serial.print(context);
-    Serial.println("响应:");
-    while(gpsSerial.available()) {
-        Serial.write(gpsSerial.read());
+    // 北斗 单模
+    configGps("$PCAS04,2*1B\r\n");
+    // 1000ms 输出一次 RMC 消息
+    configGps("$PCAS03,0,0,0,0,1,1,1,0,0,0,,,0,0,,,,0*33\r\n");
+    // 1HZ
+    setGpsHz(2);
+}
+
+void GPS::configGps(const char *configCmd)
+{
+    for (int i = 0; i < 3; i++) {
+        gpsSerial.print(configCmd);
+        delay(100);
     }
+}
+
+void GPS::setMode2()
+{
+    // 双模式
+    configGps("$PCAS04,3*1A\r\n");
+    // 1000ms 输出一次 RMC 消息
+    configGps("$PCAS03,0,0,0,0,1,1,1,0,0,0,,,0,0,,,,0*33\r\n");
+    // 1HZ
+    setGpsHz(2);
+}
+
+/*
+检查 GPS 天线 状态
+$GPTXT,01,01,01,ANTENNA OPEN*25
+表示天线状态（开路）
+$GPTXT,01,01,01,ANTENNA OK*35
+表示天线状态（良好）
+$GPTXT,01,01,01,ANTENNA SHORT*63
+表示天线状态（短路）
+*/
+bool GPS::checkGpsStatus()
+{
+    // TODO
+    return true;
 }
 
 // 优化后的频率设置函数
@@ -101,15 +84,13 @@ bool GPS::setGpsHz(int hz)
 {
     const char *cmd = nullptr;
     switch (hz) {
-        case 1:  cmd = UBX_CFG_RATE_1HZ;  break;
-        case 2:  cmd = UBX_CFG_RATE_2HZ;  break;
-        case 5:  cmd = UBX_CFG_RATE_5HZ;  break;
-        case 10: cmd = UBX_CFG_RATE_10HZ; break;
+        case 1:  cmd = "$PCAS02,1000*2E\r\n";  break;
+        case 2:  cmd = "$PCAS02,500*1A\r\n";  break;
+        case 5:  cmd = "$PCAS02,200*1D\r\n";  break;
+        case 10: cmd = "$PCAS02,100*1E\r\n"; break;
         default: return false;
     }
-    
-    gpsSerial.print(cmd);
-    delay(100);
+    configGps(cmd);
     return true;
 }
 
@@ -118,28 +99,15 @@ bool GPS::setGpsBaudRate(int baudRate)
 {
     const char* configCmd = nullptr;
     switch (baudRate) {
-        case 115200: configCmd = UBX_CFG_PRT_115200; break;
-        case 57600:  configCmd = UBX_CFG_PRT_57600;  break;
-        case 38400:  configCmd = UBX_CFG_PRT_38400;  break;
-        case 19200:  configCmd = UBX_CFG_PRT_19200;  break;
-        case 9600:   configCmd = UBX_CFG_PRT_9600;   break;
-        case 4800:   configCmd = UBX_CFG_PRT_4800;   break;
+        case 115200: configCmd = "$PCAS01,5*19\r\n"; break;
+        case 9600:   configCmd = "$PCAS01,1*1D\r\n";  break;
+        case 4800:   configCmd = "$PCAS01,1*1D\r\n";   break;
         default:     return false;
     }
     
-    gpsSerial.print(configCmd);
-    delay(50);  // 短暂等待命令发送
-    
-    // 验证配置是否生效
-    gpsSerial.begin(baudRate);
-    if(gpsSerial.available()) {
-        printGpsResponse("波特率设置");
-        return true;
-    }
-    Serial.printf("波特率%d设置失败\n", baudRate);
-    return false;
+    configGps(configCmd);
+    return true;
 }
-
 
 // 无延迟的 loop 才能准确拿到数据，必须要执行
 void GPS::loop()
