@@ -7,12 +7,12 @@
 /*
  * Device Operation Mode Configuration
  * Supported modes:
- * 1. ALL_IN_ONE: Standalone mode without Bluetooth, direct data collection and display
+ * 1. MODE_ALLINONE: Standalone mode without Bluetooth, direct data collection and display
  * 2. SERVER: Master mode - collects sensor data, sends via Bluetooth to client,
  *           and can send data to server via MQTT over WiFi
  * 3. CLIENT: Slave mode - receives data from server via Bluetooth and displays it
  */
-#define MODE_ALL_IN_ONE
+#define MODE_ALLINONE
 // #define MODE_SERVER
 // #define MODE_CLIENT
 
@@ -58,7 +58,7 @@
 #define MQTT_IMU_PUBLISH_INTERVAL   200
 #define MQTT_BAT_PRINT_INTERVAL   10000
 
-#ifdef MODE_ALL_IN_ONE
+#ifdef MODE_ALLINONE
     /* Pin Configuration for ALL_IN_ONE Mode */
     #define BTN_PIN         39
     #define BAT_PIN         20
@@ -73,6 +73,10 @@
     #define TFT_SCLK         5
     #define TFT_RST          7
     #define TFT_BL          16
+
+    /* GPS UART Pins */
+    #define GPS_RX_PIN      12
+    #define GPS_TX_PIN      11
 #endif
 
 #ifdef MODE_SERVER
