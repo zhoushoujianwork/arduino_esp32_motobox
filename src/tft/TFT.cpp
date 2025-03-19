@@ -68,7 +68,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data)
 
 void init_dashboard()
 {
-    for (int i = 0; i < UI_MAX_SPEED; i += 4)
+    for (int i = 0; i < UI_MAX_SPEED; i += 10)
     {
         lv_timer_handler(); // let the GUI do its work
         // delay(2);
@@ -85,7 +85,7 @@ void init_dashboard()
 
         lv_event_send(ui_SliderGyro, LV_EVENT_VALUE_CHANGED, NULL);
     }
-    for (int i = UI_MAX_SPEED; i >= 0; i -= 4)
+    for (int i = UI_MAX_SPEED; i >= 0; i -= 10)
     {
         lv_timer_handler(); // let the GUI do its work
         // delay(2);
@@ -136,7 +136,7 @@ void tft_begin()
     ledcSetup(backlightChannel, backlightFreq, backlightResolution);
     ledcAttachPin(TFT_BL, backlightChannel);
     // 设置默认亮度为最大
-    ledcWrite(backlightChannel, 255);
+    ledcWrite(backlightChannel, 250);
     Serial.println("[TFT] 背光初始化完成，亮度设为最大");
     #endif
 

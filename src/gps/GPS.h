@@ -50,16 +50,28 @@ public:
     
     // 根据卫星数量自动调整GPS更新频率
     bool autoAdjustUpdateRate();
+    
+    // 打印GPS数据接收统计信息
+    void printGpsStats();
+    
+    // 使GPS模块进入待机模式（低功耗模式）
+    bool enterStandbyMode();
+    
+    // 唤醒GPS模块
+    bool wakeup();
 
 private:
+    // 配置GPS工作模式，启用双模式和完整NMEA输出
+    void configGpsMode();
+    
+    // 从TinyGPS++更新设备GPS数据
+    void updateGpsData();
+    
     // 检查 GPS 天线 状态
     bool checkGpsStatus();
-    bool setGpsBaudRate(int baudRate);
     SoftwareSerial gpsSerial;
     TinyGPSPlus gps;
     int txmsgCount;
-    void setMode1();
-    void setMode2();
     
     // 发送GPS命令并等待响应
     bool sendGpsCommand(const String& cmd, int retries = 3, int retryDelay = 100);
@@ -70,6 +82,12 @@ private:
     int _rxPin;
     int _txPin;
     int _currentHz;  // 当前GPS更新频率
+    
+    // GPS数据接收统计相关
+    unsigned long _lastStatTime;
+    unsigned long _validSentences;
+    unsigned long _invalidSentences;
+    unsigned long _lastLocationUpdateTime;
 };
 
 extern GPS gps;

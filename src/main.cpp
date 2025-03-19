@@ -100,8 +100,20 @@ void taskWifi(void *parameter) {
  */
 void taskGps(void *parameter) {
   #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  // 创建计时器以跟踪GPS数据解析
+  unsigned long lastStatsTime = 0;
+  
   while (true) {
+    // 任选一种方式：
+    // 1. 使用loop函数解析NMEA数据并更新设备GPS信息
     gps.loop();
+    
+    // 2. 或者使用printRawData直接打印原始NMEA数据（调试用）
+    // gps.printRawData();
+    
+    // 定期打印GPS统计信息，显示接收质量
+    gps.printGpsStats();
+    
     delay(5);
   }
   #endif 
@@ -327,8 +339,7 @@ void initializeHardware() {
   device.init();
 
   #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-  // GPS和IMU初始化
-  gps.begin();
+  // IMU初始化
   imu.begin();
   
   // WiFi初始化
@@ -378,6 +389,25 @@ void setup() {
   
   // 初始化硬件
   initializeHardware();
+  
+  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  // 显示屏初始化完成后，再初始化 GPS
+  Serial.println("[系统] 初始化GPS...");
+  
+  // 检查是否从深度睡眠唤醒
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  bool isWakeFromDeepSleep = (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED);
+  
+  if (isWakeFromDeepSleep) {
+    // 如果是从睡眠中唤醒，需要先唤醒GPS模块
+    Serial.println("[系统] 从睡眠唤醒，正在唤醒GPS模块...");
+    gps.begin();
+    gps.wakeup();
+  } else {
+    // 正常启动，直接初始化GPS
+    gps.begin();
+  }
+  #endif
   
   // 创建任务
   #if defined(MODE_ALLINONE) || defined(MODE_SERVER)

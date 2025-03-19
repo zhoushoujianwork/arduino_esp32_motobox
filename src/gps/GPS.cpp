@@ -125,6 +125,12 @@ GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
     _rxPin = rxPin;
     _txPin = txPin;
     _currentHz = 2; // 默认初始值为2Hz
+    
+    // 初始化数据统计相关变量
+    _lastStatTime = 0;
+    _validSentences = 0;
+    _invalidSentences = 0;
+    _lastLocationUpdateTime = 0;
 }
 
 // 根据卫星数量自动调整GPS更新频率
@@ -133,15 +139,15 @@ bool GPS::autoAdjustUpdateRate()
     uint8_t satellites = device.get_gps_data()->satellites;
     int targetHz = 0;
     
-    // 根据卫星数量确定目标更新频率
-    if (satellites >= 20) {
+    // 根据卫星数量确定目标更新频率，由于数据精简可以设置更高频率
+    if (satellites >= 15) {
         targetHz = 10;  // 卫星数量很多，高精度、高更新率
-    } else if (satellites >= 10) {
+    } else if (satellites >= 8) {
         targetHz = 5;   // 卫星数量中等，中等更新率
     } else if (satellites >= 4) {
-        targetHz = 2;   // 卫星数量较少，默认更新率
+        targetHz = 2;   // 卫星数量较少，降低更新率保证质量
     } else {
-        targetHz = 1;   // 卫星数量很少，低更新率以保证质量
+        targetHz = 1;   // 卫星数量很少，最低更新率以保证质量
     }
     
     // 如果需要调整频率且与当前频率不同
@@ -168,17 +174,23 @@ bool GPS::autoAdjustUpdateRate()
 // 优化后的命令发送函数
 bool GPS::sendGpsCommand(const String& cmd, int retries, int retryDelay) {
     if (cmd.isEmpty()) {
-        Serial.println("GPS: 发送空命令");
+        Serial.println("[GPS] 发送空命令");
         return false;
     }
     
-    Serial.print("GPS: 发送命令 -> ");
+    Serial.print("[GPS] 发送命令 -> ");
     Serial.print(cmd);
+    
+    // 清空接收缓冲区
+    while (gpsSerial.available()) {
+        gpsSerial.read();
+    }
     
     bool success = false;
     for (int i = 0; i < retries && !success; i++) {
         if (i > 0) {
-            Serial.printf("GPS: 重试发送命令 (%d/%d)\n", i+1, retries);
+            Serial.printf("[GPS] 重试发送命令 (%d/%d)\n", i+1, retries);
+            delay(100); // 重试前额外延时
         }
         
         gpsSerial.print(cmd);
@@ -186,14 +198,30 @@ bool GPS::sendGpsCommand(const String& cmd, int retries, int retryDelay) {
         // 等待发送完成
         gpsSerial.flush();
         
-        // 添加延时等待GPS模块处理
-        delay(retryDelay);
+        // 增加延时等待GPS模块处理，避免通信不稳定
+        delay(retryDelay * 2);
         
-        // 模块端的响应处理可以在这里添加
-        // 对于某些命令，GPS模块会发送ACK，可以在这里读取并验证
+        // 检查是否收到响应数据（简单检测）
+        unsigned long startTime = millis();
+        bool receivedData = false;
         
-        // 简单起见，我们假设发送成功
-        success = true;
+        // 等待最多500ms检查是否有数据返回
+        while (millis() - startTime < 500) {
+            if (gpsSerial.available()) {
+                receivedData = true;
+                break;
+            }
+            delay(10);
+        }
+        
+        // 如果收到了任何响应或这是最后一次尝试，就认为成功
+        success = receivedData || (i == retries - 1);
+    }
+    
+    if (success) {
+        Serial.println("[GPS] 命令发送成功");
+    } else {
+        Serial.println("[GPS] 命令发送失败");
     }
     
     return success;
@@ -210,50 +238,94 @@ void GPS::begin()
     Serial.println(TinyGPSPlus::libraryVersion());
     Serial.printf("GPS使用引脚 RX:%d TX:%d\n", _rxPin, _txPin);
     
-    // 初始默认波特率为9600，但要设置为115200
-    gpsSerial.begin(9600);  // 初始波特率
-    delay(200); // 增加延时确保GPS模块稳定
+    // 先尝试以当前可能的波特率115200连接
+    gpsSerial.begin(115200);
+    Serial.println("[GPS] 尝试以115200波特率连接...");
     
-    // 尝试多次设置波特率为115200
-    if(setGpsBaudRate(115200)) {
-        Serial.println("GPS波特率设置为: 115200");
-    } else {
-        Serial.println("GPS波特率设置失败，尝试默认波特率");
-        // 如果设置115200失败，可能模块已经是115200，重新初始化
-        gpsSerial.end();
-        delay(100);
-        gpsSerial.begin(115200);
+    delay(300); // 确保连接稳定
+    
+    // 发送命令将GPS模块波特率切换至9600
+    String baudrateCmd = GpsCommand::buildBaudrateCmd(9600);
+    Serial.println("[GPS] 发送命令切换GPS模块到9600波特率");
+    gpsSerial.print(baudrateCmd);
+    gpsSerial.flush();
+    
+    delay(500); // 给模块足够时间处理命令
+    
+    // 重新初始化串口为9600
+    gpsSerial.end();
+    delay(200);
+    gpsSerial.begin(9600);
+    Serial.println("[GPS] 重新以9600波特率连接");
+    
+    delay(300); // 确保连接稳定
+    
+    // 设置为双模式并启用精简NMEA输出
+    configGpsMode();
+    delay(300);
+    
+    // 由于精简了NMEA数据，现在可以设置更高的默认更新率
+    if(setGpsHz(5)) {
+        _currentHz = 5;
+        Serial.println("[GPS] 默认更新率设置为: 5Hz");
     }
-    delay(200);
-
-    setMode1();
-    delay(200);
     
-    // 设置默认2Hz更新率
-    if(setGpsHz(2)) {
-        _currentHz = 2;
-        Serial.println("GPS默认更新率设置为: 2Hz");
-    }
-    
-    delay(200);
-    Serial.println("GPS 初始化完成");
+    delay(300);
+    Serial.println("[GPS] 初始化完成");
 }
 
-void GPS::setMode1()
+// 配置GPS工作模式，启用双模式和完整NMEA输出
+void GPS::configGpsMode()
 {
-    // 北斗 单模
-    // sendGpsCommand(GpsCommand::buildModeCmd(2));
-    // GPS 单模
-    sendGpsCommand(GpsCommand::buildModeCmd(1));
-    // 1000ms 输出一次 RMC 消息
-    // sendGpsCommand(GpsCommand::buildNmeaSentenceCmd(false, false, false, false, true, true, true));
-}
-
-void GPS::setMode2()
-{
-    // 双模式
-    sendGpsCommand(GpsCommand::buildModeCmd(3));
-    // sendGpsCommand(GpsCommand::buildNmeaSentenceCmd(false, false, false, false, false, false, true));
+    // 等待GPS模块稳定
+    delay(500);
+    
+    // 设置为北斗和GPS双模
+    Serial.println("[GPS] 设置为GPS+北斗双模模式");
+    bool modeSuccess = false;
+    
+    for(int attempt = 0; attempt < 3 && !modeSuccess; attempt++) {
+        if(sendGpsCommand(GpsCommand::buildModeCmd(3), 2, 300)) {
+            Serial.println("[GPS] 双模设置成功");
+            modeSuccess = true;
+        } else {
+            Serial.println("[GPS] 双模设置尝试 " + String(attempt+1) + " 失败，等待后重试");
+            delay(500); // 增加重试间隔
+        }
+    }
+    
+    if(!modeSuccess) {
+        Serial.println("[GPS] 警告：双模设置多次尝试失败");
+    }
+    
+    delay(500);
+    
+    // 只启用必要的NMEA语句，减少传输数据量
+    // 优先保留: RMC(时间/位置/速度的基本信息)和GGA(卫星数量)
+    // 参数顺序: GGA, GLL, GSA, GSV, RMC, VTG, ZDA
+    Serial.println("[GPS] 设置精简NMEA语句输出");
+    bool nmeaSuccess = false;
+    
+    for(int attempt = 0; attempt < 3 && !nmeaSuccess; attempt++) {
+        // 只保留GGA和RMC，关闭其他消息
+        // GGA提供位置和卫星数量，RMC提供速度和方向
+        if(sendGpsCommand(GpsCommand::buildNmeaSentenceCmd(true, false, true, false, true, false, false), 2, 300)) {
+            Serial.println("[GPS] NMEA语句精简设置成功");
+            nmeaSuccess = true;
+        } else {
+            Serial.println("[GPS] NMEA语句设置尝试 " + String(attempt+1) + " 失败，等待后重试");
+            delay(500);
+        }
+    }
+    
+    if(!nmeaSuccess) {
+        Serial.println("[GPS] 警告：NMEA语句设置多次尝试失败");
+    }
+    
+    // 清空GPS接收缓冲区
+    while(gpsSerial.available()) {
+        gpsSerial.read();
+    }
 }
 
 /*
@@ -283,34 +355,31 @@ bool GPS::setGpsHz(int hz)
         default: return false;
     }
     
-    bool success = sendGpsCommand(GpsCommand::buildUpdateRateCmd(updateRate));
+    Serial.printf("[GPS] 尝试设置更新频率为%dHz (周期%dms)\n", hz, updateRate);
+    
+    // 在9600波特率下，使用精简NMEA消息可以支持更高更新率
+    if (hz > 10) {
+        Serial.println("[GPS] 警告：即使精简NMEA消息，超过10Hz仍可能不稳定");
+    }
+    
+    bool success = false;
+    
+    // 最多尝试3次设置更新率
+    for (int attempt = 0; attempt < 3 && !success; attempt++) {
+        success = sendGpsCommand(GpsCommand::buildUpdateRateCmd(updateRate), 2, 300);
+        
+        if (!success) {
+            Serial.printf("[GPS] 更新率设置尝试 %d 失败，等待后重试\n", attempt+1);
+            delay(500);
+        }
+    }
     
     // 只有在成功时才更新设备中的gpsHz值
     if (success) {
         device.get_device_state()->gpsHz = hz;
-    }
-    
-    return success;
-}
-
-// 优化波特率设置函数
-bool GPS::setGpsBaudRate(int baudRate)
-{
-    // 使用新的命令构建器生成波特率设置命令
-    String baudrateCmd = GpsCommand::buildBaudrateCmd(baudRate);
-    if (baudrateCmd.isEmpty()) {
-        Serial.printf("GPS: 不支持的波特率 %d\n", baudRate);
-        return false;
-    }
-    
-    // 发送命令
-    bool success = sendGpsCommand(baudrateCmd, 5);
-    
-    // 如果发送成功，重新配置串口波特率
-    if (success) {
-        gpsSerial.end();
-        delay(100);
-        gpsSerial.begin(baudRate);
+        Serial.printf("[GPS] 更新率成功设置为%dHz\n", hz);
+    } else {
+        Serial.println("[GPS] 更新率设置失败，保持原有配置");
     }
     
     return success;
@@ -319,78 +388,194 @@ bool GPS::setGpsBaudRate(int baudRate)
 // 无延迟的 loop 才能准确拿到数据，必须要执行
 void GPS::loop()
 {
-    while (gpsSerial.available() > 0)
-    {
-        char c = (char)gpsSerial.read();
-        if (gps.encode(c))
-        {
-            if (gps.location.isUpdated())
-            {
-                // 使用更高效的时间获取方式
-                auto loc = gps.location;
-                device.get_gps_data()->latitude = loc.lat();
-                device.get_gps_data()->longitude = loc.lng();
-            }
-
-            if (gps.altitude.isUpdated())
-            {
-                auto alt = gps.altitude;
-                device.get_gps_data()->altitude = alt.meters();
-            }
-
-            if (gps.course.isUpdated())
-            {
-                auto course = gps.course;
-                device.get_gps_data()->heading = course.deg();
-            }
-
-            if (gps.time.isUpdated())
-            {
-                auto time = gps.time;
-                device.get_gps_data()->hour = time.hour();
-                device.get_gps_data()->minute = time.minute();
-                device.get_gps_data()->second = time.second();
-                device.get_gps_data()->centisecond = time.centisecond();
-            }
-
-            if (gps.date.isUpdated())
-            {
-                auto date = gps.date;
-                device.get_gps_data()->year = date.year();
-                device.get_gps_data()->month = date.month();
-                device.get_gps_data()->day = date.day();
+    // 增大缓冲区以处理更高频率数据
+    const int bufferSize = 256;
+    char buffer[bufferSize];
+    int charsRead = 0;
+    
+    // 一次性读取多个字符进缓冲区，减少频繁读取的开销
+    while (gpsSerial.available() && charsRead < bufferSize - 1) {
+        buffer[charsRead++] = (char)gpsSerial.read();
+        
+        // 快速读取，不添加延时
+        // 由于只选择了必要的NMEA语句，数据量减少，可以支持更高频率
+    }
+    
+    // 添加字符串终止符
+    if (charsRead > 0) {
+        buffer[charsRead] = '\0';
+        
+        // 逐个字符处理
+        for (int i = 0; i < charsRead; i++) {
+            // 跟踪GPS解析成功和失败的次数
+            if (gps.encode(buffer[i])) {
+                // 有效数据处理
+                updateGpsData();
+            } else if (buffer[i] == '\n') {
+                // 每当遇到行结束符，根据之前累积的数据检测是否有一个完整有效的语句
+                if (gps.failedChecksum() > 0) {
+                    _invalidSentences++;
+                } else if (gps.passedChecksum() > 0) {
+                    _validSentences++;
+                }
             }
             
-            if (gps.hdop.isUpdated())
-            {
-                // 获取
-                auto hdop = gps.hdop;
-                device.get_gps_data()->hdop = hdop.value();
+            // 记录位置更新时间
+            if (gps.location.isUpdated()) {
+                _lastLocationUpdateTime = millis();
             }
-            
-            if (gps.satellites.isUpdated())
-            {
-                auto satellites = gps.satellites;
-                device.get_gps_data()->satellites = satellites.value();
-            }
-            
-            if (gps.speed.isUpdated())
-            {
-                auto speed = gps.speed;
-                device.get_gps_data()->speed = speed.kmph();
-            }
-            
         }
+    }
+}
+
+// 从TinyGPS++更新设备GPS数据
+void GPS::updateGpsData()
+{
+    if (gps.location.isUpdated()) {
+        device.get_gps_data()->latitude = gps.location.lat();
+        device.get_gps_data()->longitude = gps.location.lng();
+    }
+
+    if (gps.altitude.isUpdated()) {
+        device.get_gps_data()->altitude = gps.altitude.meters();
+    }
+
+    if (gps.course.isUpdated()) {
+        device.get_gps_data()->heading = gps.course.deg();
+    }
+
+    if (gps.time.isUpdated()) {
+        device.get_gps_data()->hour = gps.time.hour();
+        device.get_gps_data()->minute = gps.time.minute();
+        device.get_gps_data()->second = gps.time.second();
+        device.get_gps_data()->centisecond = gps.time.centisecond();
+    }
+
+    if (gps.date.isUpdated()) {
+        device.get_gps_data()->year = gps.date.year();
+        device.get_gps_data()->month = gps.date.month();
+        device.get_gps_data()->day = gps.date.day();
+    }
+    
+    if (gps.hdop.isUpdated()) {
+        device.get_gps_data()->hdop = gps.hdop.value();
+    }
+    
+    if (gps.satellites.isUpdated()) {
+        device.get_gps_data()->satellites = gps.satellites.value();
+    }
+    
+    if (gps.speed.isUpdated()) {
+        device.get_gps_data()->speed = gps.speed.kmph();
     }
 }
 
 // 打印原始数据
 void GPS::printRawData()
 {
-    while (gpsSerial.available() > 0)
-    {
-        char c = (char)gpsSerial.read();
+    // 增大缓冲区以处理更高频率数据
+    const int bufferSize = 256;
+    char buffer[bufferSize];
+    int charsRead = 0;
+    
+    // 一次性读取多个字符
+    while (gpsSerial.available() && charsRead < bufferSize - 1) {
+        buffer[charsRead] = (char)gpsSerial.read();
+        charsRead++;
         
-        Serial.print(c);
+        // 快速读取，不添加延时
     }
+    
+    // 添加字符串终止符并打印
+    if (charsRead > 0) {
+        buffer[charsRead] = '\0';
+        Serial.print(buffer);
+    }
+}
+
+// 打印GPS数据接收统计信息
+void GPS::printGpsStats() 
+{
+    unsigned long now = millis();
+    unsigned long elapsedTime = now - _lastStatTime;
+    
+    // 每5秒打印一次统计信息
+    if (elapsedTime >= 5000) {
+        // 计算当前周期内的句子接收速率
+        float validRate = _validSentences * 1000.0f / elapsedTime;
+        float invalidRate = _invalidSentences * 1000.0f / elapsedTime;
+        
+        // 计算自上次位置更新以来的时间
+        unsigned long timeSinceLastFix = now - _lastLocationUpdateTime;
+        
+        Serial.println("\n=== GPS接收统计信息 ===");
+        Serial.printf("有效NMEA语句: %lu (%.1f句/秒)\n", _validSentences, validRate);
+        Serial.printf("无效NMEA语句: %lu (%.1f句/秒)\n", _invalidSentences, invalidRate);
+        
+        // 配置的更新率与实际接收对比
+        Serial.printf("配置更新率: %dHz，实际位置更新率: %.1fHz\n", 
+                    _currentHz, 
+                    (_lastLocationUpdateTime > 0) ? (1000.0f / max(timeSinceLastFix, 1UL)) : 0.0f);
+        
+        Serial.printf("当前卫星数量: %d\n", device.get_gps_data()->satellites);
+        Serial.printf("HDOP: %.1f\n", device.get_gps_data()->hdop);
+        Serial.printf("自上次位置更新经过时间: %lu ms\n", timeSinceLastFix);
+        Serial.println("======================\n");
+        
+        // 重置统计数据
+        _lastStatTime = now;
+        _validSentences = 0;
+        _invalidSentences = 0;
+    }
+}
+
+// 使GPS模块进入待机模式
+bool GPS::enterStandbyMode() {
+    Serial.println("[GPS] 正在使GPS模块进入待机模式...");
+    
+    // PMTK161,0是标准的待机命令，适用于大多数GPS模块
+    // 在待机模式下，GPS模块将关闭大部分内部电路，包括PPS信号灯
+    bool success = sendGpsCommand("$PMTK161,0*28", 2, 200);
+    
+    if (success) {
+        Serial.println("[GPS] GPS模块已进入待机模式");
+    } else {
+        Serial.println("[GPS] 无法使GPS模块进入待机模式");
+    }
+    
+    return success;
+}
+
+// 唤醒GPS模块
+bool GPS::wakeup() {
+    Serial.println("[GPS] 正在唤醒GPS模块...");
+    
+    // 对大多数GPS模块，发送任何命令都会唤醒它
+    // 这里我们发送一个查询版本的命令，这是一个无害的操作
+    bool success = sendGpsCommand("$PMTK605*31", 2, 300);
+    
+    if (success) {
+        Serial.println("[GPS] GPS模块已唤醒");
+        
+        // 等待GPS模块稳定
+        delay(200);
+        
+        // 恢复之前的更新频率
+        setGpsHz(_currentHz);
+    } else {
+        Serial.println("[GPS] 无法唤醒GPS模块，尝试重新初始化");
+        
+        // 清空串口缓冲区
+        while (gpsSerial.available()) {
+            gpsSerial.read();
+        }
+        
+        // 重新配置GPS模式
+        configGpsMode();
+        
+        // 恢复更新频率
+        setGpsHz(_currentHz);
+    }
+    
+    return success;
 }

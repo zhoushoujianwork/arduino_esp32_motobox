@@ -124,6 +124,10 @@ String Device::gps_data_to_json()
     doc["hour"] = gps_data.hour;
     doc["minute"] = gps_data.minute;
     doc["second"] = gps_data.second;
+    
+    // HDOP信息
+    doc["hdop"] = gps_data.hdop;
+    
     String jsonString;
     serializeJson(doc, jsonString);
     return jsonString;
