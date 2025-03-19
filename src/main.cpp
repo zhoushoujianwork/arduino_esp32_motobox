@@ -1,3 +1,15 @@
+/**
+ * ESP32 MotoBox - 摩托车数据采集与显示系统
+ * 
+ * 硬件：ESP32-S3
+ * 版本：2.0.0
+ * 
+ * 模式：
+ * - MODE_ALLINONE: 独立模式，所有功能集成在一个设备上
+ * - MODE_SERVER: 服务器模式，采集数据并通过BLE发送给客户端，同时通过MQTT发送到服务器
+ * - MODE_CLIENT: 客户端模式，通过BLE接收服务器数据并显示
+ */
+
 #include "Arduino.h"
 #include "bat/BAT.h"
 #include "ble/ble_server.h"
@@ -13,7 +25,27 @@
 #include "wifi/WifiManager.h"
 #include "power/PowerManager.h"
 
+//============================= 全局变量 =============================
+
+// 设备管理实例
 Device device;
+
+// RTC内存变量（深度睡眠后保持）
+RTC_DATA_ATTR int bootCount = 0;
+
+// 任务句柄
+TaskHandle_t gpsTaskHandle = NULL;
+
+// 发布时间记录
+unsigned long lastGpsPublishTime = 0;
+unsigned long lastImuPublishTime = 0;
+unsigned long lastBlePublishTime = 0;
+
+// GPS刷新率配置
+static int hzs[] = {1, 2, 5, 10};
+static int hz = 0;
+
+//============================= 设备实例 =============================
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
 GPS gps(GPS_RX_PIN, GPS_TX_PIN);
@@ -30,120 +62,87 @@ BLEC bc;
 BLES bs;
 #endif
 
-BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE); // 电池电压 3.3V - 4.2V
-LED led(LED_PIN);                                   // 假设LED连接在GPIO 8上
-PowerManager powerManager;                          // 电源管理模块
+BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE);
+LED led(LED_PIN);
+PowerManager powerManager;
 
-// 在头部添加全局变量声明
-unsigned long lastGpsPublishTime = 0;
-unsigned long lastImuPublishTime = 0;
-unsigned long lastBlePublishTime = 0;
+//============================= 函数声明 =============================
 
-// RTC_DATA_ATTR 变量在深度睡眠后会保留
-RTC_DATA_ATTR int bootCount = 0;
+/**
+ * 按钮事件处理
+ */
+void handleButtonEvents();
 
-void taskWifi(void *parameter)
-{
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-  while (true)
-  {
+/**
+ * 打印唤醒原因
+ */
+void printWakeupReason();
+
+/**
+ * 初始化所有硬件和模块
+ */
+void initializeHardware();
+
+//============================= 任务定义 =============================
+
+/**
+ * WiFi管理任务
+ * 负责WiFi连接和配置
+ */
+void taskWifi(void *parameter) {
+  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  while (true) {
     wifiManager.loop();
     delay(5);
   }
-#endif
+  #endif
 }
 
-
-// gps task 句柄
-TaskHandle_t gpsTaskHandle = NULL;
-void taskGps(void *parameter)
-{
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-  while (true)
-  {
+/**
+ * GPS任务
+ * 负责GPS数据获取和处理
+ */
+void taskGps(void *parameter) {
+  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  while (true) {
     gps.loop();
-    // gps.printRawData();
     delay(5);
   }
-#endif 
+  #endif 
 }
 
-void task0(void *parameter)
-{
-  static int hzs[] = {1, 2, 5, 10};
-  static int hz = 0;
+/**
+ * 系统监控任务
+ * 负责电源管理、LED状态、按钮处理
+ */
+void taskSystem(void *parameter) {
+ 
 
-  while (true)
-  {
+  while (true) {
+    // LED状态更新
     led.loop();
-// 电池电压 当在 client 模式下，且蓝牙不连接的时候，记录电池电压
-#ifdef MODE_CLIENT
-    if (!device.get_device_state()->bleConnected)
-    {
+    
+    // 电池监控
+    #ifdef MODE_CLIENT
+    if (!device.get_device_state()->bleConnected) {
       bat.loop();
     }
-#else
+    #else
     bat.loop();
-#endif
+    #endif
 
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    // 优化状态判断逻辑
-    bool isConnected =
-        device.get_device_state()->mqttConnected && device.get_device_state()->wifiConnected;
+    #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    // LED状态设置 - 连接状态指示
+    bool isConnected = device.get_device_state()->mqttConnected && 
+                      device.get_device_state()->wifiConnected;
     led.setMode(isConnected ? LED::BLINK_DUAL : LED::OFF);
 
-    // 更新按钮状态，必须在检查之前调用
+    // 按钮状态更新
     button.loop();
     
-    // 检查是否处于低功耗状态 - 如果是，只要按钮任何状态变化都打断
-    if (powerManager.getPowerState() != POWER_STATE_NORMAL) {
-      if (button.isPressed()) {
-        Serial.println("[按钮] 检测到按钮按下，打断低功耗模式");
-        powerManager.interruptLowPowerMode();
-        
-        // 等待按钮释放，避免重复触发
-        while (button.isPressed()) {
-          delay(10);
-          button.loop();
-        }
-      }
-    } 
-    // 正常模式下的按钮处理
-    else {
-      // 检查点击
-      if (button.isClicked())
-      {
-        Serial.println("[按钮] 检测到点击，切换GPS刷新率");
-        
-        hz = (hz + 1) % 4;
-        vTaskSuspend(gpsTaskHandle);
-        delay(100);
-        if (gps.setGpsHz(hzs[hz]))
-        {
-          Serial.printf("[GPS] 设置GPS更新率为%dHz\n", hzs[hz]);
-        }
-        else
-        {
-          Serial.println("[GPS] 设置GPS更新率失败");
-        }
-        // 恢复gps task
-        vTaskResume(gpsTaskHandle);
-      }
-
-      // 检查长按重置
-      if (button.isLongPressed())
-      {
-        Serial.println("[按钮] 检测到长按，重置WIFI");
-        
-        if (!wifiManager.getConfigMode())
-        {
-          wifiManager.reset();
-          // 重启设备
-          ESP.restart();
-        }
-      }
-    }
-#endif
+    // 按钮处理逻辑
+    handleButtonEvents();
+    #endif
 
     // 电源管理 - 始终保持处理
     powerManager.loop();
@@ -152,57 +151,114 @@ void task0(void *parameter)
   }
 }
 
-void task1(void *parameter)
-{
-
-  while (true)
-  {
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+/**
+ * 数据处理任务
+ * 负责数据采集、发送和显示
+ */
+void taskDataProcessing(void *parameter) {
+  while (true) {
+    #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    // IMU数据处理
     imu.loop();
+    
+    // MQTT数据发布
     mqtt.loop();
-    if (millis() - lastGpsPublishTime >= 1000)
-    {
+    
+    // GPS数据发布 (1Hz)
+    if (millis() - lastGpsPublishTime >= 1000) {
       mqtt.publishGPS(*device.get_gps_data());
       lastGpsPublishTime = millis();
-      // device.print_device_info();
-      // gps数量超过3颗星，则认为gpsReady为true
-      if (device.get_gps_data()->satellites > 3)
-        device.set_gps_ready(true);
-      else
-        device.set_gps_ready(false);
+      
+      // 更新GPS就绪状态
+      device.set_gps_ready(device.get_gps_data()->satellites > 3);
     }
-    if (millis() - lastImuPublishTime >= 500)
-    {
+    
+    // IMU数据发布 (2Hz)
+    if (millis() - lastImuPublishTime >= 500) {
       mqtt.publishIMU(*device.get_imu_data());
       lastImuPublishTime = millis();
     }
+    #endif
 
-#endif
-
-#ifdef MODE_CLIENT
+    #ifdef MODE_CLIENT
+    // 蓝牙客户端处理
     bc.loop();
-#endif
+    #endif
 
-#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+    #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+    // 显示屏更新
     tft_loop();
-#endif
+    #endif
 
-#ifdef MODE_SERVER
-    // 1000ms 执行一次 主动广播
-    if (millis() - lastBlePublishTime >= 1000)
-    {
+    #ifdef MODE_SERVER
+    // 蓝牙服务器广播 (1Hz)
+    if (millis() - lastBlePublishTime >= 1000) {
       bs.loop();
       lastBlePublishTime = millis();
     }
-#endif
+    #endif
 
     delay(5);
   }
 }
 
+//============================= 辅助函数 =============================
+
+/**
+ * 按钮事件处理
+ */
+void handleButtonEvents() {
+  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  // 检查是否处于低功耗状态
+  if (powerManager.getPowerState() != POWER_STATE_NORMAL) {
+    if (button.isPressed()) {
+      Serial.println("[按钮] 检测到按钮按下，打断低功耗模式");
+      powerManager.interruptLowPowerMode();
+      
+      // 等待按钮释放，避免重复触发
+      while (button.isPressed()) {
+        delay(10);
+        button.loop();
+      }
+    }
+  } 
+  // 正常模式下的按钮处理
+  else {
+    // 点击事件 - 切换GPS刷新率
+    if (button.isClicked()) {
+      Serial.println("[按钮] 检测到点击，切换GPS刷新率");
+      
+      hz = (hz + 1) % 4;
+      vTaskSuspend(gpsTaskHandle);
+      delay(100);
+      if (gps.setGpsHz(hzs[hz])) {
+        Serial.printf("[GPS] 设置GPS更新率为%dHz\n", hzs[hz]);
+      } else {
+        Serial.println("[GPS] 设置GPS更新率失败");
+      }
+      // 恢复GPS任务
+      vTaskResume(gpsTaskHandle);
+    }
+
+    // 长按事件 - 重置WiFi
+    if (button.isLongPressed()) {
+      Serial.println("[按钮] 检测到长按，重置WIFI");
+      
+      if (!wifiManager.getConfigMode()) {
+        wifiManager.reset();
+        // 重启设备
+        ESP.restart();
+      }
+    }
+  }
+  #endif
+}
+
+/**
+ * 打印唤醒原因
+ */
 void printWakeupReason() {
-  esp_sleep_wakeup_cause_t wakeup_reason;
-  wakeup_reason = esp_sleep_get_wakeup_cause();
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
   switch(wakeup_reason) {
     case ESP_SLEEP_WAKEUP_EXT0: 
@@ -232,79 +288,85 @@ void printWakeupReason() {
   Serial.printf("[系统] CPU频率: %d MHz\n", ESP.getCpuFreqMHz());
 }
 
-void setup()
-{
-  Serial.begin(115200);
-  delay(100);
+/**
+ * 初始化所有硬件和模块
+ */
+void initializeHardware() {
+  // 打印启动信息
+  Serial.printf("[系统] 系统启动，版本: %s\n", VERSION);
   
-  // 增加启动计数并打印
-  bootCount++;
-  Serial.println("Boot number: " + String(bootCount));
-  
-  // 打印唤醒原因
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  printWakeupReason();
-  
-  // 检查是否从深度睡眠唤醒
-  bool isWakeFromDeepSleep = (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED);
-  
-  if (isWakeFromDeepSleep) {
-    Serial.println("[系统] 从深度睡眠唤醒，重新初始化系统...");
-  } else {
-    Serial.println("[系统] 正常启动");
-  }
-  
+  // LED初始化
   led.begin();
   led.setMode(LED::OFF);
 
   // 初始化设备
   device.init();
 
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  // GPS和IMU初始化
   gps.begin();
   imu.begin();
   
-  // 重新初始化WiFi
+  // WiFi初始化
   Serial.println("[系统] 初始化WiFi连接...");
   wifiManager.begin();
+  #endif
 
-  xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 0, NULL);
-  xTaskCreatePinnedToCore(taskGps, "TaskGps", 1024 * 10, NULL, 1, &gpsTaskHandle, 1);
-#endif
-
-#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+  #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+  // 显示屏初始化
   tft_begin();
   
-  // 如果从深度睡眠唤醒，确保TFT正常唤醒
-  if (isWakeFromDeepSleep) {
+  // 从深度睡眠唤醒时，确保TFT正常唤醒
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  if (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED) {
     tft_wakeup();
   }
-#endif
+  #endif
 
-#ifdef MODE_SERVER
+  #ifdef MODE_SERVER
+  // 蓝牙服务器初始化
   bs.setup();
-#endif
+  #endif
 
-#ifdef MODE_CLIENT
+  #ifdef MODE_CLIENT
+  // 蓝牙客户端初始化
   bc.setup();
-#endif
+  #endif
 
-  // 初始化电源管理器
+  // 电源管理初始化
   powerManager.begin();
-
-  // esp双核任务
-  xTaskCreate(task0, "Task0", 1024 * 10, NULL, 0, NULL);
-  xTaskCreate(task1, "Task1", 1024 * 10, NULL, 0, NULL);
-
-  Serial.println("main setup end");
 }
 
-void loop()
-{
-  Serial.println("");
-  // device.printImuData();
-  // device.printGpsData();
-  // device.print_device_info();
-  Serial.println("");
-  delay(1000);
+//============================= ARDUINO框架函数 =============================
+
+void setup() {
+  // 初始化串口
+  Serial.begin(115200);
+  delay(100);
+  
+  // 增加启动计数并打印
+  bootCount++;
+  Serial.println("[系统] 启动次数: " + String(bootCount));
+  
+  // 打印唤醒原因
+  printWakeupReason();
+  
+  // 初始化硬件
+  initializeHardware();
+
+  // 创建任务
+  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 1, NULL);
+  xTaskCreatePinnedToCore(taskGps, "TaskGps", 1024 * 10, NULL, 1, &gpsTaskHandle, 1);
+  #endif
+  
+  xTaskCreate(taskSystem, "TaskSystem", 1024 * 10, NULL, 2, NULL);
+  xTaskCreate(taskDataProcessing, "TaskData", 1024 * 10, NULL, 1, NULL);
+
+  Serial.println("[系统] 初始化完成");
+}
+
+void loop() {
+  // 主循环留空，所有功能都在RTOS任务中处理
+  delay(10000);
 }

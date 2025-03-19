@@ -12,8 +12,8 @@
  *           and can send data to server via MQTT over WiFi
  * 3. CLIENT: Slave mode - receives data from server via Bluetooth and displays it
  */
-// #define MODE_ALL_IN_ONE
-#define MODE_SERVER
+#define MODE_ALL_IN_ONE
+// #define MODE_SERVER
 // #define MODE_CLIENT
 
 /* Common Device Configuration */
