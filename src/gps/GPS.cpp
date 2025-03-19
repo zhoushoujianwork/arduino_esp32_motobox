@@ -111,6 +111,10 @@ bool GPS::setGpsHz(int hz)
         default: return false;
     }
     configGps(cmd);
+    
+    // 同时更新device中的gpsHz值
+    device.get_device_state()->gpsHz = hz;
+    
     return true;
 }
 

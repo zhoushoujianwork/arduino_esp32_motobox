@@ -233,6 +233,8 @@ void handleButtonEvents() {
       delay(100);
       if (gps.setGpsHz(hzs[hz])) {
         Serial.printf("[GPS] 设置GPS更新率为%dHz\n", hzs[hz]);
+        // 更新设备状态中的GPS HZ值
+        device.get_device_state()->gpsHz = hzs[hz];
       } else {
         Serial.println("[GPS] 设置GPS更新率失败");
       }
