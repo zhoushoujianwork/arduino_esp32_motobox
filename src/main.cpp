@@ -11,6 +11,7 @@
 #include "tft/TFT.h"
 #include "qmi8658/IMU.h"
 #include "wifi/WifiManager.h"
+#include "power/PowerManager.h"
 
 Device device;
 
@@ -31,11 +32,15 @@ BLES bs;
 
 BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE); // 电池电压 3.3V - 4.2V
 LED led(LED_PIN);                                   // 假设LED连接在GPIO 8上
+PowerManager powerManager;                          // 电源管理模块
 
 // 在头部添加全局变量声明
 unsigned long lastGpsPublishTime = 0;
 unsigned long lastImuPublishTime = 0;
 unsigned long lastBlePublishTime = 0;
+
+// RTC_DATA_ATTR 变量在深度睡眠后会保留
+RTC_DATA_ATTR int bootCount = 0;
 
 void taskWifi(void *parameter)
 {
@@ -47,6 +52,7 @@ void taskWifi(void *parameter)
   }
 #endif
 }
+
 
 // gps task 句柄
 TaskHandle_t gpsTaskHandle = NULL;
@@ -86,37 +92,61 @@ void task0(void *parameter)
         device.get_device_state()->mqttConnected && device.get_device_state()->wifiConnected;
     led.setMode(isConnected ? LED::BLINK_DUAL : LED::OFF);
 
-    // 检查点击
-    if (button.isClicked())
-    {
-      Serial.println("检测到点击");
-      hz = (hz + 1) % 4;
-      vTaskSuspend(gpsTaskHandle);
-      delay(100);
-      if (gps.setGpsHz(hzs[hz]))
-      {
-        Serial.printf("设置GPS更新率为%dHz\n", hzs[hz]);
+    // 更新按钮状态，必须在检查之前调用
+    button.loop();
+    
+    // 检查是否处于低功耗状态 - 如果是，只要按钮任何状态变化都打断
+    if (powerManager.getPowerState() != POWER_STATE_NORMAL) {
+      if (button.isPressed()) {
+        Serial.println("[按钮] 检测到按钮按下，打断低功耗模式");
+        powerManager.interruptLowPowerMode();
+        
+        // 等待按钮释放，避免重复触发
+        while (button.isPressed()) {
+          delay(10);
+          button.loop();
+        }
       }
-      else
+    } 
+    // 正常模式下的按钮处理
+    else {
+      // 检查点击
+      if (button.isClicked())
       {
-        Serial.println("设置GPS更新率失败");
+        Serial.println("[按钮] 检测到点击，切换GPS刷新率");
+        
+        hz = (hz + 1) % 4;
+        vTaskSuspend(gpsTaskHandle);
+        delay(100);
+        if (gps.setGpsHz(hzs[hz]))
+        {
+          Serial.printf("[GPS] 设置GPS更新率为%dHz\n", hzs[hz]);
+        }
+        else
+        {
+          Serial.println("[GPS] 设置GPS更新率失败");
+        }
+        // 恢复gps task
+        vTaskResume(gpsTaskHandle);
       }
-      // 恢复gps task
-      vTaskResume(gpsTaskHandle);
-    }
 
-    // 检查长按重置
-    if (button.isLongPressed())
-    {
-      Serial.println("检测到长按,重置WIFI");
-      if (!wifiManager.getConfigMode())
+      // 检查长按重置
+      if (button.isLongPressed())
       {
-        wifiManager.reset();
-        // 重启设备
-        ESP.restart();
+        Serial.println("[按钮] 检测到长按，重置WIFI");
+        
+        if (!wifiManager.getConfigMode())
+        {
+          wifiManager.reset();
+          // 重启设备
+          ESP.restart();
+        }
       }
     }
 #endif
+
+    // 电源管理 - 始终保持处理
+    powerManager.loop();
 
     delay(5);
   }
@@ -170,9 +200,60 @@ void task1(void *parameter)
   }
 }
 
+void printWakeupReason() {
+  esp_sleep_wakeup_cause_t wakeup_reason;
+  wakeup_reason = esp_sleep_get_wakeup_cause();
+
+  switch(wakeup_reason) {
+    case ESP_SLEEP_WAKEUP_EXT0: 
+      Serial.println("[系统] 从外部RTC_IO唤醒 (运动检测)");
+      break;
+    case ESP_SLEEP_WAKEUP_EXT1: 
+      Serial.println("[系统] 从外部RTC_CNTL唤醒");
+      break;
+    case ESP_SLEEP_WAKEUP_TIMER: 
+      Serial.println("[系统] 从定时器唤醒");
+      break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD: 
+      Serial.println("[系统] 从触摸唤醒");
+      break;
+    case ESP_SLEEP_WAKEUP_ULP: 
+      Serial.println("[系统] 从ULP唤醒");
+      break;
+    default: 
+      Serial.printf("[系统] 从非深度睡眠唤醒，原因代码: %d\n", wakeup_reason);
+      break;
+  }
+  
+  // 打印系统信息
+  Serial.printf("[系统] ESP32-S3芯片ID: %llX\n", ESP.getEfuseMac());
+  Serial.printf("[系统] 总运行内存: %d KB\n", ESP.getHeapSize() / 1024);
+  Serial.printf("[系统] 可用运行内存: %d KB\n", ESP.getFreeHeap() / 1024);
+  Serial.printf("[系统] CPU频率: %d MHz\n", ESP.getCpuFreqMHz());
+}
+
 void setup()
 {
   Serial.begin(115200);
+  delay(100);
+  
+  // 增加启动计数并打印
+  bootCount++;
+  Serial.println("Boot number: " + String(bootCount));
+  
+  // 打印唤醒原因
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  printWakeupReason();
+  
+  // 检查是否从深度睡眠唤醒
+  bool isWakeFromDeepSleep = (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED);
+  
+  if (isWakeFromDeepSleep) {
+    Serial.println("[系统] 从深度睡眠唤醒，重新初始化系统...");
+  } else {
+    Serial.println("[系统] 正常启动");
+  }
+  
   led.begin();
   led.setMode(LED::OFF);
 
@@ -182,6 +263,9 @@ void setup()
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   gps.begin();
   imu.begin();
+  
+  // 重新初始化WiFi
+  Serial.println("[系统] 初始化WiFi连接...");
   wifiManager.begin();
 
   xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 0, NULL);
@@ -190,6 +274,11 @@ void setup()
 
 #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
   tft_begin();
+  
+  // 如果从深度睡眠唤醒，确保TFT正常唤醒
+  if (isWakeFromDeepSleep) {
+    tft_wakeup();
+  }
 #endif
 
 #ifdef MODE_SERVER
@@ -200,9 +289,12 @@ void setup()
   bc.setup();
 #endif
 
+  // 初始化电源管理器
+  powerManager.begin();
+
   // esp双核任务
   xTaskCreate(task0, "Task0", 1024 * 10, NULL, 0, NULL);
-  xTaskCreate(task1, "Task1", 1024 * 10, NULL, 1, NULL);
+  xTaskCreate(task1, "Task1", 1024 * 10, NULL, 0, NULL);
 
   Serial.println("main setup end");
 }
@@ -211,7 +303,7 @@ void loop()
 {
   Serial.println("");
   // device.printImuData();
-  device.printGpsData();
+  // device.printGpsData();
   // device.print_device_info();
   Serial.println("");
   delay(1000);

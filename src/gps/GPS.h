@@ -30,6 +30,8 @@ private:
     void setMode1();
     void setMode2();
     void configGps(const char *configCmd);
+    int _rxPin;
+    int _txPin;
 };
 
 extern GPS gps;

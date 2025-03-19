@@ -26,6 +26,9 @@ $PCAS04,2*1B 单北斗工作模式
 
 GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
 {
+    // 初始化时记录引脚号，便于调试
+    _rxPin = rxPin;
+    _txPin = txPin;
 }
 
 void GPS::configGps(const char *configCmd)
@@ -39,28 +42,46 @@ void GPS::configGps(const char *configCmd)
 void GPS::begin()
 {
     Serial.println(TinyGPSPlus::libraryVersion());
-    gpsSerial.begin(9600);  // 初始默认波特率
-    setMode2();
+    Serial.printf("GPS使用引脚 RX:%d TX:%d\n", _rxPin, _txPin);
+    
+    // 初始默认波特率 9600 启动然后设置
+    if (GPS_DEFAULT_BAUDRATE == 9600) {
+        gpsSerial.begin(115200);  // 初始默认波特率
+    } else {
+        gpsSerial.begin(9600);  // 初始默认波特率
+    }
+    delay(200); // 增加延时确保GPS模块稳定
+    
+    // 尝试多次设置波特率，确保命令被接收
+    if(setGpsBaudRate(GPS_DEFAULT_BAUDRATE)) {
+        Serial.printf("GPS波特率设置为: %d\n", GPS_DEFAULT_BAUDRATE);
+    } else {
+        Serial.println("GPS波特率设置失败");
+    }
+    delay(200);
+
+    setMode1();
+    delay(200);
+    setGpsHz(GPS_HZ);
+    delay(200);
     Serial.println("GPS 初始化完成");
 }
 
 void GPS::setMode1()
 {
     // 北斗 单模
-    configGps("$PCAS04,2*1B\r\n");
+    // configGps("$PCAS04,2*1B\r\n");
+    // GPS 单模
+    configGps("$PCAS04,1*18\r\n");
     // 1000ms 输出一次 RMC 消息
-    configGps("$PCAS03,0,0,0,0,1,1,1,0,0,0,,,0,0,,,,0*33\r\n");
-    // 1HZ
-    setGpsHz(1);
+    // configGps("$PCAS03,0,0,0,0,1,1,1,0,0,0,,,0,0,,,,0*33\r\n");
 }
 
 void GPS::setMode2()
 {
     // 双模式
     configGps("$PCAS04,3*1A\r\n");
-    configGps("$PCAS03,0,0,0,0,0,0,1,0,0,0,,,0,0,,,,0*33\r\n");
-    // 1HZ
-    setGpsHz(1);
+    // configGps("$PCAS03,0,0,0,0,0,0,1,0,0,0,,,0,0,,,,0*33\r\n");
 }
 
 /*
@@ -99,12 +120,21 @@ bool GPS::setGpsBaudRate(int baudRate)
     const char* configCmd = nullptr;
     switch (baudRate) {
         case 115200: configCmd = "$PCAS01,5*19\r\n"; break;
-        case 9600:   configCmd = "$PCAS01,1*1D\r\n";  break;
-        case 4800:   configCmd = "$PCAS01,1*1D\r\n";   break;
+        case 9600:   configCmd = "$PCAS01,1*1D\r\n"; break;
         default:     return false;
     }
     
-    configGps(configCmd);
+    // 多次发送配置命令，确保GPS模块接收到
+    for (int i = 0; i < 5; i++) {
+        gpsSerial.print(configCmd);
+        delay(100);
+    }
+
+    // 重新配置串口波特率
+    gpsSerial.end();
+    delay(100);
+    gpsSerial.begin(baudRate);
+    
     return true;
 }
 

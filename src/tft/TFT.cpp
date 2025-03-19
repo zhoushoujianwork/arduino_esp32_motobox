@@ -277,3 +277,32 @@ void tft_loop()
         // lv_label_set_text(ui_textHdopStatus, hdopText);
     }
 }
+
+void tft_sleep() {
+    Serial.println("TFT entering sleep mode");
+    
+    // 发送指令使显示器进入睡眠模式
+    // 尝试使用TFT_eSPI库中的睡眠相关函数
+    tft.writecommand(0x10); // 发送睡眠命令
+    
+    // 也可以关闭背光以节省电量
+    // 假设背光是通过GPIO控制的
+    #ifdef TFT_BL
+    pinMode(TFT_BL, OUTPUT);
+    digitalWrite(TFT_BL, LOW); // 关闭背光
+    #endif
+}
+
+void tft_wakeup() {
+    Serial.println("TFT waking up");
+    
+    // 发送指令唤醒显示器
+    tft.writecommand(0x11); // 发送唤醒命令
+    delay(120); // ST7789等显示器需要等待一段时间
+    
+    // 重新打开背光
+    #ifdef TFT_BL
+    pinMode(TFT_BL, OUTPUT);
+    digitalWrite(TFT_BL, HIGH); // 开启背光
+    #endif
+}

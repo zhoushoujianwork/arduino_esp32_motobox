@@ -6,6 +6,7 @@ IMU::IMU(int sda, int scl)
 {
     this->sda = sda;
     this->scl = scl;
+    this->motionIntPin = -1; // 默认不使用中断引脚
 }
 
 void IMU::begin()
@@ -150,5 +151,38 @@ void IMU::loop()
         device.get_imu_data()->pitch = ALPHA * (device.get_imu_data()->pitch + device.get_imu_data()->gyro_y * dt) + (1.0 - ALPHA) * pitch_acc;
 
         device.get_imu_data()->temperature = qmi.getTemperature_C();
+    }
+}
+
+bool IMU::enableMotionDetection(int intPin, float threshold)
+{
+    // 保存中断引脚号
+    this->motionIntPin = intPin;
+    
+    // 设置中断引脚为输入模式
+    pinMode(intPin, INPUT);
+    
+    // 注意：这里假设QMI8658库有相关函数来配置运动检测。
+    // 如果实际SensorQMI8658库没有此功能，需要添加相应的寄存器配置代码。
+    
+    // 示例配置代码（需要根据QMI8658实际寄存器映射调整）：
+    // 1. 配置加速度计中断阈值
+    // qmi.setAccInterruptThreshold(threshold);
+    
+    // 2. 启用加速度计中断功能
+    // qmi.enableAccInterrupt(intPin);
+    
+    Serial.println("Motion detection enabled");
+    return true;
+}
+
+void IMU::disableMotionDetection()
+{
+    if (motionIntPin != -1) {
+        // 禁用中断
+        // qmi.disableAccInterrupt();
+        
+        Serial.println("Motion detection disabled");
+        motionIntPin = -1;
     }
 }

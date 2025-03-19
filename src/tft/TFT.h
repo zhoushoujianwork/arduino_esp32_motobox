@@ -12,9 +12,12 @@
 
 void tft_begin();
 void tft_loop();
+void tft_sleep();
+void tft_wakeup();
 
 // 声明为类成员变量或全局变量
 extern float gyroTopLeft;
 extern float gyroTopRight;
+extern TFT_eSPI tft;
 
 #endif // _TFT_H_

@@ -16,10 +16,17 @@ public:
     IMU(int sda, int scl); // 默认I2C引脚
     void begin();
     void loop();
+    
+    // 新增方法：启用运动检测中断功能
+    bool enableMotionDetection(int intPin, float threshold);
+    
+    // 新增方法：禁用运动检测中断功能
+    void disableMotionDetection();
 
 private:
     int sda;
     int scl;
+    int motionIntPin; // 运动检测中断引脚
     SensorQMI8658 qmi;
 };
 
