@@ -114,15 +114,20 @@ void tft_begin()
     LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
 
     Serial.println(LVGL_Arduino);
-    Serial.println("I am LVGL_Arduino");
+    Serial.println("[TFT] 初始化LVGL");
 
+    // 检查是否已经从睡眠中唤醒
+    bool isWakingFromSleep = tft_is_waking_from_sleep;
+    
+    // 初始化LVGL
     lv_init();
 
 #if LV_USE_LOG != 0
     lv_log_register_print_cb(my_print); /* register print function for debugging */
 #endif
 
-    tft.begin();        /* TFT init */
+    // 初始化显示屏
+    tft.begin(); /* TFT init */
     tft.setRotation(3); /* Landscape orientation, flipped */
 
     // 初始化背光
@@ -135,6 +140,16 @@ void tft_begin()
     Serial.println("[TFT] 背光初始化完成，亮度设为最大");
     #endif
 
+    // 如果是从睡眠中唤醒，执行唤醒命令
+    if (isWakingFromSleep) {
+        Serial.println("[TFT] 从睡眠中唤醒，发送唤醒命令");
+        tft.writecommand(0x11); // SLPOUT - 退出睡眠模式
+        delay(120); // 等待唤醒
+        tft.writecommand(0x29); // DISPON - 打开显示
+        delay(50);
+    }
+
+    // 初始化LVGL绘图缓冲区
     lv_disp_draw_buf_init(&draw_buf, buf, NULL, TFT_VER_RES * TFT_HOR_RES / 10);
 
     /*Initialize the display*/
@@ -154,16 +169,27 @@ void tft_begin()
     indev_drv.read_cb = my_touchpad_read;
     lv_indev_drv_register(&indev_drv);
 
+    // 初始化UI
     ui_init();
     
     // 如果不是从睡眠唤醒，则执行初始化动画
-    if (!tft_is_waking_from_sleep) {
+    if (!isWakingFromSleep) {
+        Serial.println("[TFT] 执行仪表盘初始化动画");
         init_dashboard();
     } else {
         Serial.println("[TFT] 从睡眠模式唤醒，跳过初始化动画");
-        // 重置唤醒标志
-        tft_is_waking_from_sleep = false;
+        // 重置仪表为零值
+        lv_slider_set_value(ui_SliderSpeed, 0, LV_ANIM_OFF);
+        lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
+        lv_slider_set_value(ui_SliderGyro, 0, LV_ANIM_OFF);
+        lv_event_send(ui_SliderGyro, LV_EVENT_VALUE_CHANGED, NULL);
     }
+    
+    // 重置唤醒标志
+    tft_is_waking_from_sleep = false;
+    
+    // 确保界面刷新
+    lv_timer_handler();
     
     Serial.println("[TFT] 设置完成");
 }
@@ -199,22 +225,26 @@ void tft_loop()
     }
     else
     {
+        // 显示蓝牙图标 - 已连接状态
         lv_img_set_src(ui_imgBle, &ui_img_bluetooth_1_png);
         lv_obj_set_style_img_opa(ui_imgBle, LV_OPA_COVER, 0); // 完全不透明
-        lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0); // 完全不透明
-        lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_COVER, 0); // 完全不透明
-
-        // Show Wifi
-        if (device.get_device_state()->wifiConnected)
-        {
-            lv_img_set_src(ui_imgWifi, &ui_img_wifiok_png);
-        }
-        else
-        {
-            lv_img_set_src(ui_imgWifi, &ui_img_wificon_png);
-        }
-
         
+        // Wi-Fi图标始终显示，但根据连接状态调整透明度
+        lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0); // 默认完全不透明
+        
+        // GPS图标根据数据有效性显示
+        lv_obj_set_style_img_opa(ui_imgGps, device.get_device_state()->gpsReady ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+
+        // 根据WiFi连接状态更新图标
+        if (device.get_device_state()->wifiConnected) {
+            // WiFi已连接 - 显示正常图标
+            lv_img_set_src(ui_imgWifi, &ui_img_wifiok_png);
+            lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0); // 完全不透明
+        } else {
+            // WiFi未连接 - 降低透明度
+            lv_img_set_src(ui_imgWifi, &ui_img_wificon_png);
+            lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_50, 0); // 半透明
+        }
 
         // Show Gps
         char gpsTextnu[4]; // 增加缓冲区大小以容纳两位数字和结束符
@@ -236,22 +266,17 @@ void tft_loop()
 
         // 处理GPS无数据的情况
         int currentSpeedValue = device.get_gps_data()->speed;
-        if (device.get_device_state()->gpsReady)
-        {
-            lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_COVER, 0); // 完全不透明
-        }
-        else
-        {
+        if (!device.get_device_state()->gpsReady) {
             currentSpeedValue = 0;
-            lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_TRANSP, 0); // 完全透明
         }
+        
         lv_slider_set_value(ui_SliderSpeed, currentSpeedValue, LV_ANIM_OFF);
         lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
         char tripText[20];                             // Ensure this buffer is large enough for your number
         snprintf(tripText, sizeof(tripText), "Trip:%.0f km", device.getTotalDistanceKm());
         lv_label_set_text(ui_textTrip, tripText);
 
-        // 依据方向移动Compose TODO: 优化这块图片准确性
+        // 依据方向移动Compass
         lv_obj_set_x(ui_compass, map(device.get_gps_data()->heading, 0, 360, 150, -195));
 
         lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
@@ -262,14 +287,6 @@ void tft_loop()
         // float gyro = imu.get_imu_data()->roll;
         lv_slider_set_value(ui_SliderGyro, gyro, LV_ANIM_ON);
         lv_event_send(ui_SliderGyro, LV_EVENT_VALUE_CHANGED, NULL);
-        // top值只保留 2 秒
-        // unsigned long currentMillis = millis();
-        // if (currentMillis - previousMillis >= 2000)
-        // {
-        //     previousMillis = currentMillis;
-        //     gyroTopLeft = 0;
-        //     gyroTopRight = 0;
-        // }
 
         // get top gyro value for show
         if (gyro > gyroTopRight)
@@ -290,18 +307,6 @@ void tft_loop()
         snprintf(gyroTextRight, sizeof(gyroTextRight), "%.0f°", gyroTopRight);
         lv_label_set_text(ui_textGyroTopLeft, gyroTextLeft);
         lv_label_set_text(ui_textGyroTopRight, gyroTextRight);
-
-        // 添加HDOP状态显示
-        // char hdopText[20];
-        // float hdop = device.get_gps_data()->hdop;
-        // const char* status = "";
-        // if(hdop < 1.0) status = "优秀";
-        // else if(hdop < 2.0) status = "良好";
-        // else if(hdop < 5.0) status = "一般";
-        // else status = "较差";
-        
-        // snprintf(hdopText, sizeof(hdopText), "精度:%.1f(%s)", hdop, status);
-        // lv_label_set_text(ui_textHdopStatus, hdopText);
     }
 }
 

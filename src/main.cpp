@@ -320,14 +320,19 @@ void initializeHardware() {
   wifiManager.begin();
   #endif
 
+  // 电源管理初始化
+  powerManager.begin();
+
   #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
-  // 显示屏初始化
-  tft_begin();
-  
-  // 从深度睡眠唤醒时，确保TFT正常唤醒，但不执行初始化动画
+  // 如果从深度睡眠唤醒，设置标志位跳过动画
   if (isWakeFromDeepSleep) {
-    Serial.println("[系统] 从深度睡眠唤醒，恢复显示屏状态");
+    tft_is_waking_from_sleep = true;
+    Serial.println("[系统] 设置显示屏唤醒标志");
   }
+  
+  // 显示屏初始化
+  Serial.println("[系统] 初始化显示屏...");
+  tft_begin();
   #endif
 
   #ifdef MODE_SERVER
@@ -339,9 +344,6 @@ void initializeHardware() {
   // 蓝牙客户端初始化
   bc.setup();
   #endif
-
-  // 电源管理初始化
-  powerManager.begin();
 }
 
 //============================= ARDUINO框架函数 =============================
@@ -358,21 +360,9 @@ void setup() {
   // 打印唤醒原因
   printWakeupReason();
   
-  // 检查是否从深度睡眠唤醒
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  bool isWakeFromDeepSleep = (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED);
-  
   // 初始化硬件
   initializeHardware();
   
-  // 如果是从深度睡眠唤醒，额外处理显示屏
-  #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
-  if (isWakeFromDeepSleep) {
-    // 唤醒显示屏，但跳过初始化动画
-    tft_wakeup();
-  }
-  #endif
-
   // 创建任务
   #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 1, NULL);
