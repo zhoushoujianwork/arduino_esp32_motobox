@@ -64,6 +64,12 @@ void PowerManager::interruptLowPowerMode() {
         Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
         powerState = POWER_STATE_NORMAL;
         lastMotionTime = millis(); // 重置最后一次运动时间
+        
+        // 恢复屏幕亮度到最大
+        #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+        tft_set_brightness(255);
+        Serial.println("[电源管理] 恢复屏幕亮度到最大");
+        #endif
     }
 }
 
@@ -174,11 +180,27 @@ void PowerManager::enterLowPowerMode() {
     // 设置电源状态为倒计时
     powerState = POWER_STATE_COUNTDOWN;
     
+    // 倒计时总时间（秒）
+    const int countdownTime = 10;
+    
+    // 添加UI提示
+    #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+    // 保存当前亮度设置
+    static const int maxBrightness = 255;
+    #endif
+    
     // 添加10秒倒计时
     Serial.println("[电源管理] 10秒倒计时开始，如有动作或按钮按下将取消进入低功耗模式...");
     
-    for (int i = 10; i > 0; i--) {
+    for (int i = countdownTime; i > 0; i--) {
         Serial.printf("[电源管理] 倒计时: %d 秒\n", i);
+        
+        // 设置屏幕亮度，逐渐降低
+        #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+        int brightness = map(i, countdownTime, 1, maxBrightness, maxBrightness/10);
+        tft_set_brightness(brightness);
+        Serial.printf("[电源管理] 屏幕亮度设置为 %d/%d\n", brightness, maxBrightness);
+        #endif
         
         // 使用更小的时间间隔检查中断请求，提高响应速度
         unsigned long countdownStartTime = millis();
@@ -188,6 +210,13 @@ void PowerManager::enterLowPowerMode() {
                 Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
                 interruptRequested = false;
                 powerState = POWER_STATE_NORMAL;
+                
+                // 恢复屏幕亮度到最大
+                #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+                tft_set_brightness(maxBrightness);
+                Serial.println("[电源管理] 恢复屏幕亮度到最大");
+                #endif
+                
                 return; // 退出函数，不进入低功耗模式
             }
             
@@ -196,6 +225,13 @@ void PowerManager::enterLowPowerMode() {
                 Serial.println("[电源管理] 检测到运动，取消进入低功耗模式");
                 lastMotionTime = millis(); // 更新最后一次运动时间
                 powerState = POWER_STATE_NORMAL;
+                
+                // 恢复屏幕亮度到最大
+                #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+                tft_set_brightness(maxBrightness);
+                Serial.println("[电源管理] 恢复屏幕亮度到最大");
+                #endif
+                
                 return; // 退出函数，不进入低功耗模式
             }
             
@@ -211,6 +247,13 @@ void PowerManager::enterLowPowerMode() {
         Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
         interruptRequested = false;
         powerState = POWER_STATE_NORMAL;
+        
+        // 恢复屏幕亮度到最大
+        #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+        tft_set_brightness(maxBrightness);
+        Serial.println("[电源管理] 恢复屏幕亮度到最大");
+        #endif
+        
         return; // 退出函数，不进入低功耗模式
     }
     
@@ -224,6 +267,13 @@ void PowerManager::enterLowPowerMode() {
         Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
         interruptRequested = false;
         powerState = POWER_STATE_NORMAL;
+        
+        // 恢复屏幕亮度到最大
+        #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+        tft_set_brightness(maxBrightness);
+        Serial.println("[电源管理] 恢复屏幕亮度到最大");
+        #endif
+        
         return; // 退出函数，不进入低功耗模式
     }
     

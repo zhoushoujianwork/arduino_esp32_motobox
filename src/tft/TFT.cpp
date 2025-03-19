@@ -8,6 +8,13 @@ TFT_eSPI tft = TFT_eSPI(); /* TFT instance */
 float gyroTopLeft = 0;
 float gyroTopRight = 0;
 
+// 添加背光控制通道（假设使用PWM控制）
+#ifdef TFT_BL
+  static const int backlightChannel = 0; // 使用第一个PWM通道
+  static const int backlightFreq = 5000; // 5KHz
+  static const int backlightResolution = 8; // 8位分辨率 (0-255)
+#endif
+
 #if LV_USE_LOG != 0
 /* Serial debugging */
 void my_print(const char *buf)
@@ -116,6 +123,16 @@ void tft_begin()
 
     tft.begin();        /* TFT init */
     tft.setRotation(3); /* Landscape orientation, flipped */
+
+    // 初始化背光
+    #ifdef TFT_BL
+    // 配置LEDC通道
+    ledcSetup(backlightChannel, backlightFreq, backlightResolution);
+    ledcAttachPin(TFT_BL, backlightChannel);
+    // 设置默认亮度为最大
+    ledcWrite(backlightChannel, 255);
+    Serial.println("[TFT] 背光初始化完成，亮度设为最大");
+    #endif
 
     lv_disp_draw_buf_init(&draw_buf, buf, NULL, TFT_VER_RES * TFT_HOR_RES / 10);
 
@@ -279,30 +296,62 @@ void tft_loop()
 }
 
 void tft_sleep() {
-    Serial.println("TFT entering sleep mode");
+    Serial.println("[TFT] 进入睡眠模式");
+    
+    // 首先将亮度逐渐降低到0
+    #ifdef TFT_BL
+    // 以10步逐渐降低亮度
+    for (int brightness = 255; brightness >= 0; brightness -= 25) {
+        tft_set_brightness(brightness);
+        delay(20); // 短暂延迟以实现渐变效果
+    }
+    // 最后确保亮度为0
+    tft_set_brightness(0);
+    #endif
     
     // 发送指令使显示器进入睡眠模式
-    // 尝试使用TFT_eSPI库中的睡眠相关函数
     tft.writecommand(0x10); // 发送睡眠命令
-    
-    // 也可以关闭背光以节省电量
-    // 假设背光是通过GPIO控制的
-    #ifdef TFT_BL
-    pinMode(TFT_BL, OUTPUT);
-    digitalWrite(TFT_BL, LOW); // 关闭背光
-    #endif
 }
 
 void tft_wakeup() {
-    Serial.println("TFT waking up");
+    Serial.println("[TFT] 唤醒");
     
     // 发送指令唤醒显示器
     tft.writecommand(0x11); // 发送唤醒命令
     delay(120); // ST7789等显示器需要等待一段时间
     
-    // 重新打开背光
+    // 逐渐增加亮度
     #ifdef TFT_BL
-    pinMode(TFT_BL, OUTPUT);
-    digitalWrite(TFT_BL, HIGH); // 开启背光
+    // 确保亮度初始为0
+    tft_set_brightness(0);
+    // 以10步逐渐提高亮度
+    for (int brightness = 0; brightness <= 255; brightness += 25) {
+        tft_set_brightness(brightness);
+        delay(20); // 短暂延迟以实现渐变效果
+    }
+    // 最后确保亮度为最大
+    tft_set_brightness(255);
     #endif
+}
+
+void tft_set_brightness(uint8_t brightness) {
+  #ifdef TFT_BL
+    // 使用ledc设置PWM值控制亮度
+    if (brightness > 255) brightness = 255;
+    
+    // 检查是否已经初始化过PWM
+    static bool pwm_initialized = false;
+    if (!pwm_initialized) {
+      // 配置LEDC通道
+      ledcSetup(backlightChannel, backlightFreq, backlightResolution);
+      ledcAttachPin(TFT_BL, backlightChannel);
+      pwm_initialized = true;
+    }
+    
+    // 设置亮度
+    ledcWrite(backlightChannel, brightness);
+    Serial.printf("[TFT] 设置亮度为 %d/255\n", brightness);
+  #else
+    Serial.println("[TFT] 未定义TFT_BL引脚，无法调整亮度");
+  #endif
 }
