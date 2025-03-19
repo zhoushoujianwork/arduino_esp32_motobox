@@ -41,10 +41,6 @@ unsigned long lastGpsPublishTime = 0;
 unsigned long lastImuPublishTime = 0;
 unsigned long lastBlePublishTime = 0;
 
-// GPS刷新率配置
-static int hzs[] = {1, 2, 5, 10};
-static int hz = 0;
-
 //============================= 设备实例 =============================
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
@@ -116,8 +112,9 @@ void taskGps(void *parameter) {
  * 负责电源管理、LED状态、按钮处理
  */
 void taskSystem(void *parameter) {
+  // GPS更新率自动调整的时间记录
+  unsigned long lastGpsRateAdjustTime = 0;
  
-
   while (true) {
     // LED状态更新
     led.loop();
@@ -142,6 +139,21 @@ void taskSystem(void *parameter) {
     
     // 按钮处理逻辑
     handleButtonEvents();
+    
+    // 每5秒自动调整GPS更新率
+    if (millis() - lastGpsRateAdjustTime >= 5000) {
+      // 暂停GPS任务以避免数据读取冲突
+      vTaskSuspend(gpsTaskHandle);
+      
+      // 调整GPS更新率
+      gps.autoAdjustUpdateRate();
+      
+      // 恢复GPS任务
+      vTaskResume(gpsTaskHandle);
+      
+      // 更新时间戳
+      lastGpsRateAdjustTime = millis();
+    }
     #endif
 
     // 电源管理 - 始终保持处理
@@ -228,13 +240,17 @@ void handleButtonEvents() {
     if (button.isClicked()) {
       Serial.println("[按钮] 检测到点击，切换GPS刷新率");
       
-      hz = (hz + 1) % 4;
+      // 依次切换可用的频率: 1Hz -> 2Hz -> 5Hz -> 10Hz -> 1Hz...
+      static int hzValues[] = {1, 2, 5, 10};
+      static int hzIndex = 1; // 默认从2Hz开始 (index=1)
+      
+      hzIndex = (hzIndex + 1) % 4; // 循环切换
+      int newHz = hzValues[hzIndex];
+      
       vTaskSuspend(gpsTaskHandle);
       delay(100);
-      if (gps.setGpsHz(hzs[hz])) {
-        Serial.printf("[GPS] 设置GPS更新率为%dHz\n", hzs[hz]);
-        // 更新设备状态中的GPS HZ值
-        device.get_device_state()->gpsHz = hzs[hz];
+      if (gps.setGpsHz(newHz)) {
+        Serial.printf("[GPS] 手动设置GPS更新率为%dHz\n", newHz);
       } else {
         Serial.println("[GPS] 设置GPS更新率失败");
       }
@@ -248,8 +264,6 @@ void handleButtonEvents() {
       
       if (!wifiManager.getConfigMode()) {
         wifiManager.reset();
-        // 重启设备
-        ESP.restart();
       }
     }
   }
