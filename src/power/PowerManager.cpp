@@ -28,6 +28,11 @@ void PowerManager::loop() {
         return;
     }
 
+#ifdef MODE_CLIENT
+    // 客户端模式不使用睡眠功能
+    return;
+#endif
+
     // 仅在正常工作状态下检测运动和空闲状态
     if (powerState == POWER_STATE_NORMAL) {
         // 检测设备是否有运动
@@ -66,7 +71,7 @@ void PowerManager::interruptLowPowerMode() {
         lastMotionTime = millis(); // 重置最后一次运动时间
         
         // 恢复屏幕亮度到最大
-        #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+        #ifdef MODE_ALLINONE
         tft_set_brightness(255);
         Serial.println("[电源管理] 恢复屏幕亮度到最大");
         #endif
@@ -158,7 +163,7 @@ void PowerManager::disablePeripherals() {
 #endif
 
     // 关闭TFT显示
-#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+#ifdef MODE_ALLINONE
     // 使用新增的TFT睡眠函数
     Serial.println("[电源管理] 关闭显示屏...");
     tft_sleep();
@@ -179,6 +184,12 @@ void PowerManager::configureWakeupSources() {
 }
 
 void PowerManager::enterLowPowerMode() {
+#ifdef MODE_CLIENT
+    // 客户端模式不使用睡眠功能
+    Serial.println("[电源管理] 客户端模式不使用睡眠功能");
+    return;
+#endif
+
     Serial.println("[电源管理] 正在进入低功耗模式...");
     
     // 设置电源状态为倒计时
@@ -188,7 +199,7 @@ void PowerManager::enterLowPowerMode() {
     const int countdownTime = 10;
     
     // 添加UI提示
-    #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+    #ifdef MODE_ALLINONE
     // 保存当前亮度设置
     static const int maxBrightness = 255;
     #endif
@@ -200,7 +211,7 @@ void PowerManager::enterLowPowerMode() {
         Serial.printf("[电源管理] 倒计时: %d 秒\n", i);
         
         // 设置屏幕亮度，逐渐降低
-        #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+        #ifdef MODE_ALLINONE
         int brightness = map(i, countdownTime, 1, maxBrightness, maxBrightness/10);
         tft_set_brightness(brightness);
         Serial.printf("[电源管理] 屏幕亮度设置为 %d/%d\n", brightness, maxBrightness);
@@ -216,7 +227,7 @@ void PowerManager::enterLowPowerMode() {
                 powerState = POWER_STATE_NORMAL;
                 
                 // 恢复屏幕亮度到最大
-                #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+                #ifdef MODE_ALLINONE
                 tft_set_brightness(maxBrightness);
                 Serial.println("[电源管理] 恢复屏幕亮度到最大");
                 #endif
@@ -231,7 +242,7 @@ void PowerManager::enterLowPowerMode() {
                 powerState = POWER_STATE_NORMAL;
                 
                 // 恢复屏幕亮度到最大
-                #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+                #ifdef MODE_ALLINONE
                 tft_set_brightness(maxBrightness);
                 Serial.println("[电源管理] 恢复屏幕亮度到最大");
                 #endif
@@ -253,7 +264,7 @@ void PowerManager::enterLowPowerMode() {
         powerState = POWER_STATE_NORMAL;
         
         // 恢复屏幕亮度到最大
-        #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+        #ifdef MODE_ALLINONE
         tft_set_brightness(maxBrightness);
         Serial.println("[电源管理] 恢复屏幕亮度到最大");
         #endif
@@ -273,7 +284,7 @@ void PowerManager::enterLowPowerMode() {
         powerState = POWER_STATE_NORMAL;
         
         // 恢复屏幕亮度到最大
-        #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+        #ifdef MODE_ALLINONE
         tft_set_brightness(maxBrightness);
         Serial.println("[电源管理] 恢复屏幕亮度到最大");
         #endif

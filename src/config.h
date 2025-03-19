@@ -12,9 +12,9 @@
  *           and can send data to server via MQTT over WiFi
  * 3. CLIENT: Slave mode - receives data from server via Bluetooth and displays it
  */
-#define MODE_ALLINONE
+// #define MODE_ALLINONE
 // #define MODE_SERVER
-// #define MODE_CLIENT
+#define MODE_CLIENT
 
 /* Common Device Configuration */
 #define BLE_NAME            "ESP32-MOTO"
@@ -102,12 +102,13 @@
     #define LED_PIN          3
 
     /* TFT Display Pins */
-    #define TFT_CS          15
-    #define TFT_DC           2
-    #define TFT_MOSI        19
-    #define TFT_SCLK        18
-    #define TFT_RST          4
-    #define TFT_BL           5
+    #define TFT_CS 15
+    #define TFT_DC 2
+    #define TFT_MOSI 19
+    #define TFT_SCLK 18
+    #define TFT_RST 4
+    // #define TFT_BL 5
+    // GPIO5 不支持 PWM 输出 调整亮度，16 是支持的
 #endif
 
 #endif /* CONFIG_H */
