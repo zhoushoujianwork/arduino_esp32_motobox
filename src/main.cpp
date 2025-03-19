@@ -292,8 +292,16 @@ void printWakeupReason() {
  * 初始化所有硬件和模块
  */
 void initializeHardware() {
+  // 检查是否从深度睡眠唤醒
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  bool isWakeFromDeepSleep = (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED);
+  
   // 打印启动信息
-  Serial.printf("[系统] 系统启动，版本: %s\n", VERSION);
+  if (isWakeFromDeepSleep) {
+    Serial.println("[系统] 从深度睡眠唤醒，重新初始化系统...");
+  } else {
+    Serial.printf("[系统] 系统正常启动，版本: %s\n", VERSION);
+  }
   
   // LED初始化
   led.begin();
@@ -316,10 +324,9 @@ void initializeHardware() {
   // 显示屏初始化
   tft_begin();
   
-  // 从深度睡眠唤醒时，确保TFT正常唤醒
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  if (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED) {
-    tft_wakeup();
+  // 从深度睡眠唤醒时，确保TFT正常唤醒，但不执行初始化动画
+  if (isWakeFromDeepSleep) {
+    Serial.println("[系统] 从深度睡眠唤醒，恢复显示屏状态");
   }
   #endif
 
@@ -351,8 +358,20 @@ void setup() {
   // 打印唤醒原因
   printWakeupReason();
   
+  // 检查是否从深度睡眠唤醒
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  bool isWakeFromDeepSleep = (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED);
+  
   // 初始化硬件
   initializeHardware();
+  
+  // 如果是从深度睡眠唤醒，额外处理显示屏
+  #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+  if (isWakeFromDeepSleep) {
+    // 唤醒显示屏，但跳过初始化动画
+    tft_wakeup();
+  }
+  #endif
 
   // 创建任务
   #if defined(MODE_ALLINONE) || defined(MODE_SERVER)

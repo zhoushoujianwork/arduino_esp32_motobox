@@ -7,6 +7,7 @@ TFT_eSPI tft = TFT_eSPI(); /* TFT instance */
 
 float gyroTopLeft = 0;
 float gyroTopRight = 0;
+bool tft_is_waking_from_sleep = false; // 默认为false，表示不是从睡眠中唤醒
 
 // 添加背光控制通道（假设使用PWM控制）
 #ifdef TFT_BL
@@ -154,8 +155,17 @@ void tft_begin()
     lv_indev_drv_register(&indev_drv);
 
     ui_init();
-    init_dashboard();
-    Serial.println("TFT Setup done");
+    
+    // 如果不是从睡眠唤醒，则执行初始化动画
+    if (!tft_is_waking_from_sleep) {
+        init_dashboard();
+    } else {
+        Serial.println("[TFT] 从睡眠模式唤醒，跳过初始化动画");
+        // 重置唤醒标志
+        tft_is_waking_from_sleep = false;
+    }
+    
+    Serial.println("[TFT] 设置完成");
 }
 
 void tft_loop()
@@ -314,7 +324,10 @@ void tft_sleep() {
 }
 
 void tft_wakeup() {
-    Serial.println("[TFT] 唤醒");
+    Serial.println("[TFT] 唤醒显示屏");
+    
+    // 设置唤醒标志，告知tft_begin跳过初始化动画
+    tft_is_waking_from_sleep = true;
     
     // 发送指令唤醒显示器
     tft.writecommand(0x11); // 发送唤醒命令
@@ -332,6 +345,10 @@ void tft_wakeup() {
     // 最后确保亮度为最大
     tft_set_brightness(255);
     #endif
+    
+    // 刷新LVGL界面，确保显示正常
+    lv_timer_handler();
+    Serial.println("[TFT] 显示屏唤醒完成");
 }
 
 void tft_set_brightness(uint8_t brightness) {
