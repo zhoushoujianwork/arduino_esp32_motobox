@@ -13,8 +13,8 @@
  * 3. CLIENT: Slave mode - receives data from server via Bluetooth and displays it
  */
 // #define MODE_ALLINONE
-// #define MODE_SERVER
-#define MODE_CLIENT
+#define MODE_SERVER
+// #define MODE_CLIENT
 
 /* Common Device Configuration */
 #define BLE_NAME            "ESP32-MOTO"
