@@ -1,5 +1,8 @@
 #include "device.h"
 
+// 定义全局device变量
+Device device;
+
 Device::Device()
 {
 }

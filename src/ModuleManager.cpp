@@ -6,19 +6,23 @@ ModuleManager* ModuleManager::instance = nullptr;
 // 全局实例
 ModuleManager moduleManager;
 
+// 全局变量声明，用于其他文件访问
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+GPS gps(GPS_RX_PIN, GPS_TX_PIN);
+IMU imu(IMU_SDA_PIN, IMU_SCL_PIN);
+TaskHandle_t gpsTaskHandle = nullptr;
+#endif
+
 // RTC变量保持（深度睡眠后保持）
 RTC_DATA_ATTR int bootCount = 0;
 
 ModuleManager::ModuleManager() : 
-    gpsTaskHandle(nullptr),
     wifiInitTaskHandle(nullptr),
     lastGpsPublishTime(0),
     lastImuPublishTime(0),
     lastBlePublishTime(0),
     lastCompassPublishTime(0),
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    gps(GPS_RX_PIN, GPS_TX_PIN),
-    imu(IMU_SDA_PIN, IMU_SCL_PIN),
     button(BTN_PIN),
     mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD),
 #endif

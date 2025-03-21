@@ -18,6 +18,13 @@
 #include "power/PowerManager.h"
 #include "driver/gpio.h"
 
+// 声明全局变量
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+extern GPS gps;
+extern IMU imu;
+extern TaskHandle_t gpsTaskHandle;
+#endif
+
 // 任务类型枚举
 enum TaskType {
     TASK_WIFI,
@@ -51,7 +58,6 @@ private:
     Device device;
     
     // 任务句柄
-    TaskHandle_t gpsTaskHandle;
     TaskHandle_t wifiInitTaskHandle;
     
     // 时间记录变量
@@ -62,8 +68,6 @@ private:
     
     // 设备实例声明
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    GPS gps;
-    IMU imu;
     BTN button;
     MQTT mqtt;
 #endif
