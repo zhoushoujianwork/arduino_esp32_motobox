@@ -140,11 +140,11 @@ bool GPS::autoAdjustUpdateRate()
     int targetHz = 0;
     
     // 根据卫星数量确定目标更新频率，由于数据精简可以设置更高频率
-    if (satellites >= 15) {
+    if (satellites >= 25) {
         targetHz = 10;  // 卫星数量很多，高精度、高更新率
-    } else if (satellites >= 8) {
+    } else if (satellites >= 15) {
         targetHz = 5;   // 卫星数量中等，中等更新率
-    } else if (satellites >= 4) {
+    } else if (satellites >= 8) {
         targetHz = 2;   // 卫星数量较少，降低更新率保证质量
     } else {
         targetHz = 1;   // 卫星数量很少，最低更新率以保证质量
