@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>摩托车仪表</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            background-color: #222;
+            color: white;
+            overflow: hidden;
+        }
+        .dashboard-container {
+            width: 320px;
+            height: 240px;
+            margin: 40px auto;
+            background-color: #111;
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        .iframe-container {
+            width: 320px;
+            height: 240px;
+            overflow: hidden;
+        }
+        iframe {
+            border: none;
+            width: 100%;
+            height: 100%;
+        }
+        .iframe-tabs {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        .iframe-tab {
+            padding: 5px 10px;
+            margin: 0 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #333;
+        }
+        .iframe-tab.active {
+            background-color: #f00;
+        }
+    </style>
+</head>
+<body class="bg-gray-900">
+    <div class="container mx-auto py-8">
+        <h1 class="text-center text-2xl text-white mb-4">摩托车仪表盘设计</h1>
+        
+        <div class="dashboard-container">
+            <iframe id="dashboard-frame" src="main.html" class="iframe-display"></iframe>
+        </div>
+        
+        <div class="iframe-tabs">
+            <div class="iframe-tab active" onclick="changeFrame('main.html')">主界面</div>
+            <div class="iframe-tab" onclick="changeFrame('tire_pressure.html')">胎压监测</div>
+            <div class="iframe-tab" onclick="changeFrame('trip.html')">行程信息</div>
+            <div class="iframe-tab" onclick="changeFrame('settings.html')">设置</div>
+        </div>
+    </div>
+
+    <script>
+        function changeFrame(src) {
+            document.getElementById('dashboard-frame').src = src;
+            
+            // Update active tab
+            const tabs = document.querySelectorAll('.iframe-tab');
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.textContent.includes(src.split('.')[0].charAt(0).toUpperCase() + src.split('.')[0].slice(1))) {
+                    tab.classList.add('active');
+                }
+            });
+        }
+    </script>
+</body>
+</html> 

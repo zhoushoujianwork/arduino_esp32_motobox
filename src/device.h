@@ -63,6 +63,7 @@ typedef struct
     bool gpsReady;
     int gpsHz; // 0-10HZ
     bool imuReady;
+    bool compassReady;
     gps_data_t gpsData;
     imu_data_t imuData;
 } device_state_t;
@@ -78,6 +79,7 @@ public:
     void set_ble_connected(bool connected);
     void set_gps_ready(bool ready);
     void set_imu_ready(bool ready);
+    void set_compass_ready(bool ready);
     void print_device_info();
     void set_device_state(device_state_t *state);
     String get_device_id();

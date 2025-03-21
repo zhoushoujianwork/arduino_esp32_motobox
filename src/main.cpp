@@ -22,6 +22,7 @@
 #include "mqtt/MQTT.h"
 #include "tft/TFT.h"
 #include "qmi8658/IMU.h"
+#include "compass/COMPASS.h"
 #include "wifi/WifiManager.h"
 #include "power/PowerManager.h"
 
@@ -35,11 +36,15 @@ RTC_DATA_ATTR int bootCount = 0;
 
 // 任务句柄
 TaskHandle_t gpsTaskHandle = NULL;
+TaskHandle_t wifiInitTaskHandle = NULL;
 
 // 发布时间记录
 unsigned long lastGpsPublishTime = 0;
 unsigned long lastImuPublishTime = 0;
 unsigned long lastBlePublishTime = 0;
+
+// 新增变量记录上次罗盘数据发布时间
+unsigned long lastCompassPublishTime = 0;
 
 //============================= 设备实例 =============================
 
@@ -82,6 +87,20 @@ void initializeHardware();
 //============================= 任务定义 =============================
 
 /**
+ * WiFi初始化任务
+ * 负责WiFi的初始化和连接
+ */
+void taskWifiInit(void *parameter) {
+  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  Serial.println("[系统] 初始化WiFi连接...");
+  wifiManager.begin();
+  #endif
+  
+  // 任务完成后自动删除
+  vTaskDelete(NULL);
+}
+
+/**
  * WiFi管理任务
  * 负责WiFi连接和配置
  */
@@ -118,6 +137,23 @@ void taskGps(void *parameter) {
   }
   #endif 
 }
+
+// 在罗盘任务中使用条件编译
+#ifdef ENABLE_COMPASS
+/**
+ * 罗盘数据处理任务
+ * 负责罗盘数据获取和处理
+ */
+void taskCompass(void *parameter) {
+  while (true) {
+    // 处理罗盘数据
+    compass.loop();
+    
+    // 延迟以减轻CPU负担
+    delay(5);
+  }
+}
+#endif
 
 /**
  * 系统监控任务
@@ -202,6 +238,24 @@ void taskDataProcessing(void *parameter) {
       mqtt.publishIMU(*device.get_imu_data());
       lastImuPublishTime = millis();
     }
+
+    // 在MQTT发布部分使用条件编译
+    #ifdef ENABLE_COMPASS
+    // 如果罗盘已就绪，发布方位角数据
+    if (device.get_device_state()->compassReady) {
+      if (millis() - lastCompassPublishTime > MQTT_COMPASS_PUBLISH_INTERVAL) {
+        // 创建包含方位角的JSON数据
+        StaticJsonDocument<128> doc;
+        doc["heading"] = device.get_gps_data()->heading;
+        String compassJson;
+        serializeJson(doc, compassJson);
+        
+        // 发布到MQTT
+        mqtt.publish(MQTT_TOPIC_COMPASS, compassJson);
+        lastCompassPublishTime = millis();
+      }
+    }
+    #endif
     #endif
 
     #ifdef MODE_CLIENT
@@ -350,9 +404,41 @@ void initializeHardware() {
   // IMU初始化
   imu.begin();
   
-  // WiFi初始化
-  Serial.println("[系统] 初始化WiFi连接...");
-  wifiManager.begin();
+  #ifdef ENABLE_COMPASS
+  // 重新创建罗盘实例并初始化
+  compass = COMPASS(IMU_SDA_PIN, IMU_SCL_PIN);
+  compass.begin();
+  #endif
+  
+  // 初始化GPS（无需波特率参数）
+  gps.begin();
+  
+  // 在单独任务中启动WiFi初始化（将会并行进行）
+  xTaskCreate(taskWifiInit, "TaskWifiInit", 1024 * 10, NULL, 1, &wifiInitTaskHandle);
+
+  // 创建GPS任务
+  xTaskCreatePinnedToCore(
+      taskGps,
+      "GPS Task",
+      4096,
+      NULL,
+      1,
+      &gpsTaskHandle,
+      0
+  );
+
+  // 创建罗盘任务
+  #ifdef ENABLE_COMPASS
+  xTaskCreatePinnedToCore(
+      taskCompass,
+      "Compass Task",
+      2048,
+      NULL,
+      1,
+      NULL,
+      0
+  );
+  #endif
   #endif
 
   // 电源管理初始化
@@ -420,7 +506,6 @@ void setup() {
   // 创建任务
   #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 1, NULL);
-  xTaskCreatePinnedToCore(taskGps, "TaskGps", 1024 * 10, NULL, 1, &gpsTaskHandle, 1);
   #endif
   
   xTaskCreate(taskSystem, "TaskSystem", 1024 * 10, NULL, 2, NULL);

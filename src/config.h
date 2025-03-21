@@ -12,8 +12,8 @@
  *           and can send data to server via MQTT over WiFi
  * 3. CLIENT: Slave mode - receives data from server via Bluetooth and displays it
  */
-// #define MODE_ALLINONE
-#define MODE_SERVER
+#define MODE_ALLINONE
+// #define MODE_SERVER
 // #define MODE_CLIENT
 
 /* Common Device Configuration */
@@ -22,6 +22,7 @@
 #define DEVICE_CHAR_UUID    "BEB5483A-36E1-4688-B7F5-EA07361B26A8"
 #define GPS_CHAR_UUID       "BEB5483E-36E1-4688-B7F5-EA07361B26A8"
 #define IMU_CHAR_UUID       "BEB5483F-36E1-4688-B7F5-EA07361B26A8"
+#define COMPASS_CHAR_UUID   "BEB5483G-36E1-4688-B7F5-EA07361B26A8"
 
 /* Battery Configuration */
 #define BAT_MIN_VOLTAGE     2900
@@ -38,6 +39,9 @@
 /* IMU Configuration */
 #define IMU_MAX_D          68     /* Marquis GP retention */
 
+/* Compass Configuration */
+#define COMPASS_DECLINATION 2.5  /* 磁偏角，单位：度，可根据所在地区调整 */
+
 /* GPS Configuration */
 #define GPS_DEFAULT_BAUDRATE 9600
 #define GPS_HZ              2      /* Supported: 1, 2, 5, 10 Hz */
@@ -52,11 +56,13 @@
 #define MQTT_TOPIC_DEVICE_INFO  String("vehicle/v1/") + device.get_device_id() + "/device/info"
 #define MQTT_TOPIC_GPS         String("vehicle/v1/") + device.get_device_id() + "/gps/position"
 #define MQTT_TOPIC_IMU         String("vehicle/v1/") + device.get_device_id() + "/imu/gyro"
+#define MQTT_TOPIC_COMPASS     String("vehicle/v1/") + device.get_device_id() + "/compass/heading"
 
 /* MQTT Intervals (in milliseconds) */
 #define MQTT_DEVICE_INFO_INTERVAL  5000
 #define MQTT_IMU_PUBLISH_INTERVAL   200
 #define MQTT_BAT_PRINT_INTERVAL   10000
+#define MQTT_COMPASS_PUBLISH_INTERVAL 500
 
 #ifdef MODE_ALLINONE
     /* Pin Configuration for ALL_IN_ONE Mode */
@@ -77,6 +83,9 @@
     /* GPS UART Pins */
     #define GPS_RX_PIN      12
     #define GPS_TX_PIN      11
+    
+    /* 启用罗盘功能 */
+    // #define ENABLE_COMPASS
 #endif
 
 #ifdef MODE_SERVER
@@ -92,6 +101,9 @@
     /* GPS UART Pins */
     #define GPS_RX_PIN      12
     #define GPS_TX_PIN      11
+    
+    /* 启用罗盘功能 */
+    #define ENABLE_COMPASS
 #endif
 
 #ifdef MODE_CLIENT

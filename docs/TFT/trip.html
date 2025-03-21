@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>行程信息</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 320px;
+            height: 240px;
+            background-color: #111;
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        .dashboard {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            padding: 10px;
+        }
+        .header {
+            text-align: center;
+            padding: 5px 0;
+            margin-bottom: 5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 18px;
+            margin: 0;
+            flex-grow: 1;
+            text-align: center;
+        }
+        .trip-tab-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 5px;
+        }
+        .trip-tab {
+            padding: 3px 10px;
+            background-color: rgba(255, 255, 255, 0.1);
+            margin: 0 3px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .trip-tab.active {
+            background-color: #f00;
+            color: white;
+        }
+        .trip-info-container {
+            display: flex;
+            gap: 10px;
+            height: 150px;
+            margin-top: 5px;
+        }
+        .trip-data {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            width: 160px;
+        }
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 8px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+        }
+        .data-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        .data-value {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .summary-section {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 8px;
+            width: 130px;
+        }
+        .summary-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+        }
+        .summary-item {
+            text-align: center;
+        }
+        .summary-label {
+            font-size: 10px;
+            opacity: 0.7;
+        }
+        .summary-value {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .info-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 12px;
+        }
+        .reset-button {
+            padding: 4px 12px;
+            background-color: #f00;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>行程信息</h1>
+            <button class="reset-button" onclick="resetTrip()">重置</button>
+        </div>
+        
+        <div class="trip-tab-container">
+            <div class="trip-tab active" onclick="changeTab('trip1')">行程 1</div>
+            <div class="trip-tab" onclick="changeTab('trip2')">行程 2</div>
+            <div class="trip-tab" onclick="changeTab('total')">总计</div>
+        </div>
+        
+        <div class="trip-info-container" id="trip1">
+            <div class="trip-data">
+                <div class="data-row">
+                    <div class="data-label">距离</div>
+                    <div class="data-value">2000 km</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">行驶时间</div>
+                    <div class="data-value">12:45:30</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">平均速度</div>
+                    <div class="data-value">105 km/h</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">最高速度</div>
+                    <div class="data-value">185 km/h</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">平均油耗</div>
+                    <div class="data-value">4.2 L/100km</div>
+                </div>
+            </div>
+            
+            <div class="summary-section">
+                <div class="summary-title">本次行程</div>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-label">开始时间</div>
+                        <div class="summary-value">08:30</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">结束时间</div>
+                        <div class="summary-value">21:15</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">开始日期</div>
+                        <div class="summary-value">09-04</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">结束日期</div>
+                        <div class="summary-value">09-05</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="trip-info-container" id="trip2" style="display: none;">
+            <div class="trip-data">
+                <div class="data-row">
+                    <div class="data-label">距离</div>
+                    <div class="data-value">850 km</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">行驶时间</div>
+                    <div class="data-value">07:30:15</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">平均速度</div>
+                    <div class="data-value">95 km/h</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">最高速度</div>
+                    <div class="data-value">165 km/h</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">平均油耗</div>
+                    <div class="data-value">3.8 L/100km</div>
+                </div>
+            </div>
+            
+            <div class="summary-section">
+                <div class="summary-title">本次行程</div>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-label">开始时间</div>
+                        <div class="summary-value">10:15</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">结束时间</div>
+                        <div class="summary-value">17:45</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">开始日期</div>
+                        <div class="summary-value">09-01</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">结束日期</div>
+                        <div class="summary-value">09-01</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="trip-info-container" id="total" style="display: none;">
+            <div class="trip-data">
+                <div class="data-row">
+                    <div class="data-label">总里程</div>
+                    <div class="data-value">12850 km</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">总行驶时间</div>
+                    <div class="data-value">135:20:45</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">平均速度</div>
+                    <div class="data-value">98 km/h</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">平均油耗</div>
+                    <div class="data-value">4.1 L/100km</div>
+                </div>
+                <div class="data-row">
+                    <div class="data-label">车辆使用寿命</div>
+                    <div class="data-value">2.8 年</div>
+                </div>
+            </div>
+            
+            <div class="summary-section">
+                <div class="summary-title">摩托车状态</div>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-label">下次保养</div>
+                        <div class="summary-value">750 km</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">机油状态</div>
+                        <div class="summary-value">良好</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">电池状态</div>
+                        <div class="summary-value">95%</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">链条状态</div>
+                        <div class="summary-value">良好</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info Bar -->
+        <div class="info-bar">
+            <div>上次更新: 10分钟前</div>
+            <div><i class="fas fa-save"></i> 已保存</div>
+        </div>
+    </div>
+
+    <script>
+        function changeTab(tabId) {
+            // Hide all trip info containers
+            document.querySelectorAll('.trip-info-container').forEach(container => {
+                container.style.display = 'none';
+            });
+            
+            // Show the selected container
+            document.getElementById(tabId).style.display = 'flex';
+            
+            // Update active tab
+            document.querySelectorAll('.trip-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Set active class based on tab id
+            let activeTabIndex = 0;
+            if (tabId === 'trip2') {
+                activeTabIndex = 1;
+            } else if (tabId === 'total') {
+                activeTabIndex = 2;
+            }
+            
+            document.querySelectorAll('.trip-tab')[activeTabIndex].classList.add('active');
+        }
+        
+        function resetTrip() {
+            // Get current active tab
+            let activeTab = document.querySelector('.trip-tab.active').textContent.trim();
+            
+            if (confirm(`确定要重置 ${activeTab} 吗?`)) {
+                // In a real app, we would reset the trip data
+                // For this demo, just show a confirmation
+                alert(`${activeTab} 已重置`);
+            }
+        }
+    </script>
+</body>
+</html> 

@@ -83,6 +83,14 @@ void Device::set_imu_ready(bool ready)
     }
 }
 
+void Device::set_compass_ready(bool ready)
+{
+    if (device_state.compassReady != ready) {
+        Serial.printf("Compass状态变更: %d -> %d\n", device_state.compassReady, ready);
+        device_state.compassReady = ready;
+    }
+}
+
 device_state_t *Device::get_device_state()
 {
     return &device_state;
@@ -99,12 +107,16 @@ String Device::device_state_to_json()
     doc["mqttConnected"] = device_state.mqttConnected;
     doc["wifiConnected"] = device_state.wifiConnected;
     doc["bleConnected"] = device_state.bleConnected;
+    doc["battery_voltage"] = device_state.battery_voltage;
+    doc["battery_percentage"] = device_state.battery_percentage;
     doc["gpsReady"] = device_state.gpsReady;
     doc["gpsHz"] = device_state.gpsHz;
     doc["imuReady"] = device_state.imuReady;
-    doc["batteryVoltage"] = device_state.battery_voltage;
-    doc["batteryPercentage"] = device_state.battery_percentage;
-    return doc.as<String>();
+    doc["compassReady"] = device_state.compassReady;
+
+    String output;
+    serializeJson(doc, output);
+    return output;
 }
 
 // 将gps_data_t结构体转换为JSON字符串

@@ -6,6 +6,7 @@
 #include "config.h"
 #include "gps/GPS.h"
 #include "qmi8658/IMU.h"
+#include "compass/COMPASS.h"
 
 class BLES
 {
@@ -19,6 +20,7 @@ private:
     NimBLECharacteristic *pCharacteristic;
     NimBLECharacteristic *pGPSCharacteristic;
     NimBLECharacteristic *pIMUCharacteristic;
+    NimBLECharacteristic *pCompassCharacteristic;
 };
 
 #endif

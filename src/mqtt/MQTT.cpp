@@ -18,6 +18,9 @@ MQTT::MQTT(const char *server, int port, const char *user, const char *password)
     mqtt_topic_gps = MQTT_TOPIC_GPS;
     mqtt_topic_imu = MQTT_TOPIC_IMU;
     mqtt_topic_device_info = MQTT_TOPIC_DEVICE_INFO;
+    
+    // 默认启用MQTT
+    isEnabled_ = true;
 }
 
 bool MQTT::reconnect()
@@ -128,4 +131,19 @@ void MQTT::publishDeviceInfo(device_state_t device_state)
     {
         // Serial.println("设备信息发布失败,WiFi未连接");
     }
+}
+
+bool MQTT::publish(const String& topic, const String& payload)
+{
+    if (!isEnabled_ || !device.get_device_state()->wifiConnected)
+    {
+        return false;
+    }
+    
+    if (!mqttClient.connected() && !reconnect())
+    {
+        return false;
+    }
+    
+    return mqttClient.publish(topic.c_str(), payload.c_str());
 }

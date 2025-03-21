@@ -7,6 +7,7 @@ static NimBLEAdvertisedDevice *myDevice;
 static NimBLERemoteCharacteristic *pRemoteCharacteristic;
 static NimBLERemoteCharacteristic *pRemoteIMUCharacteristic;
 static NimBLERemoteCharacteristic *pRemoteGPSCharacteristic;
+static NimBLERemoteCharacteristic *pRemoteCompassCharacteristic;
 
 static bool doConnect = false;
 static bool connected = false;
@@ -240,12 +241,23 @@ bool connectToServer()
         // IMU数据特征值
         pRemoteIMUCharacteristic = pSvc->getCharacteristic(IMU_CHAR_UUID);
         if (pRemoteIMUCharacteristic == nullptr)
-            return false;
+        {
+            Serial.println("Failed to find IMU characteristic UUID");
+        }
 
         // GPS数据特征值
         pRemoteGPSCharacteristic = pSvc->getCharacteristic(GPS_CHAR_UUID);
         if (pRemoteGPSCharacteristic == nullptr)
-            return false;
+        {
+            Serial.println("Failed to find GPS characteristic UUID");
+        }
+
+        // 罗盘数据特征值
+        pRemoteCompassCharacteristic = pSvc->getCharacteristic(COMPASS_CHAR_UUID);
+        if (pRemoteCompassCharacteristic == nullptr)
+        {
+            Serial.println("Failed to find Compass characteristic UUID");
+        }
     }
     else
     {
@@ -378,6 +390,27 @@ void BLEC::loop()
                 Serial.printf("Error reading IMU characteristic: %s\n", e.what());
             }
         }
+
+        // 添加对罗盘数据的读取
+        if (pRemoteCompassCharacteristic != nullptr && pRemoteCompassCharacteristic->canRead())
+        {
+            try {
+                std::string value = pRemoteCompassCharacteristic->readValue();
+                if (value.length() >= sizeof(float)) {
+                    // 使用安全的内存拷贝而不是直接指针转换
+                    float heading = 0.0f;
+                    memcpy(&heading, value.data(), sizeof(float));
+                    
+                    // 检查数值是否有效（方位角应该在0-360度之间）
+                    if (heading >= 0.0f && heading <= 360.0f) {
+                        device.get_gps_data()->heading = heading;
+                    }
+                }
+            } catch (const std::exception& e) {
+                Serial.printf("Error reading Compass characteristic: %s\n", e.what());
+            }
+        }
+
         doConnect = false;
     }
     else if (doScan)

@@ -237,28 +237,15 @@ void GPS::begin()
 {
     Serial.println(TinyGPSPlus::libraryVersion());
     Serial.printf("GPS使用引脚 RX:%d TX:%d\n", _rxPin, _txPin);
-    
-    // 先尝试以当前可能的波特率115200连接
-    gpsSerial.begin(115200);
-    Serial.println("[GPS] 尝试以115200波特率连接...");
-    
-    delay(300); // 确保连接稳定
-    
-    // 发送命令将GPS模块波特率切换至9600
-    String baudrateCmd = GpsCommand::buildBaudrateCmd(9600);
-    Serial.println("[GPS] 发送命令切换GPS模块到9600波特率");
-    gpsSerial.print(baudrateCmd);
-    gpsSerial.flush();
-    
-    delay(500); // 给模块足够时间处理命令
-    
-    // 重新初始化串口为9600
-    gpsSerial.end();
-    delay(200);
     gpsSerial.begin(9600);
     Serial.println("[GPS] 重新以9600波特率连接");
     
-    delay(300); // 确保连接稳定
+    delay(500); // 确保连接稳定
+    
+    // 清空接收缓冲区
+    while(gpsSerial.available()) {
+        gpsSerial.read();
+    }
     
     // 设置为双模式并启用精简NMEA输出
     configGpsMode();
@@ -272,6 +259,9 @@ void GPS::begin()
     
     delay(300);
     Serial.println("[GPS] 初始化完成");
+    
+    // 设置GPS就绪状态
+    device.set_gps_ready(true);
 }
 
 // 配置GPS工作模式，启用双模式和完整NMEA输出

@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主界面</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 320px;
+            height: 240px;
+            background-color: #111;
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        .dashboard {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        .status-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 35px;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 12px;
+            font-size: 12px;
+            z-index: 10;
+        }
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 30%;
+        }
+        .status-center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            width: 40%;
+        }
+        .status-right {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 15px;
+            width: 30%;
+        }
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .status-icon {
+            opacity: 0.7;
+        }
+        .status-value {
+            font-weight: bold;
+        }
+        .driving-mode {
+            background-color: #f00;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .rpm-gauge {
+            position: absolute;
+            top: 45px;
+            left: 10px;
+            width: 300px;
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            padding-top: 2px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+        }
+        .rpm-bar {
+            width: 7px;
+            height: 18px;
+            margin: 0 2px;
+            background-color: rgba(0, 0, 0, 0.3);
+            position: relative;
+            border-radius: 1px;
+        }
+        .rpm-bar.active {
+            background-color: #ffffff;
+        }
+        .rpm-bar.warning {
+            background-color: #f39c12;
+        }
+        .rpm-bar.danger {
+            background-color: #e74c3c;
+        }
+        .speed-display {
+            position: absolute;
+            top: 82px;
+            left: 20px;
+            text-align: center;
+        }
+        .speed-value {
+            font-size: 80px;
+            font-weight: bold;
+            line-height: 1;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: -2px;
+        }
+        .speed-unit {
+            font-size: 16px;
+            color: white;
+            opacity: 0.8;
+            margin-top: -5px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .trip-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 40px;
+            background-color: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 18px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .gear-display {
+            position: absolute;
+            top: 90px;
+            right: 30px;
+            font-size: 24px;
+            font-weight: bold;
+            background-color: rgba(255,255,255,0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .left-lean {
+            color: #3498db; /* 蓝色 */
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .right-lean {
+            color: #f39c12; /* 橙色 */
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #fff;
+            width: 75%;
+        }
+        .coordinates {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        .satellite-icon {
+            margin-right: 3px;
+        }
+        .right-panel {
+            position: absolute;
+            top: 80px;
+            right: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 90px;
+        }
+        .panel-item {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            padding: 5px;
+            font-size: 10px;
+        }
+        .panel-title {
+            opacity: 0.7;
+            font-size: 9px;
+            margin-bottom: 3px;
+        }
+        .panel-value {
+            font-weight: bold;
+            text-align: center;
+        }
+        .tire {
+            text-align: center;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .tire-icon {
+            font-size: 9px;
+        }
+        .tire-pressure {
+            font-weight: bold;
+        }
+        .gyro-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3px;
+        }
+        .gyro-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 3px;
+        }
+        .lean-indicator {
+            width: 70px;
+            height: 10px;
+            background: linear-gradient(to right, #3498db, #eee, #f39c12);
+            border-radius: 5px;
+            position: relative;
+        }
+        .lean-pointer {
+            position: absolute;
+            top: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 3px;
+            height: 20px;
+            background-color: #fff;
+            transition: left 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Status Bar at top -->
+        <div class="status-bar">
+            <div class="status-left">
+                <div class="status-item">
+                    <i class="fas fa-clock status-icon"></i>
+                    <span class="clock-time">12:12</span>
+                </div>
+            </div>
+            <div class="status-center">
+                <div class="status-item">
+                    <i class="fas fa-wifi status-icon"></i>
+                </div>
+                <div class="status-item">
+                    <i class="fab fa-bluetooth-b status-icon"></i>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-satellite status-icon"></i>
+                    <span class="status-value">8</span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-location-arrow status-icon"></i>
+                    <span class="status-value">10Hz</span>
+                </div>
+            </div>
+            <div class="status-right">
+                <div class="status-item">
+                    <i class="fas fa-calendar-alt status-icon"></i>
+                    <span class="clock-date">09-05</span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-battery-full"></i>
+                    <span>100%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RPM Gauge with gradient background -->
+        <div class="rpm-gauge">
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+            <div class="rpm-bar"></div>
+        </div>
+
+        <!-- Speed Display -->
+        <div class="speed-display">
+            <div class="speed-value">85</div>
+            <div class="speed-unit">KM/H</div>
+        </div>
+
+        <!-- Progress Bar (for fuel or other metric) -->
+        <div class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
+
+        <!-- Trip Info and Coordinates -->
+        <div class="trip-info">
+            <div>Trip: 2000 km</div>
+            <div class="coordinates">
+                <i class="fas fa-satellite satellite-icon"></i>
+                <span>120°23332.1"/61°01324.5"</span>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="right-panel">
+            <div class="panel-item">
+                <div class="panel-title">胎压状态</div>
+                <div class="panel-value">
+                    <div class="tire front-tire">
+                        <div class="tire-icon"><i class="fas fa-circle"></i> 前:</div>
+                        <div class="tire-pressure">2.5 bar</div>
+                    </div>
+                    <div class="tire rear-tire">
+                        <div class="tire-icon"><i class="fas fa-circle"></i> 后:</div>
+                        <div class="tire-pressure">2.8 bar</div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-item">
+                <div class="panel-title">倾角</div>
+                <div class="panel-value">
+                    <div class="gyro-display">
+                        <div class="left-lean">-58°</div>
+                        <div class="right-lean">68°</div>
+                    </div>
+                    <div class="gyro-indicator">
+                        <div class="lean-indicator">
+                            <div class="lean-pointer"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simulate RPM gauge animation and speed changes
+        let rpmBars = document.querySelectorAll('.rpm-bar');
+        let currentRPM = 20; // Max active bars (out of 28)
+        let currentSpeed = 85;
+        let speedDirection = -1;
+        
+        function updateRPMAndSpeed() {
+            // Change direction occasionally
+            if (Math.random() < 0.1) {
+                speedDirection = -speedDirection;
+            }
+            
+            // Update speed
+            currentSpeed += speedDirection * Math.floor(Math.random() * 3);
+            
+            // Keep within reasonable range
+            if (currentSpeed < 0) {
+                currentSpeed = 0;
+                speedDirection = 1;
+            }
+            if (currentSpeed > 199) {
+                currentSpeed = 199;
+                speedDirection = -1;
+            }
+            
+            // Calculate RPM based on speed (simplified relationship)
+            // At speed 0, RPM is minimum (8)
+            // At max speed 199, RPM is maximum (28)
+            currentRPM = Math.floor(8 + (currentSpeed / 199) * 20);
+            
+            // Update RPM display
+            rpmBars.forEach((bar, index) => {
+                bar.classList.remove('active', 'warning', 'danger');
+                
+                if (index < currentRPM) {
+                    if (index < 12) {
+                        bar.classList.add('active');
+                    } else if (index < 24) {
+                        bar.classList.add('warning');
+                    } else {
+                        bar.classList.add('danger');
+                    }
+                }
+            });
+            
+            // Update speed display with color change
+            const speedElement = document.querySelector('.speed-value');
+            speedElement.textContent = currentSpeed;
+            
+            // Change color based on speed
+            if (currentSpeed > 60) {
+                speedElement.style.color = '#2ecc71'; // Light green
+            } else {
+                speedElement.style.color = 'white';
+            }
+            
+            setTimeout(updateRPMAndSpeed, 500);
+        }
+        
+        // Update date and time
+        function updateDateTime() {
+            const now = new Date();
+            const dateStr = now.toISOString().slice(5, 10); // MM-DD format
+            const timeStr = now.toTimeString().slice(0, 5); // HH:MM format
+            
+            document.querySelector('.clock-date').textContent = dateStr;
+            document.querySelector('.clock-time').textContent = timeStr;
+            
+            setTimeout(updateDateTime, 1000);
+        }
+        
+        // Simulate gyro angle changes
+        let currentLean = 0; // 0 is center, negative is left, positive is right
+        
+        function updateGyro() {
+            // Simulate lean angle changes
+            currentLean += (Math.random() * 10 - 5);
+            
+            // Keep within reasonable range (-80 to 80 degrees)
+            currentLean = Math.max(-80, Math.min(80, currentLean));
+            
+            // Update lean display
+            const leftLean = document.querySelector('.left-lean');
+            const rightLean = document.querySelector('.right-lean');
+            const leanPointer = document.querySelector('.lean-pointer');
+            
+            if (currentLean < 0) {
+                leftLean.textContent = `${Math.round(currentLean)}°`;
+                rightLean.textContent = '0°';
+            } else {
+                leftLean.textContent = '0°';
+                rightLean.textContent = `${Math.round(currentLean)}°`;
+            }
+            
+            // Update pointer position (50% is center, 0% is far left, 100% is far right)
+            const pointerPosition = (currentLean + 80) / 160 * 100;
+            leanPointer.style.left = `${pointerPosition}%`;
+            
+            setTimeout(updateGyro, 500);
+        }
+        
+        // Simulate GPS satellites count changes
+        function updateGPSStats() {
+            const satCount = Math.floor(Math.random() * 5) + 6; // 6-10 satellites
+            document.querySelector('.status-center .status-value').textContent = satCount;
+            
+            setTimeout(updateGPSStats, 3000);
+        }
+        
+        // Initialize
+        updateRPMAndSpeed();
+        updateDateTime();
+        updateGyro();
+        updateGPSStats();
+    </script>
+</body>
+</html> 

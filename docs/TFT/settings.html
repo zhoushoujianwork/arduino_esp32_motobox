@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 320px;
+            height: 240px;
+            background-color: #111;
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        .dashboard {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            padding: 10px;
+        }
+        .header {
+            text-align: center;
+            padding: 5px 0;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .header h1 {
+            font-size: 18px;
+            margin: 0;
+        }
+        .settings-container {
+            display: flex;
+            height: 170px;
+        }
+        .settings-menu {
+            width: 100px;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding-right: 10px;
+        }
+        .menu-item {
+            padding: 8px 5px;
+            cursor: pointer;
+            font-size: 14px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .menu-item.active {
+            background-color: #f00;
+        }
+        .menu-item i {
+            width: 20px;
+            margin-right: 5px;
+            text-align: center;
+        }
+        .settings-content {
+            flex-grow: 1;
+            padding-left: 15px;
+            overflow-y: auto;
+        }
+        .settings-panel {
+            display: none;
+        }
+        .settings-panel.active {
+            display: block;
+        }
+        .setting-item {
+            margin-bottom: 12px;
+        }
+        .setting-label {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        .setting-control {
+            display: flex;
+            align-items: center;
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .toggle-slider {
+            background-color: #f00;
+        }
+        input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+        select, input[type="number"] {
+            background-color: #333;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            padding: 5px;
+            width: 100%;
+        }
+        .units {
+            margin-left: 5px;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        .info-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 12px;
+        }
+        .save-button {
+            background-color: #f00;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>设置</h1>
+        </div>
+        
+        <div class="settings-container">
+            <div class="settings-menu">
+                <div class="menu-item active" onclick="changePanel('general')">
+                    <i class="fas fa-sliders-h"></i>常规
+                </div>
+                <div class="menu-item" onclick="changePanel('display')">
+                    <i class="fas fa-desktop"></i>显示
+                </div>
+                <div class="menu-item" onclick="changePanel('tires')">
+                    <i class="fas fa-circle"></i>胎压
+                </div>
+                <div class="menu-item" onclick="changePanel('system')">
+                    <i class="fas fa-cog"></i>系统
+                </div>
+            </div>
+            
+            <div class="settings-content">
+                <!-- General Settings -->
+                <div class="settings-panel active" id="general">
+                    <div class="setting-item">
+                        <div class="setting-label">单位系统</div>
+                        <div class="setting-control">
+                            <select>
+                                <option selected>公制</option>
+                                <option>英制</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <div class="setting-label">时间格式</div>
+                        <div class="setting-control">
+                            <select>
+                                <option selected>24小时制</option>
+                                <option>12小时制</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <div class="setting-label">自动锁定</div>
+                        <div class="setting-control">
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Display Settings -->
+                <div class="settings-panel" id="display">
+                    <div class="setting-item">
+                        <div class="setting-label">亮度</div>
+                        <div class="setting-control">
+                            <input type="range" min="1" max="100" value="80">
+                        </div>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <div class="setting-label">屏幕自动关闭</div>
+                        <div class="setting-control">
+                            <select>
+                                <option>从不</option>
+                                <option>1分钟</option>
+                                <option selected>5分钟</option>
+                                <option>10分钟</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <div class="setting-label">夜间模式</div>
+                        <div class="setting-control">
+                            <label class="toggle-switch">
+                                <input type="checkbox">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tire Pressure Settings -->
+                <div class="settings-panel" id="tires">
+                    <div class="setting-item">
+                        <div class="setting-label">前轮标准胎压</div>
+                        <div class="setting-control">
+                            <input type="number" value="2.5" step="0.1" min="1.5" max="3.5">
+                            <span class="units">bar</span>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <div class="setting-label">后轮标准胎压</div>
+                        <div class="setting-control">
+                            <input type="number" value="2.8" step="0.1" min="1.5" max="3.5">
+                            <span class="units">bar</span>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <div class="setting-label">胎压报警</div>
+                        <div class="setting-control">
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <div class="setting-label">报警阈值</div>
+                        <div class="setting-control">
+                            <input type="number" value="0.3" step="0.1" min="0.1" max="1.0">
+                            <span class="units">bar</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- System Settings -->
+                <div class="settings-panel" id="system">
+                    <div class="setting-item">
+                        <div class="setting-label">软件版本</div>
+                        <div class="setting-control">
+                            v1.2.5
+                        </div>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <div class="setting-label">固件更新</div>
+                        <div class="setting-control">
+                            <button class="save-button">检查更新</button>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-item">
+                        <div class="setting-label">恢复出厂设置</div>
+                        <div class="setting-control">
+                            <button class="save-button" onclick="resetDevice()">重置</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info Bar -->
+        <div class="info-bar">
+            <div></div>
+            <button class="save-button" onclick="saveSettings()">保存设置</button>
+        </div>
+    </div>
+
+    <script>
+        function changePanel(panelId) {
+            // Hide all panels
+            document.querySelectorAll('.settings-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            
+            // Show the selected panel
+            document.getElementById(panelId).classList.add('active');
+            
+            // Update active menu item
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Find and activate the clicked menu item
+            const menuItems = document.querySelectorAll('.menu-item');
+            for (let i = 0; i < menuItems.length; i++) {
+                if (menuItems[i].textContent.includes(getPanelName(panelId))) {
+                    menuItems[i].classList.add('active');
+                    break;
+                }
+            }
+        }
+        
+        function getPanelName(panelId) {
+            switch (panelId) {
+                case 'general': return '常规';
+                case 'display': return '显示';
+                case 'tires': return '胎压';
+                case 'system': return '系统';
+                default: return '';
+            }
+        }
+        
+        function saveSettings() {
+            alert('设置已保存');
+        }
+        
+        function resetDevice() {
+            if (confirm('确定要恢复出厂设置吗？这将清除所有个人数据和设置。')) {
+                alert('设备正在重置...');
+            }
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>胎压监测</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 320px;
+            height: 240px;
+            background-color: #111;
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        .dashboard {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            padding: 10px;
+        }
+        .header {
+            text-align: center;
+            padding: 5px 0;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .header h1 {
+            font-size: 18px;
+            margin: 0;
+        }
+        .tire-display {
+            display: flex;
+            justify-content: space-around;
+            gap: 20px;
+            margin-top: 10px;
+            height: 170px;
+        }
+        .tire-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 140px;
+        }
+        .tire-label {
+            font-size: 16px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .tire-graphic {
+            width: 100px;
+            height: 50px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            margin-bottom: 10px;
+        }
+        .front-tire .tire-graphic {
+            width: 80px;
+            height: 40px;
+        }
+        .tire-pressure-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .tire-stats {
+            display: flex;
+            justify-content: space-between;
+            width: 120px;
+            margin-top: 5px;
+            padding: 5px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+        .tire-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .tire-stat-label {
+            font-size: 10px;
+            opacity: 0.7;
+        }
+        .tire-stat-value {
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .normal {
+            color: #2ecc71;
+        }
+        .warning {
+            color: #f39c12;
+        }
+        .danger {
+            color: #e74c3c;
+        }
+        .tire-status {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+        }
+        .status-normal {
+            background-color: #2ecc71;
+        }
+        .status-warning {
+            background-color: #f39c12;
+        }
+        .status-danger {
+            background-color: #e74c3c;
+        }
+        .info-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 12px;
+        }
+        .pressure-guage {
+            width: 120px;
+            height: 8px;
+            background-color: #333;
+            border-radius: 4px;
+            margin-top: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+        .pressure-fill {
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .front-fill {
+            width: 65%;
+            background: linear-gradient(to right, #3498db, #2ecc71);
+        }
+        .rear-fill {
+            width: 75%;
+            background: linear-gradient(to right, #3498db, #2ecc71, #f39c12);
+        }
+        .tire-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>胎压监测系统</h1>
+        </div>
+        
+        <div class="tire-display">
+            <!-- Front Tire -->
+            <div class="tire-container front-tire">
+                <div class="tire-label">前轮胎压</div>
+                <div class="tire-graphic">
+                    <div class="tire-pressure-value">2.5 bar</div>
+                    <div class="tire-status status-normal">
+                        <i class="fas fa-check"></i>
+                    </div>
+                </div>
+                <div class="tire-info">
+                    <div class="pressure-guage">
+                        <div class="pressure-fill front-fill"></div>
+                    </div>
+                    <div class="tire-stats">
+                        <div class="tire-stat">
+                            <div class="tire-stat-label">最低</div>
+                            <div class="tire-stat-value">2.2</div>
+                        </div>
+                        <div class="tire-stat">
+                            <div class="tire-stat-label">正常</div>
+                            <div class="tire-stat-value normal">2.5</div>
+                        </div>
+                        <div class="tire-stat">
+                            <div class="tire-stat-label">最高</div>
+                            <div class="tire-stat-value">2.8</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Rear Tire -->
+            <div class="tire-container rear-tire">
+                <div class="tire-label">后轮胎压</div>
+                <div class="tire-graphic">
+                    <div class="tire-pressure-value">2.8 bar</div>
+                    <div class="tire-status status-normal">
+                        <i class="fas fa-check"></i>
+                    </div>
+                </div>
+                <div class="tire-info">
+                    <div class="pressure-guage">
+                        <div class="pressure-fill rear-fill"></div>
+                    </div>
+                    <div class="tire-stats">
+                        <div class="tire-stat">
+                            <div class="tire-stat-label">最低</div>
+                            <div class="tire-stat-value">2.5</div>
+                        </div>
+                        <div class="tire-stat">
+                            <div class="tire-stat-label">正常</div>
+                            <div class="tire-stat-value normal">2.8</div>
+                        </div>
+                        <div class="tire-stat">
+                            <div class="tire-stat-label">最高</div>
+                            <div class="tire-stat-value">3.0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info Bar -->
+        <div class="info-bar">
+            <div>最后更新: 30秒前</div>
+            <div><i class="fas fa-wifi"></i> 已连接</div>
+        </div>
+    </div>
+
+    <script>
+        // Simulate tire pressure changes
+        let frontPressure = 2.5;
+        let rearPressure = 2.8;
+        
+        function updateTirePressure() {
+            // Simulate small random changes
+            frontPressure += (Math.random() * 0.2 - 0.1) * 0.1;
+            rearPressure += (Math.random() * 0.2 - 0.1) * 0.1;
+            
+            // Keep within realistic range
+            frontPressure = Math.max(2.0, Math.min(3.0, frontPressure));
+            rearPressure = Math.max(2.3, Math.min(3.2, rearPressure));
+            
+            // Update display
+            document.querySelector('.front-tire .tire-pressure-value').textContent = frontPressure.toFixed(1) + ' bar';
+            document.querySelector('.rear-tire .tire-pressure-value').textContent = rearPressure.toFixed(1) + ' bar';
+            
+            // Update front tire status
+            const frontStatus = document.querySelector('.front-tire .tire-status');
+            frontStatus.classList.remove('status-normal', 'status-warning', 'status-danger');
+            if (frontPressure < 2.2 || frontPressure > 2.8) {
+                frontStatus.classList.add('status-danger');
+                frontStatus.innerHTML = '<i class="fas fa-exclamation"></i>';
+            } else if (frontPressure < 2.3 || frontPressure > 2.7) {
+                frontStatus.classList.add('status-warning');
+                frontStatus.innerHTML = '<i class="fas fa-exclamation"></i>';
+            } else {
+                frontStatus.classList.add('status-normal');
+                frontStatus.innerHTML = '<i class="fas fa-check"></i>';
+            }
+            
+            // Update rear tire status
+            const rearStatus = document.querySelector('.rear-tire .tire-status');
+            rearStatus.classList.remove('status-normal', 'status-warning', 'status-danger');
+            if (rearPressure < 2.5 || rearPressure > 3.0) {
+                rearStatus.classList.add('status-danger');
+                rearStatus.innerHTML = '<i class="fas fa-exclamation"></i>';
+            } else if (rearPressure < 2.6 || rearPressure > 2.9) {
+                rearStatus.classList.add('status-warning');
+                rearStatus.innerHTML = '<i class="fas fa-exclamation"></i>';
+            } else {
+                rearStatus.classList.add('status-normal');
+                rearStatus.innerHTML = '<i class="fas fa-check"></i>';
+            }
+            
+            // Update pressure gauge fills
+            document.querySelector('.front-fill').style.width = `${(frontPressure - 2.0) / (3.0 - 2.0) * 100}%`;
+            document.querySelector('.rear-fill').style.width = `${(rearPressure - 2.3) / (3.2 - 2.3) * 100}%`;
+            
+            // Update last update time
+            document.querySelector('.info-bar div:first-child').textContent = '最后更新: 刚刚';
+            
+            setTimeout(() => {
+                document.querySelector('.info-bar div:first-child').textContent = '最后更新: 5秒前';
+            }, 5000);
+            
+            setTimeout(updateTirePressure, 10000);
+        }
+        
+        // Initialize
+        updateTirePressure();
+    </script>
+</body>
+</html> 

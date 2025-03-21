@@ -30,12 +30,42 @@ class ImuCharacteristicCallbacks : public NimBLECharacteristicCallbacks
     }
 };
 
+class CompassCharacteristicCallbacks : public NimBLECharacteristicCallbacks
+{
+    void onRead(NimBLECharacteristic *pCompassCharacteristic)
+    {
+        #ifdef ENABLE_COMPASS
+        if (device.get_device_state()->compassReady) {
+            // 创建临时缓冲区存储方位角度数据
+            float heading = device.get_gps_data()->heading;
+            // 确保方位角在有效范围内
+            if (heading >= 0.0f && heading <= 360.0f) {
+                pCompassCharacteristic->setValue((uint8_t *)&heading, sizeof(float));
+            } else {
+                // 如果方位角无效，返回0
+                float defaultHeading = 0.0f;
+                pCompassCharacteristic->setValue((uint8_t *)&defaultHeading, sizeof(float));
+            }
+        } else {
+            // 如果罗盘未就绪，返回0
+            float defaultHeading = 0.0f;
+            pCompassCharacteristic->setValue((uint8_t *)&defaultHeading, sizeof(float));
+        }
+        #else
+        // 如果未启用罗盘功能，返回0
+        float defaultHeading = 0.0f;
+        pCompassCharacteristic->setValue((uint8_t *)&defaultHeading, sizeof(float));
+        #endif
+    }
+};
+
 BLES::BLES()
 {
     pServer = NULL;
     pCharacteristic = NULL;
     pGPSCharacteristic = NULL;
     pIMUCharacteristic = NULL;
+    pCompassCharacteristic = NULL;
 }
 
 void BLES::setup()
@@ -58,21 +88,27 @@ void BLES::setup()
     // 创建设备状态特征值
     pCharacteristic = pService->createCharacteristic(
         DEVICE_CHAR_UUID,
-        NIMBLE_PROPERTY::NOTIFY); // 根据需要设置属性
+        NIMBLE_PROPERTY::NOTIFY);
 
     // 创建GPS特征值
     pGPSCharacteristic = pService->createCharacteristic(
         GPS_CHAR_UUID,
         NIMBLE_PROPERTY::READ);
-
     pGPSCharacteristic->setCallbacks(new GpsCharacteristicCallbacks());
 
     // 创建IMU特征值
     pIMUCharacteristic = pService->createCharacteristic(
         IMU_CHAR_UUID,
         NIMBLE_PROPERTY::READ);
-
     pIMUCharacteristic->setCallbacks(new ImuCharacteristicCallbacks());
+
+    #ifdef ENABLE_COMPASS
+    // 只在启用罗盘功能时创建罗盘特征值
+    pCompassCharacteristic = pService->createCharacteristic(
+        COMPASS_CHAR_UUID,
+        NIMBLE_PROPERTY::READ);
+    pCompassCharacteristic->setCallbacks(new CompassCharacteristicCallbacks());
+    #endif
 
     // 启动服务
     pService->start();
