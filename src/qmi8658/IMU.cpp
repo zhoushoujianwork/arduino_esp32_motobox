@@ -159,28 +159,53 @@ bool IMU::enableMotionDetection(int intPin, float threshold)
     // 保存中断引脚号
     this->motionIntPin = intPin;
     
-    // 设置中断引脚为输入模式
-    pinMode(intPin, INPUT);
+    // 设置中断引脚为输入模式，带上拉电阻
+    pinMode(intPin, INPUT_PULLUP);
     
-    // 注意：这里假设QMI8658库有相关函数来配置运动检测。
-    // 如果实际SensorQMI8658库没有此功能，需要添加相应的寄存器配置代码。
+    // 直接配置QMI8658寄存器来实现运动检测
+    // 1. 配置中断控制寄存器
+    Wire.beginTransmission(QMI8658_L_SLAVE_ADDRESS);
+    Wire.write(0x0E); // INT1_CTRL寄存器地址
+    Wire.write(0x20); // 使能ACC任何方向的活动检测中断
+    Wire.endTransmission();
     
-    // 示例配置代码（需要根据QMI8658实际寄存器映射调整）：
-    // 1. 配置加速度计中断阈值
-    // qmi.setAccInterruptThreshold(threshold);
+    // 2. 配置中断引脚配置寄存器（高电平有效，推挽输出）
+    Wire.beginTransmission(QMI8658_L_SLAVE_ADDRESS);
+    Wire.write(0x0F); // INT_PIN_CONFIG寄存器地址
+    Wire.write(0x04); // INT1为推挽输出，高电平有效
+    Wire.endTransmission();
     
-    // 2. 启用加速度计中断功能
-    // qmi.enableAccInterrupt(intPin);
+    // 3. 配置活动检测阈值
+    uint8_t thresholdValue = uint8_t(threshold * 32); // 将g值转换为寄存器值
+    Wire.beginTransmission(QMI8658_L_SLAVE_ADDRESS);
+    Wire.write(0x10); // 活动检测阈值寄存器地址
+    Wire.write(thresholdValue); // 设置阈值
+    Wire.endTransmission();
     
-    Serial.println("Motion detection enabled");
+    // 4. 使能活动检测
+    Wire.beginTransmission(QMI8658_L_SLAVE_ADDRESS);
+    Wire.write(0x12); // 活动检测控制寄存器
+    Wire.write(0x01); // 使能活动检测
+    Wire.endTransmission();
+    
+    Serial.printf("Motion detection enabled on pin %d with threshold %.2f\n", intPin, threshold);
     return true;
 }
 
 void IMU::disableMotionDetection()
 {
     if (motionIntPin != -1) {
-        // 禁用中断
-        // qmi.disableAccInterrupt();
+        // 关闭活动检测
+        Wire.beginTransmission(QMI8658_L_SLAVE_ADDRESS);
+        Wire.write(0x12); // 活动检测控制寄存器
+        Wire.write(0x00); // 禁用活动检测
+        Wire.endTransmission();
+        
+        // 关闭中断
+        Wire.beginTransmission(QMI8658_L_SLAVE_ADDRESS);
+        Wire.write(0x0E); // INT1_CTRL寄存器地址
+        Wire.write(0x00); // 禁用所有中断
+        Wire.endTransmission();
         
         Serial.println("Motion detection disabled");
         motionIntPin = -1;

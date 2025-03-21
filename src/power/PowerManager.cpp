@@ -1,5 +1,6 @@
 #include "PowerManager.h"
 #include "btn/BTN.h"
+#include "config.h"
 
 PowerManager::PowerManager() {
     // 设置默认值
@@ -54,9 +55,23 @@ void PowerManager::loop() {
                     device.get_device_state()->wifiConnected ? "已连接" : "未连接",
                     device.get_device_state()->mqttConnected ? "已连接" : "未连接");
                 
-                enterLowPowerMode();
+                // 使用浅睡眠代替深度睡眠
+                enterLightSleepMode();
             }
         }
+    }
+}
+
+// 配置运动检测中断
+void PowerManager::configureMotionDetection() {
+    Serial.println("[电源管理] 配置IMU运动检测中断...");
+    
+    // 使用IMU类的运动检测功能
+    if (imu.enableMotionDetection(IMU_INT_PIN, motionThreshold)) {
+        Serial.printf("[电源管理] IMU运动检测已配置，阈值: %.2f, 中断引脚: %d\n", 
+                     motionThreshold, IMU_INT_PIN);
+    } else {
+        Serial.println("[电源管理] 警告: IMU运动检测配置失败");
     }
 }
 
@@ -65,11 +80,17 @@ void PowerManager::interruptLowPowerMode() {
     // 设置打断请求标志
     interruptRequested = true;
     
-    // 如果当前正处于倒计时状态，则立即更新状态
-    if (powerState == POWER_STATE_COUNTDOWN || powerState == POWER_STATE_PREPARING_SLEEP) {
+    // 如果当前正处于任何睡眠相关状态，则立即更新状态
+    if (powerState == POWER_STATE_COUNTDOWN || 
+        powerState == POWER_STATE_PREPARING_SLEEP || 
+        powerState == POWER_STATE_LIGHT_SLEEP) {
+        
         Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
         powerState = POWER_STATE_NORMAL;
         lastMotionTime = millis(); // 重置最后一次运动时间
+        
+        // 禁用IMU中断唤醒
+        imu.disableMotionDetection();
         
         // 恢复屏幕亮度到最大
         #ifdef MODE_ALLINONE
@@ -218,20 +239,21 @@ void PowerManager::configureWakeupSources() {
     #endif
 }
 
-void PowerManager::enterLowPowerMode() {
+// 新增：进入浅睡眠模式
+void PowerManager::enterLightSleepMode() {
 #ifdef MODE_CLIENT
     // 客户端模式不使用睡眠功能
     Serial.println("[电源管理] 客户端模式不使用睡眠功能");
     return;
 #endif
 
-    Serial.println("[电源管理] 正在进入低功耗模式...");
+    Serial.println("[电源管理] 正在进入浅睡眠模式...");
     
     // 设置电源状态为倒计时
     powerState = POWER_STATE_COUNTDOWN;
     
     // 倒计时总时间（秒）
-    const int countdownTime = 10;
+    const int countdownTime = 5; // 缩短倒计时
     
     // 添加UI提示
     #ifdef MODE_ALLINONE
@@ -239,15 +261,15 @@ void PowerManager::enterLowPowerMode() {
     static const int maxBrightness = 255;
     #endif
     
-    // 添加10秒倒计时
-    Serial.println("[电源管理] 10秒倒计时开始，如有动作或按钮按下将取消进入低功耗模式...");
+    // 添加5秒倒计时
+    Serial.println("[电源管理] 5秒倒计时开始，如有动作或按钮按下将取消进入浅睡眠模式...");
     
     for (int i = countdownTime; i > 0; i--) {
         Serial.printf("[电源管理] 倒计时: %d 秒\n", i);
         
         // 设置屏幕亮度，逐渐降低
         #ifdef MODE_ALLINONE
-        int brightness = map(i, countdownTime, 1, maxBrightness, maxBrightness/10);
+        int brightness = map(i, countdownTime, 1, maxBrightness, maxBrightness/5);
         tft_set_brightness(brightness);
         Serial.printf("[电源管理] 屏幕亮度设置为 %d/%d\n", brightness, maxBrightness);
         #endif
@@ -257,7 +279,7 @@ void PowerManager::enterLowPowerMode() {
         while (millis() - countdownStartTime < 1000) { // 每秒分为多个小间隔检查
             // 检查是否已请求打断
             if (interruptRequested) {
-                Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
+                Serial.println("[电源管理] 收到打断请求，取消进入浅睡眠模式");
                 interruptRequested = false;
                 powerState = POWER_STATE_NORMAL;
                 
@@ -267,12 +289,12 @@ void PowerManager::enterLowPowerMode() {
                 Serial.println("[电源管理] 恢复屏幕亮度到最大");
                 #endif
                 
-                return; // 退出函数，不进入低功耗模式
+                return; // 退出函数，不进入浅睡眠模式
             }
             
-            // 在倒计时期间检测运动，如果有运动则取消进入低功耗模式
+            // 在倒计时期间检测运动，如果有运动则取消进入浅睡眠模式
             if (detectMotion()) {
-                Serial.println("[电源管理] 检测到运动，取消进入低功耗模式");
+                Serial.println("[电源管理] 检测到运动，取消进入浅睡眠模式");
                 lastMotionTime = millis(); // 更新最后一次运动时间
                 powerState = POWER_STATE_NORMAL;
                 
@@ -282,7 +304,7 @@ void PowerManager::enterLowPowerMode() {
                 Serial.println("[电源管理] 恢复屏幕亮度到最大");
                 #endif
                 
-                return; // 退出函数，不进入低功耗模式
+                return; // 退出函数，不进入浅睡眠模式
             }
             
             delay(50); // 小间隔检查，更快响应
@@ -294,7 +316,7 @@ void PowerManager::enterLowPowerMode() {
     
     // 再次检查是否已请求打断
     if (interruptRequested) {
-        Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
+        Serial.println("[电源管理] 收到打断请求，取消进入浅睡眠模式");
         interruptRequested = false;
         powerState = POWER_STATE_NORMAL;
         
@@ -304,7 +326,7 @@ void PowerManager::enterLowPowerMode() {
         Serial.println("[电源管理] 恢复屏幕亮度到最大");
         #endif
         
-        return; // 退出函数，不进入低功耗模式
+        return; // 退出函数，不进入浅睡眠模式
     }
     
     Serial.println("[电源管理] 倒计时结束，开始关闭外设...");
@@ -314,7 +336,7 @@ void PowerManager::enterLowPowerMode() {
     
     // 最后一次检查是否有打断请求
     if (interruptRequested) {
-        Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
+        Serial.println("[电源管理] 收到打断请求，取消进入浅睡眠模式");
         interruptRequested = false;
         powerState = POWER_STATE_NORMAL;
         
@@ -324,11 +346,58 @@ void PowerManager::enterLowPowerMode() {
         Serial.println("[电源管理] 恢复屏幕亮度到最大");
         #endif
         
-        return; // 退出函数，不进入低功耗模式
+        return; // 退出函数，不进入浅睡眠模式
     }
     
     // 配置唤醒源
-    configureWakeupSources();
+    // 不使用定时唤醒，只靠运动唤醒
+    Serial.println("[电源管理] 配置运动唤醒...");
+    
+    // 配置IMU中断检测运动
+    configureMotionDetection();
+
+    // 配置RTC GPIO中断唤醒
+    if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
+        Serial.printf("[电源管理] 设置IMU中断引脚唤醒 (GPIO%d)\n", IMU_INT_PIN);
+        
+        // 初始化RTC GPIO
+        rtc_gpio_init((gpio_num_t)IMU_INT_PIN);
+        // 设置GPIO模式为输入
+        rtc_gpio_set_direction((gpio_num_t)IMU_INT_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+        // 启用内部上拉电阻
+        rtc_gpio_pullup_en((gpio_num_t)IMU_INT_PIN);
+        rtc_gpio_pulldown_dis((gpio_num_t)IMU_INT_PIN);
+        // 配置为高电平触发唤醒（根据IMU中断的实际输出）
+        esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT_PIN, 1);
+    } else {
+        Serial.printf("[电源管理] 警告：IMU_INT_PIN (GPIO%d) 不是有效的RTC GPIO\n", IMU_INT_PIN);
+        // 设置60秒定时唤醒作为备份
+        const uint64_t WAKEUP_INTERVAL_US = 60 * 1000000ULL;
+        esp_sleep_enable_timer_wakeup(WAKEUP_INTERVAL_US);
+    }
+    
+    // 配置按钮唤醒
+    #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    if (BTN_PIN >= 0 && BTN_PIN <= 21) {
+        Serial.printf("[电源管理] 设置按钮唤醒 (GPIO%d)\n", BTN_PIN);
+        
+        // 检查按钮当前状态，避免无限重启
+        extern BTN button;
+        if (button.isPressed()) {
+            Serial.println("[电源管理] 警告：按钮当前处于按下状态，跳过按钮唤醒配置");
+        } else {
+            // 初始化RTC GPIO
+            rtc_gpio_init((gpio_num_t)BTN_PIN);
+            // 设置GPIO模式为输入
+            rtc_gpio_set_direction((gpio_num_t)BTN_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+            // 启用内部上拉电阻，确保按钮未按下时为高电平
+            rtc_gpio_pullup_en((gpio_num_t)BTN_PIN);
+            rtc_gpio_pulldown_dis((gpio_num_t)BTN_PIN);
+            // 配置为低电平触发唤醒
+            esp_sleep_enable_ext1_wakeup(1ULL << BTN_PIN, ESP_EXT1_WAKEUP_ALL_LOW);
+        }
+    }
+    #endif
     
     // 打印设备信息和统计数据
     Serial.println("[电源管理] 设备状态汇总:");
@@ -338,9 +407,56 @@ void PowerManager::enterLowPowerMode() {
     // 延迟一段时间以允许串行输出完成
     delay(500);
     
-    // 进入深度睡眠模式
-    Serial.println("[电源管理] 正在进入深度睡眠模式...");
-    esp_deep_sleep_start();
+    // 设置为浅睡眠模式
+    powerState = POWER_STATE_LIGHT_SLEEP;
     
-    // 此后的代码不会被执行，因为设备已进入深度睡眠
+    // 进入浅睡眠模式
+    Serial.println("[电源管理] 正在进入浅睡眠模式...");
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+    esp_light_sleep_start();
+    
+    // 唤醒后的处理
+    Serial.println("[电源管理] 从浅睡眠模式唤醒");
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    
+    switch(wakeup_reason) {
+        case ESP_SLEEP_WAKEUP_EXT0:
+            Serial.println("[电源管理] 通过IMU运动检测唤醒");
+            break;
+        case ESP_SLEEP_WAKEUP_EXT1:
+            Serial.println("[电源管理] 通过按钮唤醒");
+            break;
+        case ESP_SLEEP_WAKEUP_TIMER:
+            Serial.println("[电源管理] 通过定时器唤醒");
+            break;
+        default:
+            Serial.printf("[电源管理] 未知原因唤醒，代码: %d\n", wakeup_reason);
+    }
+    
+    // 清除IMU中断标志
+    imu.disableMotionDetection();
+    
+    // 唤醒外设
+    #ifdef MODE_ALLINONE
+    // 恢复显示屏
+    tft_wakeup();
+    tft_set_brightness(255);
+    #endif
+    
+    // 重置状态
+    powerState = POWER_STATE_NORMAL;
+    lastMotionTime = millis();
+    
+    Serial.println("[电源管理] 已完全唤醒，恢复正常工作");
+}
+
+void PowerManager::enterLowPowerMode() {
+#ifdef MODE_CLIENT
+    // 客户端模式不使用睡眠功能
+    Serial.println("[电源管理] 客户端模式不使用睡眠功能");
+    return;
+#endif
+
+    Serial.println("[电源管理] 浅睡眠模式已启用，改为使用浅睡眠模式");
+    enterLightSleepMode();
 } 

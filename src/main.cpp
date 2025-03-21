@@ -25,6 +25,7 @@
 #include "compass/COMPASS.h"
 #include "wifi/WifiManager.h"
 #include "power/PowerManager.h"
+#include "driver/gpio.h"
 
 //============================= 全局变量 =============================
 
@@ -353,9 +354,20 @@ void printWakeupReason() {
   switch(wakeup_reason) {
     case ESP_SLEEP_WAKEUP_EXT0: 
       Serial.println("[系统] 从外部RTC_IO唤醒 (运动检测)");
+      // 如果是通过IMU中断唤醒，则重新启用IMU
+      if (gpio_get_level((gpio_num_t)IMU_INT_PIN) == 1) {
+        Serial.println("[系统] 检测到IMU运动中断引脚处于高电平，确认为运动检测唤醒");
+      }
       break;
     case ESP_SLEEP_WAKEUP_EXT1: 
-      Serial.println("[系统] 从外部RTC_CNTL唤醒");
+      {
+        uint64_t wakeup_pin_mask = esp_sleep_get_ext1_wakeup_status();
+        if (wakeup_pin_mask & (1ULL << BTN_PIN)) {
+          Serial.println("[系统] 从按钮唤醒");
+        } else {
+          Serial.println("[系统] 从外部RTC_CNTL唤醒");
+        }
+      }
       break;
     case ESP_SLEEP_WAKEUP_TIMER: 
       Serial.println("[系统] 从定时器唤醒");
@@ -403,6 +415,13 @@ void initializeHardware() {
   #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   // IMU初始化
   imu.begin();
+  
+  // 如果是从浅睡眠中唤醒并且是因为运动检测，则需要清除IMU中断状态
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+    Serial.println("[系统] 从IMU运动检测唤醒，清除中断状态");
+    // 调用disableMotionDetection来清除中断状态
+    imu.disableMotionDetection();
+  }
   
   #ifdef ENABLE_COMPASS
   // 重新创建罗盘实例并初始化

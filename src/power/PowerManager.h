@@ -14,7 +14,8 @@
 enum PowerState {
     POWER_STATE_NORMAL,           // 正常工作状态
     POWER_STATE_COUNTDOWN,        // 倒计时状态
-    POWER_STATE_PREPARING_SLEEP   // 正在准备进入睡眠状态
+    POWER_STATE_PREPARING_SLEEP,  // 正在准备进入睡眠状态
+    POWER_STATE_LIGHT_SLEEP       // 浅睡眠模式
 };
 
 class PowerManager {
@@ -23,6 +24,7 @@ public:
     void begin();
     void loop();
     void enterLowPowerMode();
+    void enterLightSleepMode();  // 新增：进入浅睡眠模式
     void configureWakeupSources();
     bool isDeviceIdle();
     
@@ -41,6 +43,7 @@ private:
     
     bool detectMotion();          // 检测设备是否在运动
     void disablePeripherals();    // 关闭外设
+    void configureMotionDetection(); // 配置运动检测中断
 };
 
 extern PowerManager powerManager;

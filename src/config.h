@@ -70,6 +70,7 @@
     #define BAT_PIN         20
     #define IMU_SDA_PIN     42
     #define IMU_SCL_PIN      2
+    #define IMU_INT_PIN      4    //* IMU中断引脚，用于运动检测唤醒 支持 RTC 唤醒引脚 1-20 */
     #define LED_PIN          8
 
     /* TFT Display Pins */
