@@ -355,9 +355,11 @@ void printWakeupReason() {
     case ESP_SLEEP_WAKEUP_EXT0: 
       Serial.println("[系统] 从外部RTC_IO唤醒 (运动检测)");
       // 如果是通过IMU中断唤醒，则重新启用IMU
+#if defined(IMU_INT_PIN)
       if (gpio_get_level((gpio_num_t)IMU_INT_PIN) == 1) {
         Serial.println("[系统] 检测到IMU运动中断引脚处于高电平，确认为运动检测唤醒");
       }
+#endif
       break;
     case ESP_SLEEP_WAKEUP_EXT1: 
       {

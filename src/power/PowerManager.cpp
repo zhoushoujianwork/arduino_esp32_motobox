@@ -66,13 +66,15 @@ void PowerManager::loop() {
 void PowerManager::configureMotionDetection() {
     Serial.println("[电源管理] 配置IMU运动检测中断...");
     
-    // 使用IMU类的运动检测功能
+    // 使用IMU类的运动检测功能  
+#if defined(IMU_INT_PIN)
     if (imu.enableMotionDetection(IMU_INT_PIN, motionThreshold)) {
         Serial.printf("[电源管理] IMU运动检测已配置，阈值: %.2f, 中断引脚: %d\n", 
                      motionThreshold, IMU_INT_PIN);
     } else {
         Serial.println("[电源管理] 警告: IMU运动检测配置失败");
     }
+#endif
 }
 
 // 新增：打断低功耗模式进入过程
@@ -355,7 +357,7 @@ void PowerManager::enterLightSleepMode() {
     
     // 配置IMU中断检测运动
     configureMotionDetection();
-
+#if defined(IMU_INT_PIN)
     // 配置RTC GPIO中断唤醒
     if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
         Serial.printf("[电源管理] 设置IMU中断引脚唤醒 (GPIO%d)\n", IMU_INT_PIN);
@@ -371,11 +373,12 @@ void PowerManager::enterLightSleepMode() {
         esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT_PIN, 1);
     } else {
         Serial.printf("[电源管理] 警告：IMU_INT_PIN (GPIO%d) 不是有效的RTC GPIO\n", IMU_INT_PIN);
+    }
+#else
         // 设置60秒定时唤醒作为备份
         const uint64_t WAKEUP_INTERVAL_US = 60 * 1000000ULL;
         esp_sleep_enable_timer_wakeup(WAKEUP_INTERVAL_US);
-    }
-    
+#endif
     // 配置按钮唤醒
     #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     if (BTN_PIN >= 0 && BTN_PIN <= 21) {
