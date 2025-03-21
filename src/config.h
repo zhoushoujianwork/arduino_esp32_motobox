@@ -12,9 +12,6 @@
  *           and can send data to server via MQTT over WiFi
  * 3. CLIENT: Slave mode - receives data from server via Bluetooth and displays it
  */
-#define MODE_ALLINONE
-// #define MODE_SERVER
-// #define MODE_CLIENT
 
 /* Common Device Configuration */
 #define BLE_NAME            "ESP32-MOTO"
@@ -64,64 +61,18 @@
 #define MQTT_BAT_PRINT_INTERVAL   10000
 #define MQTT_COMPASS_PUBLISH_INTERVAL 500
 
-#ifdef MODE_ALLINONE
-    /* Pin Configuration for ALL_IN_ONE Mode */
-    #define BTN_PIN         39
-    #define BAT_PIN         20
-    #define IMU_SDA_PIN     42
-    #define IMU_SCL_PIN      2
-    // #define IMU_INT_PIN      4    //* IMU中断引脚，用于运动检测唤醒 支持 RTC 唤醒引脚 1-20 */
-    #define LED_PIN          8
+/* 配置时钟频率宏 */
+#define GPS_PUBLISH_INTERVAL 1000  // 1Hz
+#define IMU_PUBLISH_INTERVAL 500   // 2Hz
+#define BLE_PUBLISH_INTERVAL 1000  // 1Hz
 
-    /* TFT Display Pins */
-    #define TFT_CS           6
-    #define TFT_DC           4
-    #define TFT_MOSI        15
-    #define TFT_SCLK         5
-    #define TFT_RST          7
-    #define TFT_BL          16
-
-    /* GPS UART Pins */
-    #define GPS_RX_PIN      12
-    #define GPS_TX_PIN      11
-    
-    /* 启用罗盘功能 */
-    // #define ENABLE_COMPASS
-#endif
-
+/* 模式定义：通过platformio.ini中的build_flags自动定义，这里不需要再定义引脚 */
 #ifdef MODE_SERVER
     #define BLE_SERVER              /* Enable server mode */
-    
-    /* Pin Configuration for SERVER Mode */
-    #define IMU_SDA_PIN     42
-    #define IMU_SCL_PIN      2
-    #define BTN_PIN         39
-    #define BAT_PIN          7
-    #define LED_PIN          8
-    
-    /* GPS UART Pins */
-    #define GPS_RX_PIN      12
-    #define GPS_TX_PIN      11
-    
-    /* 启用罗盘功能 */
-    #define ENABLE_COMPASS
 #endif
 
 #ifdef MODE_CLIENT
     #define BLE_CLIENT              /* Enable client mode */
-    
-    /* Pin Configuration for CLIENT Mode */
-    #define BAT_PIN         14
-    #define LED_PIN          3
-
-    /* TFT Display Pins */
-    #define TFT_CS 15
-    #define TFT_DC 2
-    #define TFT_MOSI 19
-    #define TFT_SCLK 18
-    #define TFT_RST 4
-    // #define TFT_BL 5
-    // GPIO5 不支持 PWM 输出 调整亮度，16 是支持的
 #endif
 
 #endif /* CONFIG_H */
