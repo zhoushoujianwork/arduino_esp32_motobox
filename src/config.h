@@ -72,6 +72,11 @@
 #define IMU_MAX_D          68     /* Marquis GP retention */
 #endif
 
+/* IMU Interrupt Configuration */
+#ifndef IMU_INT1_PIN
+#define IMU_INT1_PIN       1      /* GPIO1 used for IMU interrupt */
+#endif
+
 /* GPS Configuration */
 #ifndef GPS_DEFAULT_BAUDRATE
 #define GPS_DEFAULT_BAUDRATE 9600

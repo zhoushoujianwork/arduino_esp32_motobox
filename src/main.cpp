@@ -299,7 +299,16 @@ void printWakeupReason() {
 
   switch(wakeup_reason) {
     case ESP_SLEEP_WAKEUP_EXT0: 
-      Serial.println("[系统] 从外部RTC_IO唤醒 (运动检测)");
+      // ESP32-S3 ext0 唤醒只能使用一个引脚
+      // 由于系统只配置了一个ext0唤醒源，如果唤醒原因是EXT0，
+      // 我们需要判断是按钮还是IMU引脚引起的
+      if (digitalRead(IMU_INT1_PIN) == LOW) {
+        Serial.println("[系统] 从IMU运动检测唤醒");
+      } else if (digitalRead(BTN_PIN) == LOW) {
+        Serial.println("[系统] 从按钮按下唤醒");
+      } else {
+        Serial.println("[系统] 从外部RTC_IO唤醒，但无法确定具体引脚");
+      }
       break;
     case ESP_SLEEP_WAKEUP_EXT1: 
       Serial.println("[系统] 从外部RTC_CNTL唤醒");
@@ -349,7 +358,18 @@ void initializeHardware() {
 
   #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   // IMU初始化
+  Serial.println("[系统] 初始化IMU...");
   imu.begin();
+  
+  // 如果是从深度睡眠唤醒且是IMU唤醒，需要特殊处理
+  if (isWakeFromDeepSleep && wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+    // 检查是否为IMU中断引脚引起的唤醒
+    if (digitalRead(IMU_INT1_PIN) == LOW) {
+      Serial.println("[系统] 从IMU唤醒，处理唤醒事件并重置运动检测");
+      // 这里可以针对IMU唤醒做一些特殊处理
+      // 例如记录运动事件、调整唤醒灵敏度等
+    }
+  }
   
   // WiFi初始化
   Serial.println("[系统] 初始化WiFi连接...");

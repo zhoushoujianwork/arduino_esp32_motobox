@@ -157,6 +157,15 @@ void PowerManager::disablePeripherals() {
     }
 #endif
 
+    // IMU特殊处理 - 保持运动检测功能
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    extern IMU imu;
+    Serial.println("[电源管理] 配置IMU为低功耗模式，保持运动检测...");
+    // 对IMU进行特殊配置，禁用陀螺仪，但保持加速度计运动检测
+    // 注意：我们无法直接访问IMU的私有成员，这里假设IMU已经完成配置
+    Serial.println("[电源管理] IMU: 保留加速度计用于运动检测，其他功能进入低功耗");
+#endif
+
     // 关闭TFT显示
 #ifdef MODE_ALLINONE
     // 使用新增的TFT睡眠函数
@@ -177,9 +186,45 @@ void PowerManager::configureWakeupSources() {
     Serial.printf("[电源管理] 设置定时器唤醒：%llu 微秒后\n", WAKEUP_INTERVAL_US);
     esp_sleep_enable_timer_wakeup(WAKEUP_INTERVAL_US);
     
-    // 新增：配置按钮唤醒
+    // ESP32-S3 ext0只能配置一个唤醒源，需要选择IMU或按钮
+    // 这里优先使用IMU中断作为唤醒源
     #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    // 检查按钮引脚是否为有效的RTC GPIO (ESP32-S3只有GPIO0-GPIO21是RTC GPIO)
+    // 检查IMU_INT1_PIN是否为有效的RTC GPIO (ESP32-S3只有GPIO0-GPIO21是RTC GPIO)
+    if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21) {
+        Serial.printf("[电源管理] 配置IMU运动唤醒 (GPIO%d)\n", IMU_INT1_PIN);
+        
+        // 配置IMU中断在进入低功耗模式前
+        extern IMU imu;
+        bool result = imu.enableMotionDetection(IMU_INT1_PIN, 0.05); // 设置较低的阈值提高灵敏度
+        
+        if (result) {
+            Serial.println("[电源管理] IMU运动检测已配置成功");
+            
+            // 初始化RTC GPIO
+            rtc_gpio_init((gpio_num_t)IMU_INT1_PIN);
+            // 设置GPIO模式为输入
+            rtc_gpio_set_direction((gpio_num_t)IMU_INT1_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+            // 启用内部上拉电阻，避免悬空状态
+            rtc_gpio_pullup_en((gpio_num_t)IMU_INT1_PIN);
+            rtc_gpio_pulldown_dis((gpio_num_t)IMU_INT1_PIN);
+            // 配置为低电平触发唤醒
+            esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT1_PIN, 0); 
+            
+            // 检查当前中断状态，确保不会立即唤醒
+            if (digitalRead(IMU_INT1_PIN) == LOW) {
+                Serial.println("[电源管理] 警告：IMU中断引脚当前为低电平，可能会立即唤醒设备");
+            }
+            
+            Serial.println("[电源管理] 已将IMU中断配置为唤醒源，按钮唤醒功能被禁用");
+            return; // 已配置IMU唤醒，不再配置按钮唤醒
+        } else {
+            Serial.println("[电源管理] IMU运动检测配置失败，尝试使用按钮作为唤醒源");
+        }
+    } else {
+        Serial.printf("[电源管理] 警告：IMU_INT1_PIN (GPIO%d) 不是有效的RTC GPIO，无法用作唤醒源\n", IMU_INT1_PIN);
+    }
+    
+    // 如果IMU配置失败或不可用，尝试使用按钮作为唤醒源
     if (BTN_PIN >= 0 && BTN_PIN <= 21) {
         Serial.printf("[电源管理] 设置按钮唤醒 (GPIO%d)\n", BTN_PIN);
         

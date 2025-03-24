@@ -162,27 +162,89 @@ bool IMU::enableMotionDetection(int intPin, float threshold)
     // 设置中断引脚为输入模式
     pinMode(intPin, INPUT);
     
-    // 注意：这里假设QMI8658库有相关函数来配置运动检测。
-    // 如果实际SensorQMI8658库没有此功能，需要添加相应的寄存器配置代码。
+    Serial.println("[IMU] 开始配置运动检测...");
+
+    // 首先确保加速度计已启用
+    if (!qmi.isEnableAccelerometer()) {
+        qmi.enableAccelerometer();
+        Serial.println("[IMU] 已启用加速度计");
+    }
+
+    // 配置任意运动检测（ANY_MOTION）
+    uint8_t motionCtrl = 0;
+    motionCtrl |= SensorQMI8658::ANY_MOTION_EN_X;  // 启用X轴检测
+    motionCtrl |= SensorQMI8658::ANY_MOTION_EN_Y;  // 启用Y轴检测
+    motionCtrl |= SensorQMI8658::ANY_MOTION_EN_Z;  // 启用Z轴检测
     
-    // 示例配置代码（需要根据QMI8658实际寄存器映射调整）：
-    // 1. 配置加速度计中断阈值
-    // qmi.setAccInterruptThreshold(threshold);
+    // 配置无运动检测（NO_MOTION）
+    motionCtrl |= SensorQMI8658::NO_MOTION_EN_X;   // 启用X轴检测
+    motionCtrl |= SensorQMI8658::NO_MOTION_EN_Y;   // 启用Y轴检测
+    motionCtrl |= SensorQMI8658::NO_MOTION_EN_Z;   // 启用Z轴检测
     
-    // 2. 启用加速度计中断功能
-    // qmi.enableAccInterrupt(intPin);
+    // 使用逻辑OR关系，任一轴检测到运动就触发
+    // 默认任意运动检测使用逻辑OR，无需额外配置
     
-    Serial.println("Motion detection enabled");
-    return true;
+    // 阈值设置 - 将g值转换为更适合的范围
+    // 注意：阈值设置取决于传感器量程，这里使用的是ACC_RANGE_4G
+    float motionThreshold = threshold;  // g值，例如0.05g
+
+    // 配置任意运动检测参数
+    int result = qmi.configMotion(
+        motionCtrl,           // 控制寄存器
+        motionThreshold,      // X轴阈值
+        motionThreshold,      // Y轴阈值
+        motionThreshold,      // Z轴阈值
+        5,                    // 任意运动检测窗口 (1-255)
+        0.0,                  // 无运动X阈值，设为0不启用
+        0.0,                  // 无运动Y阈值，设为0不启用
+        0.0,                  // 无运动Z阈值，设为0不启用
+        0,                    // 无运动窗口
+        0,                    // 显著运动等待窗口
+        0                     // 显著运动确认窗口
+    );
+    
+    if (result != 0) {
+        Serial.println("[IMU] 运动检测配置失败");
+        return false;
+    }
+    
+    // 启用运动检测中断
+    bool success = false;
+    if (intPin == 1) {
+        success = qmi.enableMotionDetect(SensorQMI8658::INTERRUPT_PIN_1);
+    } else if (intPin == 2) {
+        success = qmi.enableMotionDetect(SensorQMI8658::INTERRUPT_PIN_2);
+    } else {
+        Serial.println("[IMU] 不支持的中断引脚，尝试使用INT1");
+        success = qmi.enableMotionDetect(SensorQMI8658::INTERRUPT_PIN_1);
+    }
+    
+    if (success) {
+        Serial.printf("[IMU] 运动检测已启用，中断引脚: GPIO%d, 阈值: %.3fg\n", intPin, motionThreshold);
+    } else {
+        Serial.println("[IMU] 启用运动检测中断失败");
+        return false;
+    }
+    
+    // 验证中断引脚状态
+    int pinValue = digitalRead(intPin);
+    Serial.printf("[IMU] 当前中断引脚状态: %s\n", pinValue ? "HIGH" : "LOW");
+    
+    return success;
 }
 
 void IMU::disableMotionDetection()
 {
     if (motionIntPin != -1) {
-        // 禁用中断
-        // qmi.disableAccInterrupt();
+        // 禁用运动检测中断
+        bool success = qmi.disableMotionDetect();
         
-        Serial.println("Motion detection disabled");
+        if (success) {
+            Serial.printf("[IMU] 已禁用运动检测，中断引脚: GPIO%d\n", motionIntPin);
+        } else {
+            Serial.println("[IMU] 禁用运动检测失败");
+        }
+        
         motionIntPin = -1;
     }
 }
