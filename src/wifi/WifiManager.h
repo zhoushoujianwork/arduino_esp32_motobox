@@ -51,6 +51,7 @@ public:
     bool isConnected() const { return WiFi.status() == WL_CONNECTED; }
     void reset();
     bool getConfigMode() const { return isConfigMode; }
+    String getSuccessPage();
 };
 
 // 全局实例和接口函数

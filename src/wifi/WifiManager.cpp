@@ -208,8 +208,8 @@ void WiFiConfigManager::handleConfigSubmit()
     }
 
     saveWiFiCredentials(newSSID, newPassword);
-    server.send(200, "text/html", "success! restarting...");
-    delay(1000);
+    server.send(200, "text/html", getSuccessPage());  // 使用新的成功页面
+    delay(3000);  // 延长重启前的时间，让用户看到动画
     ESP.restart();
 }
 
@@ -397,4 +397,91 @@ void WiFiConfigManager::reset()
 {
     Serial.println("重置配置");
     preferences.clear();
+}
+
+// 添加一个新函数，用于返回成功页面的HTML
+String WiFiConfigManager::getSuccessPage()
+{
+    String html = R"(
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='utf-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1'>
+            <title>MotoBox - 配置成功</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif;
+                    padding: 20px;
+                    background-color: #f5f5f5;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    text-align: center;
+                }
+                .container {
+                    background: white;
+                    padding: 30px;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                    margin-top: 50px;
+                }
+                h1 {
+                    color: #007bff;
+                    font-size: 24px;
+                    margin-bottom: 20px;
+                }
+                p {
+                    color: #333;
+                    font-size: 16px;
+                    margin-bottom: 30px;
+                }
+                .loader {
+                    border: 8px solid #f3f3f3;
+                    border-radius: 50%;
+                    border-top: 8px solid #007bff;
+                    width: 60px;
+                    height: 60px;
+                    margin: 0 auto 20px;
+                    animation: spin 2s linear infinite;
+                }
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                .countdown {
+                    font-size: 18px;
+                    font-weight: bold;
+                    color: #333;
+                    margin-top: 15px;
+                }
+            </style>
+            <script>
+                // 倒计时脚本
+                window.onload = function() {
+                    var seconds = 3;
+                    var countdownElement = document.getElementById('countdown');
+                    
+                    var interval = setInterval(function() {
+                        seconds--;
+                        countdownElement.textContent = seconds + ' 秒后重启...';
+                        
+                        if (seconds <= 0) {
+                            clearInterval(interval);
+                        }
+                    }, 1000);
+                };
+            </script>
+        </head>
+        <body>
+            <div class="container">
+                <h1>WiFi配置成功!</h1>
+                <div class="loader"></div>
+                <p>MotoBox即将重新启动，连接到您的WiFi网络。</p>
+                <p>设备重启后，请关闭此页面。</p>
+                <div id="countdown" class="countdown">3 秒后重启...</div>
+            </div>
+        </body>
+        </html>
+    )";
+    return html;
 }

@@ -47,6 +47,7 @@ unsigned long lastBlePublishTime = 0;
 GPS gps(GPS_RX_PIN, GPS_TX_PIN);
 IMU imu(IMU_SDA_PIN, IMU_SCL_PIN);
 BTN button(BTN_PIN);
+
 MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
 #endif
 
@@ -112,7 +113,7 @@ void taskGps(void *parameter) {
     // gps.printRawData();
     
     // 定期打印GPS统计信息，显示接收质量
-    gps.printGpsStats();
+    // gps.printGpsStats();
     
     delay(5);
   }
@@ -401,20 +402,7 @@ void setup() {
   #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   // 显示屏初始化完成后，再初始化 GPS
   Serial.println("[系统] 初始化GPS...");
-  
-  // 检查是否从深度睡眠唤醒
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  bool isWakeFromDeepSleep = (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED);
-  
-  if (isWakeFromDeepSleep) {
-    // 如果是从睡眠中唤醒，需要先唤醒GPS模块
-    Serial.println("[系统] 从睡眠唤醒，正在唤醒GPS模块...");
-    gps.begin();
-    gps.wakeup();
-  } else {
-    // 正常启动，直接初始化GPS
-    gps.begin();
-  }
+  gps.begin();
   #endif
   
   // 创建任务

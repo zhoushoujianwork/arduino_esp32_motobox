@@ -140,11 +140,11 @@ bool GPS::autoAdjustUpdateRate()
     int targetHz = 0;
     
     // 根据卫星数量确定目标更新频率，由于数据精简可以设置更高频率
-    if (satellites >= 15) {
+    if (satellites >= 23) {
         targetHz = 10;  // 卫星数量很多，高精度、高更新率
-    } else if (satellites >= 8) {
+    } else if (satellites >= 18) {
         targetHz = 5;   // 卫星数量中等，中等更新率
-    } else if (satellites >= 4) {
+    } else if (satellites >= 8) {
         targetHz = 2;   // 卫星数量较少，降低更新率保证质量
     } else {
         targetHz = 1;   // 卫星数量很少，最低更新率以保证质量
@@ -527,55 +527,4 @@ void GPS::printGpsStats()
         _validSentences = 0;
         _invalidSentences = 0;
     }
-}
-
-// 使GPS模块进入待机模式
-bool GPS::enterStandbyMode() {
-    Serial.println("[GPS] 正在使GPS模块进入待机模式...");
-    
-    // PMTK161,0是标准的待机命令，适用于大多数GPS模块
-    // 在待机模式下，GPS模块将关闭大部分内部电路，包括PPS信号灯
-    bool success = sendGpsCommand("$PMTK161,0*28", 2, 200);
-    
-    if (success) {
-        Serial.println("[GPS] GPS模块已进入待机模式");
-    } else {
-        Serial.println("[GPS] 无法使GPS模块进入待机模式");
-    }
-    
-    return success;
-}
-
-// 唤醒GPS模块
-bool GPS::wakeup() {
-    Serial.println("[GPS] 正在唤醒GPS模块...");
-    
-    // 对大多数GPS模块，发送任何命令都会唤醒它
-    // 这里我们发送一个查询版本的命令，这是一个无害的操作
-    bool success = sendGpsCommand("$PMTK605*31", 2, 300);
-    
-    if (success) {
-        Serial.println("[GPS] GPS模块已唤醒");
-        
-        // 等待GPS模块稳定
-        delay(200);
-        
-        // 恢复之前的更新频率
-        setGpsHz(_currentHz);
-    } else {
-        Serial.println("[GPS] 无法唤醒GPS模块，尝试重新初始化");
-        
-        // 清空串口缓冲区
-        while (gpsSerial.available()) {
-            gpsSerial.read();
-        }
-        
-        // 重新配置GPS模式
-        configGpsMode();
-        
-        // 恢复更新频率
-        setGpsHz(_currentHz);
-    }
-    
-    return success;
 }

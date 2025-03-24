@@ -151,15 +151,9 @@ void PowerManager::disablePeripherals() {
     
     // 关闭GPS
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    // 先让GPS模块进入待机模式，这样PPS信号灯也会关闭
-    Serial.println("[电源管理] 使GPS模块进入待机模式...");
-    gps.enterStandbyMode();
-    
-    // 挂起GPS任务
     extern TaskHandle_t gpsTaskHandle;
     if (gpsTaskHandle != NULL) {
-        Serial.println("[电源管理] 挂起GPS任务...");
-        vTaskSuspend(gpsTaskHandle);
+        vTaskDelete(gpsTaskHandle);
     }
 #endif
 

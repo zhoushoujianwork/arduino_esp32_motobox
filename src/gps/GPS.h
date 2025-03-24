@@ -54,11 +54,6 @@ public:
     // 打印GPS数据接收统计信息
     void printGpsStats();
     
-    // 使GPS模块进入待机模式（低功耗模式）
-    bool enterStandbyMode();
-    
-    // 唤醒GPS模块
-    bool wakeup();
 
 private:
     // 配置GPS工作模式，启用双模式和完整NMEA输出
