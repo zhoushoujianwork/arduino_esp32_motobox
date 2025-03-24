@@ -237,11 +237,11 @@ void tft_loop()
 
         // 根据WiFi连接状态更新图标
         if (device.get_device_state()->wifiConnected) {
-            // WiFi已连接 - 显示正常图标
-            lv_img_set_src(ui_imgWifi, &ui_img_wifiok_png);
+            // WiFi已连接 - 显示正常图标但完全不透明
+            lv_img_set_src(ui_imgWifi, &ui_img_wificon_png);
             lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0); // 完全不透明
         } else {
-            // WiFi未连接 - 降低透明度
+            // WiFi未连接 - 使用相同图标但半透明
             lv_img_set_src(ui_imgWifi, &ui_img_wificon_png);
             lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_50, 0); // 半透明
         }
@@ -316,9 +316,9 @@ void tft_sleep() {
     // 首先将亮度逐渐降低到0
     #ifdef TFT_BL
     // 以10步逐渐降低亮度
-    for (int brightness = 255; brightness >= 0; brightness -= 25) {
+    for (int brightness = 255; brightness >= 0; brightness -= 2) {
         tft_set_brightness(brightness);
-        delay(20); // 短暂延迟以实现渐变效果
+        delay(2); // 短暂延迟以实现渐变效果
     }
     // 最后确保亮度为0
     tft_set_brightness(0);
