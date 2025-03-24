@@ -1,5 +1,28 @@
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
+                       
+                WITH COMMONS CLAUSE RESTRICTION
+
+"Commons Clause" License Condition v1.0
+
+The Software is provided to you by the Licensor under the License, as defined
+below, subject to the following condition.
+
+Without limiting other conditions in the License, the grant of rights under the
+License will not include, and the License does not grant to you, the right to
+Sell the Software.
+
+For purposes of the foregoing, "Sell" means practicing any or all of the rights
+granted to you under the License to provide to third parties, for a fee or other
+consideration (including without limitation fees for hosting or consulting/
+support services related to the Software), a product or service whose value
+derives, entirely or substantially, from the functionality of the Software. Any
+license notice or attribution required by the License must also include this
+Commons Clause License Condition notice.
+
+Software: ESP32-S3 MotoBox
+License: GNU General Public License v3.0
+Licensor: 项目作者
 
  Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
  Everyone is permitted to copy and distribute verbatim copies
@@ -675,7 +698,13 @@ Public License instead of this License.  But first, please read
 
 项目特定许可声明：
 
-本项目 ESP32-S3 MotoBox 遵循 GNU General Public License v3.0 许可证。
+本项目 ESP32-S3 MotoBox 遵循 GNU General Public License v3.0 许可证，并附加 Commons Clause 限制条款。
 版权所有 (C) 2024 项目作者
 
-联系方式：[请在此处添加项目联系人信息]
+本许可证禁止任何商业用途，包括但不限于：
+1. 销售本软件或基于本软件的产品
+2. 提供基于本软件的付费服务
+3. 将本软件集成到商业产品中
+4. 利用本软件的功能提供商业服务
+
+联系方式：[QQ群：952981364]
