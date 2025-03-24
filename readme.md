@@ -1,99 +1,139 @@
-# MotoBox 项目文档
+# ESP32-S3 MotoBox 开发指南
 
-## 项目简介
+## 项目概述
+本项目是基于ESP32-S3的摩托车数据采集与显示系统，专注于嵌入式系统开发和低功耗设计。
 
-MotoBox（大菠萝车机） 是一个基于 ESP32-S3 的多功能车载信息系统，提供实时 GPS 定位、IMU 数据采集、蓝牙通信和 MQTT 数据传输等功能。
+## 开发经验总结
 
-## 硬件配置
+### ESP32-S3 深度睡眠与唤醒
 
-### 支持的硬件
-- 开发板：ESP32-S3-DevKitC-1
-- 显示屏：ST7789 TFT 显示屏（172x320分辨率）
-- GPS 模块：支持 NMEA 协议
-- IMU 传感器：QMI8658
-- 电池管理
+#### RTC GPIO 唤醒源限制
+- ESP32-S3 仅支持 GPIO0-GPIO21 作为 RTC GPIO 唤醒源
+- 深度睡眠唤醒只能使用这些特定的 GPIO 引脚
+- 建议在硬件设计时，将按钮或唤醒信号连接到这些引脚
 
-### 引脚配置
+#### 唤醒源配置注意事项
+```cpp
+// 正确的RTC GPIO唤醒配置示例
+if (BTN_PIN >= 0 && BTN_PIN <= 21) {
+    rtc_gpio_init((gpio_num_t)BTN_PIN);
+    rtc_gpio_set_direction((gpio_num_t)BTN_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en((gpio_num_t)BTN_PIN);
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)BTN_PIN, 0); 
+}
+```
 
-#### 显示屏 (TFT)
-- CS: 34
-- MOSI: 35
-- SCLK: 36
-- DC: 7
-- RST: 6
+### 低功耗设计最佳实践
 
-#### GPS
-- RX: 12
-- TX: 11
-- 默认波特率: 9600
+1. **外设管理**
+   - 进入深度睡眠前关闭所有不必要的外设
+   - 断开WiFi和MQTT连接
+   - 使GPS模块进入待机模式
+   - 关闭显示屏
 
-#### IMU
-- SDA: 42
-- SCL: 2
+2. **电源状态管理**
+   - 使用状态机追踪设备电源状态
+   - 提供倒计时机制，允许在进入深度睡眠前中断
 
-#### 电池
-- 电压检测引脚: 7
-- 电压范围: 2.9V - 3.25V
+3. **运动检测**
+   - 使用IMU传感器检测设备运动
+   - 动态调整运动检测阈值
+   - 在低功耗模式下自动中断睡眠
 
-## 软件配置
+### 常见陷阱与解决方案
 
-### 运行模式
+#### GPIO 唤醒限制
+- 问题：并非所有 GPIO 都支持深度睡眠唤醒
+- 解决方案：
+  1. 检查引脚是否为 RTC GPIO
+  2. 必要时重新设计硬件连接
+  3. 使用 `esp_sleep_enable_ext0_wakeup()` 配置唤醒源
 
-项目支持三种运行模式（在 `config.h` 中配置）：
+#### 防止意外重启
+- 添加按钮状态检查
+- 配置上拉/下拉电阻
+- 检查引脚电平，避免立即唤醒
 
-1. `MODE_ALLINONE`：独立模式，自行采集数据并渲染
-2. `MODE_SERVER`：主机模式，通过蓝牙发送数据，WIFI 发送 MQTT
-3. `MODE_CLIENT`：从机模式，接收蓝牙数据并渲染
+### 性能优化建议
 
-### MQTT 配置
+1. 使用 RTOS 任务管理
+2. 合理配置任务优先级
+3. 使用 `vTaskSuspend()` 和 `vTaskResume()` 管理任务
 
-Server 端数据上传后可以在网站登录绑定设备 ID 后查看信息；网址：https://daboluo.cc/
+## 硬件兼容性
 
-- 服务器：mq-hub.daboluo.cc
-- 端口：1883
-- 主题：
-  - 设备信息：`vehicle/v1/{device_id}/device/info`
-  - GPS：`vehicle/v1/{device_id}/gps/position`
-  - IMU：`vehicle/v1/{device_id}/imu/gyro`
+### ESP32-S3 特殊引脚
+- GPIO26-GPIO32：连接到 SPI Flash 和 PSRAM，不建议使用
+- GPIO0-GPIO21：RTC GPIO，适合深度睡眠唤醒
+- 部分 GPIO 支持电容触摸
 
-## 开发环境
+## 调试技巧
 
-- 开发工具：PlatformIO
-- 框架：Arduino
-- 依赖库：
-  - TinyGPSPlus
-  - EspSoftwareSerial
-  - NimBLE-Arduino
-  - PubSubClient
-  - ArduinoJson
+1. 使用 `Serial.printf()` 输出详细日志
+2. 在关键位置添加状态输出
+3. 使用 `millis()` 进行时间追踪
 
-## 编译与烧录
+## 注意事项
 
-1. 安装 PlatformIO
-2. 克隆项目
-3. 执行 `pio run` 编译
-4. 执行 `pio run -t upload` 烧录
-
-## 使用说明
-
-- 长按按键可重置 WiFi 配置
-- 短按按键可切换 GPS 更新频率
+- 深度睡眠会重置所有非 RTC 内存
+- 使用 `RTC_DATA_ATTR` 保存关键变量
+- 谨慎处理电源管理状态转换
 
 ## 许可证
 
-本项目采用 GNU General Public License v3.0 (GPL-3.0) 开源许可证。
+本项目采用 GNU General Public License v3.0 (GPL-3.0) 开源许可证，并附加 Commons Clause 限制条款，禁止商业使用。
 
-- 您可以自由地使用、修改和分发本项目
-- 任何修改后的版本也必须开源
-- 禁止在闭源商业产品中使用
-- 详细条款请参见 LICENSE 文件
+### 许可证主要条款
 
-有关完整许可证详情，请访问：https://www.gnu.org/licenses/gpl-3.0.html
+1. **使用与分发限制**
+   - 您可以自由地使用、修改和分发本项目，但仅限于非商业用途
+   - 禁止任何形式的商业使用，包括销售本软件或基于本软件的产品/服务
+
+2. **开源要求**
+   - 任何基于本项目的修改版本必须同样开源
+   - 必须保留原始版权声明和许可证
+   - 修改后的版本需要清晰标注所做的更改
+
+3. **责任与担保**
+   - 本项目按"原样"提供，不提供任何明确或隐含的担保
+   - 作者不对使用本项目造成的任何直接或间接损失负责
+
+4. **再分发限制**
+   - 再分发时必须包含完整的源代码
+   - 不得对原始许可证施加额外限制
+   - 必须同时包含Commons Clause限制条款
+
+### 商业使用限制
+
+以下活动被明确禁止：
+
+1. 销售本软件或基于本软件的产品
+2. 提供基于本软件的付费服务
+3. 将本软件集成到商业产品中
+4. 利用本软件的功能提供商业服务
+
+如需商业授权，请联系项目作者获取单独的商业许可。
+
+### 完整许可证
+
+详细许可证条款请参见项目根目录下的 `LICENSE` 文件。
+
+有关GPL-3.0许可证详情，请访问：https://www.gnu.org/licenses/gpl-3.0.html
+有关Commons Clause的详情，请访问：https://commonsclause.com/
+
+### 贡献者协议
+
+通过向本项目提交代码，您同意将您的贡献遵循GPL-3.0许可证和Commons Clause限制条款。
 
 ## 免责声明
 
-本项目按"原样"提供，不保证稳定性和适用性。使用本项目所造成的任何损失，作者概不负责。
+本项目旨在提供有用的功能，但不保证完全没有缺陷。使用本项目所造成的任何损失，作者概不负责。
 
 ## 贡献
 
-欢迎提交 Issues 和 Pull Requests！
+欢迎通过以下方式参与项目：
+- 提交 Issues 报告 Bug 或建议新功能
+- 发起 Pull Requests 改进代码
+- 分享使用心得和二次开发经验
+
+请遵守项目的代码风格和贡献准则。

@@ -271,12 +271,20 @@ void handleButtonEvents() {
     }
 
     // 长按事件 - 重置WiFi
-    if (button.isLongPressed()) {
+    static bool longPressHandled = false;  // 添加静态变量记录长按是否已处理
+    bool currentlyLongPressed = button.isLongPressed();
+    
+    if (currentlyLongPressed && !longPressHandled) {  // 只有未处理过的长按才执行
       Serial.println("[按钮] 检测到长按，重置WIFI");
       
       if (!wifiManager.getConfigMode()) {
         wifiManager.reset();
       }
+      
+      longPressHandled = true;  // 标记为已处理
+    } else if (!currentlyLongPressed) {
+      // 不是长按状态时重置标志，以便下次长按可以触发
+      longPressHandled = false;
     }
   }
   #endif

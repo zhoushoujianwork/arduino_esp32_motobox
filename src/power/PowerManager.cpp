@@ -1,4 +1,5 @@
 #include "PowerManager.h"
+#include "btn/BTN.h"
 
 PowerManager::PowerManager() {
     // 设置默认值
@@ -181,6 +182,40 @@ void PowerManager::configureWakeupSources() {
     
     Serial.printf("[电源管理] 设置定时器唤醒：%llu 微秒后\n", WAKEUP_INTERVAL_US);
     esp_sleep_enable_timer_wakeup(WAKEUP_INTERVAL_US);
+    
+    // 新增：配置按钮唤醒
+    #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    // 检查按钮引脚是否为有效的RTC GPIO (ESP32-S3只有GPIO0-GPIO21是RTC GPIO)
+    if (BTN_PIN >= 0 && BTN_PIN <= 21) {
+        Serial.printf("[电源管理] 设置按钮唤醒 (GPIO%d)\n", BTN_PIN);
+        
+        // 检查按钮当前状态，避免无限重启
+        extern BTN button;
+        if (button.isPressed()) {
+            Serial.println("[电源管理] 警告：按钮当前处于按下状态，跳过按钮唤醒配置");
+        } else {
+            // 初始化RTC GPIO
+            rtc_gpio_init((gpio_num_t)BTN_PIN);
+            // 设置GPIO模式为输入
+            rtc_gpio_set_direction((gpio_num_t)BTN_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+            // 启用内部上拉电阻，确保按钮未按下时为高电平
+            rtc_gpio_pullup_en((gpio_num_t)BTN_PIN);
+            rtc_gpio_pulldown_dis((gpio_num_t)BTN_PIN);
+            // 配置为低电平触发唤醒
+            esp_sleep_enable_ext0_wakeup((gpio_num_t)BTN_PIN, 0); 
+            
+            // 再次检查GPIO状态，如果已经是低电平，则禁用此唤醒源
+            if (rtc_gpio_get_level((gpio_num_t)BTN_PIN) == 0) {
+                Serial.println("[电源管理] 警告：按钮引脚处于低电平，禁用按钮唤醒源");
+                esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_EXT0);
+            }
+        }
+    } else {
+        Serial.printf("[电源管理] 警告：BTN_PIN (GPIO%d) 不是有效的RTC GPIO，无法用作睡眠唤醒源\n", BTN_PIN);
+        Serial.println("[电源管理] ESP32-S3只有GPIO0-GPIO21能用作RTC GPIO");
+        Serial.println("[电源管理] 建议：修改硬件连接，将按钮接到GPIO0-GPIO21之间的任一引脚，并更新config.h中的BTN_PIN定义");
+    }
+    #endif
 }
 
 void PowerManager::enterLowPowerMode() {
