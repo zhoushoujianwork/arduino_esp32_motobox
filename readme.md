@@ -3,6 +3,62 @@
 ## 项目概述
 本项目是基于ESP32-S3的摩托车数据采集与显示系统，专注于嵌入式系统开发和低功耗设计。
 
+## 深度睡眠模式实现
+
+### 睡眠模式唤醒源优先级
+- **按钮唤醒**: 最高优先级，通过BTN_PIN配置
+- **IMU运动检测唤醒**: 次优先级，通过IMU_INT1_PIN配置
+- **定时器唤醒**: 最低优先级，作为兜底唤醒机制
+
+### 唤醒处理流程
+```cpp
+// 唤醒源处理逻辑
+void PowerManager::setupWakeupSources() {
+  // 首先检查按钮是否为有效的RTC GPIO
+  if (BTN_PIN >= 0 && BTN_PIN <= 21) {
+    rtc_gpio_init((gpio_num_t)BTN_PIN);
+    rtc_gpio_set_direction((gpio_num_t)BTN_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_en((gpio_num_t)BTN_PIN);
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)BTN_PIN, 0); 
+    _wakeupSourceConfigured = true;
+  }
+  
+  // 如果按钮无法配置，检查IMU中断引脚
+  if (!_wakeupSourceConfigured && IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21) {
+    rtc_gpio_init((gpio_num_t)IMU_INT1_PIN);
+    rtc_gpio_set_direction((gpio_num_t)IMU_INT1_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pulldown_en((gpio_num_t)IMU_INT1_PIN);
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT1_PIN, 1);
+    _wakeupSourceConfigured = true;
+  }
+  
+  // 最后，始终配置定时器唤醒作为兜底机制
+  esp_sleep_enable_timer_wakeup(WAKEUP_INTERVAL_US);
+}
+```
+
+### 唤醒响应机制
+- **按钮唤醒**: LED以BLINK_SINGLE模式闪烁，恢复系统
+- **IMU运动唤醒**: 记录运动事件，可选择性唤醒或继续睡眠
+- **定时器唤醒**: 检查系统状态，执行周期性任务
+
+### IMU运动检测配置
+- 通过QMI8658传感器的INT1引脚连接到ESP32-S3
+- 配置传感器进行运动检测，超过阈值时触发中断
+- 支持在深度睡眠状态下保持运动检测功能
+
+### 显示系统状态
+使用LED指示系统状态：
+- **OFF**: 休眠状态
+- **ON**: 正常工作
+- **BLINK_SINGLE**: 唤醒或特殊事件
+- **BLINK_DUAL**: 警告状态
+
+### 电源管理优化
+- 进入睡眠前关闭所有非必要外设
+- 配置适当的RTC唤醒源
+- 保持关键状态变量在RTC内存中
+
 ## 开发经验总结
 
 ### ESP32-S3 深度睡眠与唤醒

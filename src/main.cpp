@@ -298,19 +298,23 @@ void printWakeupReason() {
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
   switch(wakeup_reason) {
-    case ESP_SLEEP_WAKEUP_EXT0: 
-      // ESP32-S3 ext0 唤醒只能使用一个引脚
-      // 由于系统只配置了一个ext0唤醒源，如果唤醒原因是EXT0，
-      // 我们需要判断是按钮还是IMU引脚引起的
-      if (digitalRead(IMU_INT1_PIN) == LOW) {
-        Serial.println("[系统] 从IMU运动检测唤醒");
-      } else if (digitalRead(BTN_PIN) == LOW) {
-        Serial.println("[系统] 从按钮按下唤醒");
+    case ESP_SLEEP_WAKEUP_EXT0: {
+      // 检查唤醒源是按钮还是IMU
+      int wakeup_pin = -1;
+      // 检查哪个引脚为低电平，可能是唤醒源
+      if (BTN_PIN >= 0 && BTN_PIN <= 21 && digitalRead(BTN_PIN) == LOW) {
+        wakeup_pin = BTN_PIN;
+        Serial.printf("[系统] 从按钮唤醒 (GPIO%d)\n", BTN_PIN);
+      } else if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21 && digitalRead(IMU_INT1_PIN) == LOW) {
+        wakeup_pin = IMU_INT1_PIN;
+        Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT1_PIN);
       } else {
         Serial.println("[系统] 从外部RTC_IO唤醒，但无法确定具体引脚");
       }
       break;
+    }
     case ESP_SLEEP_WAKEUP_EXT1: 
+      // ESP_SLEEP_WAKEUP_EXT1使用位掩码，但我们的代码没有使用此方式
       Serial.println("[系统] 从外部RTC_CNTL唤醒");
       break;
     case ESP_SLEEP_WAKEUP_TIMER: 
@@ -361,13 +365,28 @@ void initializeHardware() {
   Serial.println("[系统] 初始化IMU...");
   imu.begin();
   
-  // 如果是从深度睡眠唤醒且是IMU唤醒，需要特殊处理
-  if (isWakeFromDeepSleep && wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
-    // 检查是否为IMU中断引脚引起的唤醒
-    if (digitalRead(IMU_INT1_PIN) == LOW) {
-      Serial.println("[系统] 从IMU唤醒，处理唤醒事件并重置运动检测");
-      // 这里可以针对IMU唤醒做一些特殊处理
-      // 例如记录运动事件、调整唤醒灵敏度等
+  // 如果是从深度睡眠唤醒，检查唤醒原因
+  if (isWakeFromDeepSleep) {
+    switch (wakeup_reason) {
+      case ESP_SLEEP_WAKEUP_EXT0:
+        // 如果是按钮唤醒，立即激活LED指示
+        if (BTN_PIN >= 0 && BTN_PIN <= 21 && digitalRead(BTN_PIN) == LOW) {
+          led.setMode(LED::BLINK_SINGLE);
+          Serial.println("[系统] 按钮唤醒检测到，准备恢复系统");
+        } 
+        // 如果是IMU唤醒，处理运动事件
+        else if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21 && digitalRead(IMU_INT1_PIN) == LOW) {
+          Serial.println("[系统] IMU运动唤醒检测到，记录运动事件");
+          // 这里可以添加运动事件处理代码
+          // 例如：记录唤醒时间、记录运动状态等
+        }
+        break;
+      case ESP_SLEEP_WAKEUP_TIMER:
+        Serial.println("[系统] 定时器唤醒，检查系统状态");
+        // 这里可以添加定期状态检查代码
+        break;
+      default:
+        break;
     }
   }
   
