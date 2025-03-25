@@ -338,6 +338,20 @@ void tft_wakeup() {
     tft.writecommand(0x11); // 发送唤醒命令
     delay(120); // ST7789等显示器需要等待一段时间
     
+    // 设置MADCTL寄存器，修复颜色和方向问题
+    tft.writecommand(TFT_MADCTL);
+    // 反转颜色顺序：从BGR改为RGB或从RGB改为BGR
+    tft.writedata(TFT_MAD_MX | TFT_MAD_MY | TFT_MAD_RGB); // 使用RGB顺序
+    delay(10);
+    
+    // 打开显示
+    tft.writecommand(0x29); // DISPON - 打开显示
+    delay(50);
+    
+    // 设置屏幕旋转方向
+    tft.setRotation(3); // Landscape orientation, flipped
+    Serial.println("[TFT] 重新设置屏幕方向为横屏模式");
+    
     // 逐渐增加亮度
     #ifdef TFT_BL
     // 确保亮度初始为0
