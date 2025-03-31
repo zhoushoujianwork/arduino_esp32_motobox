@@ -128,7 +128,7 @@ void tft_begin()
 
     // 初始化显示屏
     tft.begin(); /* TFT init */
-    tft.setRotation(3); /* Landscape orientation, flipped */
+    tft.setRotation(TFT_ROTATION); /* Landscape orientation, flipped */
 
     // 初始化背光
     #ifdef TFT_BL
@@ -390,4 +390,68 @@ void tft_set_brightness(uint8_t brightness) {
   #else
     Serial.println("[TFT] 未定义TFT_BL引脚，无法调整亮度");
   #endif
+}
+
+void tft_show_notification(const char *title, const char *message, uint32_t duration) {
+    #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+    // 创建通知对话框
+    static lv_obj_t *notification = NULL;
+    
+    // 如果已经有通知，先删除旧的
+    if (notification != NULL) {
+        lv_obj_del(notification);
+        notification = NULL;
+    }
+    
+    // 创建新通知对话框
+    notification = lv_obj_create(lv_scr_act());
+    
+    // 设置通知样式
+    lv_obj_set_size(notification, 150, 80);
+    lv_obj_align(notification, LV_ALIGN_TOP_MID, 0, 10);
+    lv_obj_set_style_bg_color(notification, lv_color_hex(0x2196F3), LV_PART_MAIN); // 蓝色背景
+    lv_obj_set_style_radius(notification, 10, LV_PART_MAIN); // 圆角
+    lv_obj_set_style_shadow_width(notification, 10, LV_PART_MAIN); // 添加阴影
+    lv_obj_set_style_shadow_color(notification, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_shadow_opa(notification, 50, LV_PART_MAIN);
+    
+    // 创建标题
+    lv_obj_t *title_label = lv_label_create(notification);
+    lv_label_set_text(title_label, title);
+    lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 5);
+    lv_obj_set_style_text_color(title_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN); // 白色文字
+    
+    // 创建内容
+    lv_obj_t *msg_label = lv_label_create(notification);
+    lv_label_set_text(msg_label, message);
+    lv_obj_align(msg_label, LV_ALIGN_CENTER, 0, 10);
+    lv_obj_set_style_text_color(msg_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN); // 白色文字
+    
+    // 设置动画效果
+    lv_obj_fade_in(notification, 300, 0);
+    
+    // 创建定时器自动关闭通知
+    static lv_timer_t *close_timer = NULL;
+    if (close_timer != NULL) {
+        lv_timer_del(close_timer);
+    }
+    
+    // 设置通知自动关闭
+    close_timer = lv_timer_create([](lv_timer_t *timer) {
+        lv_obj_t *notif = (lv_obj_t*)timer->user_data;
+        lv_obj_fade_out(notif, 300, 0);
+        lv_timer_t *close_timer = lv_timer_create([](lv_timer_t *timer) {
+            lv_obj_t *notif = (lv_obj_t*)timer->user_data;
+            lv_obj_del(notif);
+            lv_timer_del(timer);
+        }, 300, notif);
+        lv_timer_set_repeat_count(close_timer, 1);
+        lv_timer_del(timer);
+    }, duration, notification);
+    
+    lv_timer_set_repeat_count(close_timer, 1);
+    
+    // 刷新显示
+    lv_timer_handler();
+    #endif
 }

@@ -32,12 +32,16 @@ public:
     // 新增：获取当前电源状态
     PowerState getPowerState() { return powerState; }
 
+    // 检查休眠功能是否启用（由编译时配置决定）
+    bool isSleepEnabled() { return sleepEnabled; }
+
 private:
     unsigned long lastMotionTime; // 最后一次检测到运动的时间
     unsigned long idleThreshold;  // 进入低功耗模式的空闲时间阈值（毫秒）
     float motionThreshold;        // 运动检测阈值
     PowerState powerState;        // 当前电源状态
     bool interruptRequested;      // 是否请求打断低功耗模式
+    RTC_DATA_ATTR static bool sleepEnabled;  // 是否启用休眠功能（RTC内存，由编译时配置决定）
     
     bool detectMotion();          // 检测设备是否在运动
     void disablePeripherals();    // 关闭外设

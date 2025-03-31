@@ -408,6 +408,14 @@ void initializeHardware() {
   // 显示屏初始化
   Serial.println("[系统] 初始化显示屏...");
   tft_begin();
+  
+  // 在TFT完全初始化后显示休眠功能状态通知
+  delay(100); // 短暂延迟确保UI已准备好
+  #if ENABLE_SLEEP
+  tft_show_notification("休眠已启用", "1分钟无活动将进入休眠", 3000);
+  #else
+  tft_show_notification("休眠已禁用", "睡眠功能已关闭", 3000);
+  #endif
   #endif
 
   #ifdef MODE_SERVER

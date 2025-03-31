@@ -13,6 +13,14 @@
  * 3. MODE_CLIENT: Slave mode - receives data from server via Bluetooth and displays it
  */
 
+/* 是否启用睡眠模式，在platformio.ini中定义 
+ * 默认值: ENABLE_SLEEP=1 (启用)
+ * 禁用值: ENABLE_SLEEP=0 (禁用)
+ */
+#ifndef ENABLE_SLEEP
+#define ENABLE_SLEEP 0 
+#endif
+
 /*
  * 以下定义保留是为了兼容性，实际的值在 platformio.ini 中配置
  * Common device configurations are now defined in platformio.ini [env] section
@@ -20,88 +28,34 @@
  */
 
 /* Common Device Configuration */
-#ifndef BLE_NAME
 #define BLE_NAME            "ESP32-MOTO"
-#endif
-
-#ifndef SERVICE_UUID
 #define SERVICE_UUID        "4FAFC201-1FB5-459E-8FCC-C5C9C331914B"
-#endif
-
-#ifndef DEVICE_CHAR_UUID
 #define DEVICE_CHAR_UUID    "BEB5483A-36E1-4688-B7F5-EA07361B26A8"
-#endif
-
-#ifndef GPS_CHAR_UUID
 #define GPS_CHAR_UUID       "BEB5483E-36E1-4688-B7F5-EA07361B26A8"
-#endif
-
-#ifndef IMU_CHAR_UUID
 #define IMU_CHAR_UUID       "BEB5483F-36E1-4688-B7F5-EA07361B26A8"
-#endif
 
 /* Battery Configuration */
-#ifndef BAT_MIN_VOLTAGE
 #define BAT_MIN_VOLTAGE     2900
-#endif
-
-#ifndef BAT_MAX_VOLTAGE
 #define BAT_MAX_VOLTAGE     3250
-#endif
 
-/* Display Configuration */
-#ifndef TFT_HOR_RES
-#define TFT_HOR_RES        172
-#endif
 
-#ifndef TFT_VER_RES
-#define TFT_VER_RES        320
-#endif
-
-#ifndef UI_MAX_SPEED
-#define UI_MAX_SPEED       199    /* Maximum speed in km/h */
-#endif
 
 /* LED Configuration */
-#ifndef LED_BLINK_INTERVAL
 #define LED_BLINK_INTERVAL 100
-#endif
 
 /* IMU Configuration */
-#ifndef IMU_MAX_D
 #define IMU_MAX_D          68     /* Marquis GP retention */
-#endif
-
-/* IMU Interrupt Configuration */
-#ifndef IMU_INT1_PIN
 #define IMU_INT1_PIN       1      /* GPIO1 used for IMU interrupt */
-#endif
 
 /* GPS Configuration */
-#ifndef GPS_DEFAULT_BAUDRATE
 #define GPS_DEFAULT_BAUDRATE 9600
-#endif
-
-#ifndef GPS_HZ
 #define GPS_HZ              2      /* Supported: 1, 2, 5, 10 Hz */
-#endif
 
 /* MQTT Configuration */
-#ifndef MQTT_SERVER
 #define MQTT_SERVER        "mq-hub.daboluo.cc"
-#endif
-
-#ifndef MQTT_PORT
-#define MQTT_PORT         1883
-#endif
-
-#ifndef MQTT_USER
+#define MQTT_PORT         32571
 #define MQTT_USER         ""
-#endif
-
-#ifndef MQTT_PASSWORD
 #define MQTT_PASSWORD     ""
-#endif
 
 /* MQTT Topics - These must stay in C++ code because they include runtime expressions */
 #define MQTT_TOPIC_DEVICE_INFO  String("vehicle/v1/") + device.get_device_id() + "/device/info"
@@ -120,5 +74,15 @@
 #ifndef MQTT_BAT_PRINT_INTERVAL
 #define MQTT_BAT_PRINT_INTERVAL   10000
 #endif
+
+/* 
+TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
+*/
+
+/* Display Configuration */
+#define TFT_HOR_RES        172
+#define TFT_VER_RES        320
+#define TFT_ROTATION       1 // 0: 0度, 1: 90度, 2: 180度, 3: 270度
+#define UI_MAX_SPEED       199    /* Maximum speed in km/h */
 
 #endif /* CONFIG_H */

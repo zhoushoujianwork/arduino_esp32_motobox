@@ -149,38 +149,57 @@ void WiFiConfigManager::setupAP()
 
 void WiFiConfigManager::setupDNS()
 {
+    // 设置 DNS 服务器响应所有域名查询
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     if (dnsServer.start(53, "*", WiFi.softAPIP()))
     {
         Serial.println("DNS服务器启动成功");
+        Serial.printf("DNS服务器IP: %s\n", WiFi.softAPIP().toString().c_str());
+    }
+    else
+    {
+        Serial.println("DNS服务器启动失败");
     }
 }
 
 void WiFiConfigManager::setupWebServer()
 {
-    // 处理所有请求
+    // 处理根路径请求
     server.on("/", HTTP_GET, [this]()
               { server.send(200, "text/html", getConfigPage()); });
 
     server.on("/configure", HTTP_POST, [this]()
               { handleConfigSubmit(); });
 
-    // 处理Captive Portal所需的特殊URL
+    // 处理 Apple 设备的 Captive Portal 检测
+    server.on("/hotspot-detect.html", HTTP_GET, [this]()
+              { server.send(200, "text/html", getConfigPage()); });
+
+    // 处理 Android 设备的 Captive Portal 检测
     server.on("/generate_204", HTTP_GET, [this]()
-              {
-        server.sendHeader("Location", String("http://") + WiFi.softAPIP().toString(), true);
-        server.send(302, "text/plain", ""); });
+              { server.send(200, "text/html", getConfigPage()); });
+    
+    server.on("/redirect", HTTP_GET, [this]()
+              { server.send(200, "text/html", getConfigPage()); });
+
+    // 处理 Windows 设备的 Captive Portal 检测
+    server.on("/ncsi.txt", HTTP_GET, [this]()
+              { server.send(200, "text/html", getConfigPage()); });
 
     server.on("/fwlink", HTTP_GET, [this]()
-              {
-        server.sendHeader("Location", String("http://") + WiFi.softAPIP().toString(), true);
-        server.send(302, "text/plain", ""); });
+              { server.send(200, "text/html", getConfigPage()); });
 
-    // 所有未处理的请求都重定向到配置页面
+    server.on("/connecttest.txt", HTTP_GET, [this]()
+              { server.send(200, "text/html", getConfigPage()); });
+
+    server.on("/success.txt", HTTP_GET, [this]()
+              { server.send(200, "text/html", getConfigPage()); });
+
+    // 处理所有未定义的请求
     server.onNotFound([this]()
-                      {
-        if (captivePortalRequest())
-        { // 如果是Captive Portal请求
+                     {
+        if (!isIp(server.hostHeader()))
+        {
             server.sendHeader("Location", String("http://") + WiFi.softAPIP().toString(), true);
             server.send(302, "text/plain", "");
         }
@@ -382,15 +401,35 @@ bool WiFiConfigManager::captivePortalRequest()
 // 添加新的辅助方法来检查是否是IP地址
 bool WiFiConfigManager::isIp(String str)
 {
-    for (size_t i = 0; i < str.length(); i++)
-    {
-        int c = str.charAt(i);
-        if (c != '.' && (c < '0' || c > '9'))
-        {
-            return false;
+    for (int i = 0; i < 4; i++) {
+        int nOctet = 0;
+        int nLen = 0;
+        
+        while (nLen < str.length()) {
+            char c = str[nLen];
+            
+            if (c == '.') {
+                if (i < 3) break;
+                else return false;
+            }
+            else if (c >= '0' && c <= '9') {
+                nOctet = nOctet * 10 + (c - '0');
+                if (nOctet > 255) return false;
+            }
+            else {
+                return false;
+            }
+            
+            nLen++;
         }
+        
+        if (nOctet > 255 || nLen == 0) return false;
+        if (i < 3 && str[nLen] != '.') return false;
+        
+        str = str.substring(nLen + 1);
     }
-    return true;
+    
+    return str.length() == 0;
 }
 
 void WiFiConfigManager::reset()

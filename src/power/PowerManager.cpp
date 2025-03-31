@@ -1,6 +1,13 @@
 #include "PowerManager.h"
 #include "btn/BTN.h"
 
+// 初始化静态变量
+#if ENABLE_SLEEP
+RTC_DATA_ATTR bool PowerManager::sleepEnabled = true;  // 默认启用休眠功能
+#else
+RTC_DATA_ATTR bool PowerManager::sleepEnabled = false; // 默认禁用休眠功能
+#endif
+
 PowerManager::PowerManager() {
     // 设置默认值
     idleThreshold = 60000; // 默认1分钟无活动进入低功耗模式
@@ -8,6 +15,7 @@ PowerManager::PowerManager() {
     lastMotionTime = 0;
     powerState = POWER_STATE_NORMAL;
     interruptRequested = false;
+    // sleepEnabled已经作为静态变量初始化
 }
 
 void PowerManager::begin() {
@@ -15,6 +23,15 @@ void PowerManager::begin() {
     lastMotionTime = millis(); // 初始化时间
     powerState = POWER_STATE_NORMAL;
     interruptRequested = false;
+    
+    // 打印休眠状态，根据编译时配置
+#if ENABLE_SLEEP
+    Serial.println("[电源管理] 休眠功能已启用 (编译时配置)");
+#else
+    Serial.println("[电源管理] 休眠功能已禁用 (编译时配置)");
+#endif
+
+    // 注意：显示屏通知将在TFT初始化后由主程序调用，避免在TFT未初始化时调用导致崩溃
 }
 
 void PowerManager::loop() {
@@ -33,6 +50,22 @@ void PowerManager::loop() {
     // 客户端模式不使用睡眠功能
     return;
 #endif
+
+#if !ENABLE_SLEEP
+    // 如果编译时禁用了休眠功能，始终保持在正常状态
+    if (powerState != POWER_STATE_NORMAL) {
+        powerState = POWER_STATE_NORMAL;
+    }
+    return;
+#else
+    // 编译时启用了休眠功能，但需要检查运行时状态
+    if (!sleepEnabled) {
+        // 保持在正常状态，不进入休眠
+        if (powerState != POWER_STATE_NORMAL) {
+            powerState = POWER_STATE_NORMAL;
+        }
+        return;
+    }
 
     // 仅在正常工作状态下检测运动和空闲状态
     if (powerState == POWER_STATE_NORMAL) {
@@ -58,6 +91,7 @@ void PowerManager::loop() {
             }
         }
     }
+#endif
 }
 
 // 新增：打断低功耗模式进入过程
@@ -276,6 +310,17 @@ void PowerManager::enterLowPowerMode() {
     return;
 #endif
 
+#if !ENABLE_SLEEP
+    // 编译时禁用了休眠功能
+    Serial.println("[电源管理] 休眠功能已在编译时禁用，不进入低功耗模式");
+    return;
+#else
+    // 编译时启用了休眠功能，但需要检查运行时状态
+    if (!sleepEnabled) {
+        Serial.println("[电源管理] 休眠功能已禁用，不进入低功耗模式");
+        return;
+    }
+
     Serial.println("[电源管理] 正在进入低功耗模式...");
     
     // 设置电源状态为倒计时
@@ -394,4 +439,5 @@ void PowerManager::enterLowPowerMode() {
     esp_deep_sleep_start();
     
     // 此后的代码不会被执行，因为设备已进入深度睡眠
+#endif
 } 

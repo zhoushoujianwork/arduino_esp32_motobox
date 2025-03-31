@@ -16,6 +16,7 @@ void tft_sleep();
 void tft_wakeup();
 void tft_set_brightness(uint8_t brightness); // 0-255，0为最暗，255为最亮
 void init_dashboard(); // 仪表盘初始化动画
+void tft_show_notification(const char *title, const char *message, uint32_t duration); // 显示通知
 
 // 声明为类成员变量或全局变量
 extern float gyroTopLeft;
