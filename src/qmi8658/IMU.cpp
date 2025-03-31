@@ -125,19 +125,12 @@ void IMU::loop()
 
         // 选择需要的旋转方式（取消注释其中一种）：
 
+#if defined(IMU_ROTATION) 
         // 1. 顺时针旋转90度（适用于传感器侧装）
         float temp = device.get_imu_data()->accel_x;
         device.get_imu_data()->accel_x = device.get_imu_data()->accel_y;
         device.get_imu_data()->accel_y = -temp;
-
-        // 2. 逆时针旋转90度
-        // float temp = imu_data.accel_x;
-        // imu_data.accel_x = -imu_data.accel_y;
-        // imu_data.accel_y = temp;
-
-        // 3. 旋转180度
-        // imu_data.accel_x = -imu_data.accel_x;
-        // imu_data.accel_y = -imu_data.accel_y;
+#endif
 
         qmi.getGyroscope(device.get_imu_data()->gyro_x, device.get_imu_data()->gyro_y, device.get_imu_data()->gyro_z);
 
