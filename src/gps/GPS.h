@@ -67,6 +67,12 @@ private:
     SoftwareSerial gpsSerial;
     TinyGPSPlus gps;
     int txmsgCount;
+
+
+    // 异步初始化标志
+    static bool _initInProgress;
+
+    void asyncInit();
     
     // 发送GPS命令并等待响应
     bool sendGpsCommand(const String& cmd, int retries = 3, int retryDelay = 100);

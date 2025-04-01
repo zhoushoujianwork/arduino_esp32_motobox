@@ -19,6 +19,7 @@
 #include "device.h"
 #include "gps/GPS.h"
 #include "led/LED.h"
+#include "led/PWMLED.h"
 #include "mqtt/MQTT.h"
 #include "tft/TFT.h"
 #include "qmi8658/IMU.h"
@@ -60,7 +61,13 @@ BLES bs;
 #endif
 
 BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE);
+
+#ifdef PWM_LED_PIN
+PWMLED pwmLed(PWM_LED_PIN);
+#else
 LED led(LED_PIN);
+#endif
+
 PowerManager powerManager;
 
 //============================= 函数声明 =============================
@@ -127,10 +134,22 @@ void taskGps(void *parameter) {
 void taskSystem(void *parameter) {
   // GPS更新率自动调整的时间记录
   unsigned long lastGpsRateAdjustTime = 0;
+  
+  // 添加任务启动提示
+  Serial.println("[系统] 系统监控任务启动");
  
   while (true) {
     // LED状态更新
+    #ifdef PWM_LED_PIN
+    static unsigned long lastLedDebugTime = 0;
+    if (millis() - lastLedDebugTime >= 1000) {
+        Serial.println("[系统] 执行PWM LED更新");
+        lastLedDebugTime = millis();
+    }
+    pwmLed.loop();
+    #else
     led.loop();
+    #endif
     
     // 电池监控
     #ifdef MODE_CLIENT
@@ -145,7 +164,11 @@ void taskSystem(void *parameter) {
     // LED状态设置 - 连接状态指示
     bool isConnected = device.get_device_state()->mqttConnected && 
                       device.get_device_state()->wifiConnected;
+    #ifdef PWM_LED_PIN
+    pwmLed.setMode(isConnected ? PWMLED::BREATH : PWMLED::RAINBOW);
+    #else
     led.setMode(isConnected ? LED::BLINK_DUAL : LED::OFF);
+    #endif
 
     // 按钮状态更新
     button.loop();
@@ -354,8 +377,13 @@ void initializeHardware() {
   }
   
   // LED初始化
+  #ifdef PWM_LED_PIN
+  pwmLed.begin();
+  pwmLed.setMode(PWMLED::OFF);
+  #else
   led.begin();
   led.setMode(LED::OFF);
+  #endif
 
   // 初始化设备
   device.init();
@@ -371,7 +399,11 @@ void initializeHardware() {
       case ESP_SLEEP_WAKEUP_EXT0:
         // 如果是按钮唤醒，立即激活LED指示
         if (BTN_PIN >= 0 && BTN_PIN <= 21 && digitalRead(BTN_PIN) == LOW) {
+          #ifdef PWM_LED_PIN
+          pwmLed.setMode(PWMLED::RED);
+          #else
           led.setMode(LED::BLINK_SINGLE);
+          #endif
           Serial.println("[系统] 按钮唤醒检测到，准备恢复系统");
         } 
         // 如果是IMU唤醒，处理运动事件
