@@ -9,19 +9,21 @@ PWMLED::PWMLED(uint8_t pin)
     , _increasing(true)
     , _hue(0)
 {
-    Serial.println("[PWMLED] 构造函数初始化完成");
 }
 
 void PWMLED::begin() {
-    // 配置PWM通道
-    ledcSetup(PWM_CHANNEL, PWM_FREQ, PWM_RESOLUTION);
+    // 初始化 FastLED
+    FastLED.addLeds<WS2812, 45, GRB>(_leds, NUM_LEDS);
+    Serial.printf("[PWMLED] FastLED 初始化完成，引脚: %d\n", _pin);
     
-    // 将PWM通道附加到GPIO引脚
-    ledcAttachPin(_pin, PWM_CHANNEL);
+    // 测试LED
+    _leds[0] = CRGB::White;
+    FastLED.show();
+    delay(500);
+    _leds[0] = CRGB::Black;
+    FastLED.show();
     
-    // 初始状态设置为关闭
-    setBrightness(0);
-    Serial.printf("[PWMLED] 初始化完成，引脚: %d, PWM通道: %d\n", _pin, PWM_CHANNEL);
+    Serial.println("[PWMLED] 初始化测试完成");
 }
 
 void PWMLED::setMode(Mode mode) {
@@ -36,28 +38,29 @@ void PWMLED::setMode(Mode mode) {
                      modeToString(_lastMode), 
                      modeToString(mode));
         
-        // 根据模式设置初始亮度
+        // 根据模式设置初始颜色
         switch (mode) {
             case OFF:
-                setBrightness(0);
+                _leds[0] = CRGB::Black;
                 break;
             case RED:
-                setBrightness(COLOR_RED);
+                _leds[0].setHSV(0, 255, MAX_BRIGHTNESS);
                 break;
             case GREEN:
-                setBrightness(COLOR_GREEN);
+                _leds[0].setHSV(96, 255, MAX_BRIGHTNESS);
                 break;
             case BLUE:
-                setBrightness(COLOR_BLUE);
+                _leds[0].setHSV(160, 255, MAX_BRIGHTNESS);
                 break;
             case YELLOW:
-                setBrightness(COLOR_YELLOW);
+                _leds[0].setHSV(64, 255, MAX_BRIGHTNESS);
                 break;
             case BREATH:
             case RAINBOW:
-                setBrightness(0);
+                _leds[0] = CRGB::Black;
                 break;
         }
+        FastLED.show();
     }
 }
 
@@ -87,20 +90,11 @@ void PWMLED::loop() {
     }
 }
 
-void PWMLED::setBrightness(uint8_t brightness) {
-    ledcWrite(PWM_CHANNEL, brightness);
-    // 每100次更新打印一次亮度值，避免打印太多
-    static uint32_t printCount = 0;
-    if (++printCount % 100 == 0) {
-        Serial.printf("[PWMLED] 设置亮度: %d\n", brightness);
-    }
-}
-
 void PWMLED::updateBreath() {
     if (_increasing) {
         _brightness += BREATH_STEP;
-        if (_brightness >= 255) {
-            _brightness = 255;
+        if (_brightness >= MAX_BRIGHTNESS) {
+            _brightness = MAX_BRIGHTNESS;
             _increasing = false;
         }
     } else {
@@ -110,33 +104,29 @@ void PWMLED::updateBreath() {
             _increasing = true;
         }
     }
-    setBrightness(_brightness);
+    
+    // 使用 HSV 设置白色并控制亮度
+    _leds[0].setHSV(0, 0, _brightness);  // 色相和饱和度为0表示白色
+    FastLED.show();
+    
+    // 每100次更新打印一次亮度值
+    static uint32_t printCount = 0;
+    if (++printCount % 100 == 0) {
+        Serial.printf("[PWMLED] 呼吸灯亮度: %d\n", _brightness);
+    }
 }
 
 void PWMLED::updateRainbow() {
-    // 使用正弦函数创建平滑的彩虹效果
+    // 使用 FastLED 的 HSV 转换
     _hue = (_hue + RAINBOW_STEP) % 256;
-    
-    // 使用正弦函数创建更明显的颜色变化
-    float phase = _hue * 2 * PI / 256;
-    
-    // 计算RGB值
-    uint8_t r = (uint8_t)(127.5 + 127.5 * sin(phase));
-    uint8_t g = (uint8_t)(127.5 + 127.5 * sin(phase + 2 * PI / 3));
-    uint8_t b = (uint8_t)(127.5 + 127.5 * sin(phase + 4 * PI / 3));
-    
-    // 由于是单引脚LED，我们取RGB的最大值作为亮度
-    _brightness = max(max(r, g), b);
+    _leds[0].setHSV(_hue, 255, MAX_BRIGHTNESS);
+    FastLED.show();
     
     // 每100次更新打印一次详细信息
     static uint32_t printCount = 0;
     if (++printCount % 100 == 0) {
-        Serial.printf("[PWMLED] 彩虹效果 - 色相: %d, RGB: (%d,%d,%d), 亮度: %d\n", 
-                     _hue, r, g, b, _brightness);
+        Serial.printf("[PWMLED] 彩虹效果 - 色相: %d\n", _hue);
     }
-    
-    // 应用亮度
-    setBrightness(_brightness);
 }
 
 const char* PWMLED::modeToString(Mode mode) {

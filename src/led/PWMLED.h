@@ -2,6 +2,7 @@
 #define PWM_LED_H
 
 #include <Arduino.h>
+#include <FastLED.h>
 
 class PWMLED {
 public:
@@ -14,6 +15,8 @@ public:
         BREATH,        // 呼吸效果
         RAINBOW        // 彩虹效果
     };
+
+    static const uint8_t MAX_BRIGHTNESS = 128;  // 固定最大亮度为 50%
 
     PWMLED(uint8_t pin);
     void begin();
@@ -29,27 +32,17 @@ private:
     bool _increasing;
     uint8_t _hue;      // 用于彩虹效果的色相值
     
-    // PWM 相关参数
-    static const uint8_t PWM_CHANNEL = 0;
-    static const uint8_t PWM_RESOLUTION = 8;  // 8位分辨率 (0-255)
-    static const uint32_t PWM_FREQ = 5000;    // 5KHz频率
+    // WS2812 LED 参数
+    static const uint8_t NUM_LEDS = 1;    // LED数量
+    CRGB _leds[NUM_LEDS];                 // LED数组
     
-    // 呼吸灯参数
+    // 效果参数
     static const uint8_t BREATH_STEP = 5;     // 每次亮度变化步长
-    static const uint8_t BREATH_INTERVAL = 50; // 亮度更新间隔(ms)
-    
-    // 彩虹效果参数
-    static const uint8_t RAINBOW_STEP = 1;    // 色相变化步长
+    static const uint8_t BREATH_INTERVAL = 40; // 亮度更新间隔(ms)
+    static const uint8_t RAINBOW_STEP = 2;     // 色相变化步长
     static const uint8_t RAINBOW_INTERVAL = 20; // 彩虹效果更新间隔(ms)
     
-    // 颜色参数 (10% 亮度)
-    static const uint8_t COLOR_RED = 25;      // 255 * 10% ≈ 25
-    static const uint8_t COLOR_GREEN = 25;    // 255 * 10% ≈ 25
-    static const uint8_t COLOR_BLUE = 25;     // 255 * 10% ≈ 25
-    static const uint8_t COLOR_YELLOW = 25;   // 黄色使用相同亮度
-    
     // 辅助函数
-    void setBrightness(uint8_t brightness);
     void updateBreath();
     void updateRainbow();
     const char* modeToString(Mode mode);

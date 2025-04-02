@@ -143,7 +143,6 @@ void taskSystem(void *parameter) {
     #ifdef PWM_LED_PIN
     static unsigned long lastLedDebugTime = 0;
     if (millis() - lastLedDebugTime >= 1000) {
-        Serial.println("[系统] 执行PWM LED更新");
         lastLedDebugTime = millis();
     }
     pwmLed.loop();
@@ -165,7 +164,7 @@ void taskSystem(void *parameter) {
     bool isConnected = device.get_device_state()->mqttConnected && 
                       device.get_device_state()->wifiConnected;
     #ifdef PWM_LED_PIN
-    pwmLed.setMode(isConnected ? PWMLED::BREATH : PWMLED::RAINBOW);
+    pwmLed.setMode(isConnected ? PWMLED::BREATH : PWMLED::OFF);
     #else
     led.setMode(isConnected ? LED::BLINK_DUAL : LED::OFF);
     #endif
@@ -363,6 +362,8 @@ void printWakeupReason() {
 
 /**
  * 初始化所有硬件和模块
+ * 
+ * 
  */
 void initializeHardware() {
   // 检查是否从深度睡眠唤醒
@@ -379,7 +380,7 @@ void initializeHardware() {
   // LED初始化
   #ifdef PWM_LED_PIN
   pwmLed.begin();
-  pwmLed.setMode(PWMLED::OFF);
+  pwmLed.setMode(PWMLED::RAINBOW);  // 启动时设置为彩虹模式
   #else
   led.begin();
   led.setMode(LED::OFF);
