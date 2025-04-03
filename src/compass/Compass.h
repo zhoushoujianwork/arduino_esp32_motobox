@@ -5,6 +5,7 @@
 #include "device.h"
 #include <QMC5883LCompass.h>
 
+
 class Compass {
 public:
     Compass(int sda, int scl);
@@ -16,8 +17,13 @@ public:
     void getRawData(int16_t &x, int16_t &y, int16_t &z);
     
     // 获取处理后的航向角
-    float getHeading();
+    float getHeading(int16_t x, int16_t y, int16_t z);
     
+    int getDirection(int16_t x, int16_t y, int16_t z);
+
+    // 获取方向的char表示
+    char* getDirectionChar(int direction);
+
     // 设置磁偏角校正值
     void setDeclination(float declination);
 
@@ -29,7 +35,6 @@ private:
     
     // 数据处理函数
     float calculateHeading(int16_t x, int16_t y);
-    void updateDeviceState();
 };
 
 extern Compass compass;  // 全局罗盘对象

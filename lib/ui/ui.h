@@ -31,21 +31,16 @@ void compass2_Animation( lv_obj_t *TargetObject, int delay);
 void ui_Screen1_screen_init(void);
 extern lv_obj_t *ui_Screen1;
 extern lv_obj_t *ui_backend;
-extern lv_obj_t *ui_ContainerDIr;
-extern lv_obj_t *ui_compass;
-extern lv_obj_t *ui_imgDirZ;
 extern lv_obj_t *ui_topLeft;
 extern lv_obj_t *ui_textTime;
-extern lv_obj_t *ui_ImageGpsDisc;
-extern lv_obj_t *ui_imgGps;
 extern lv_obj_t *ui_textGpsHz;
+extern lv_obj_t *ui_imgGps;
 extern lv_obj_t *ui_textGpsNu;
+extern lv_obj_t *ui_TopMid;
+extern lv_obj_t *ui_Composs;
 extern lv_obj_t *ui_topRight;
 extern lv_obj_t *ui_imgBle;
-extern lv_obj_t *ui_imgWificon;
-extern lv_obj_t *ui_imgWifiOk;
 extern lv_obj_t *ui_imgWifi;
-extern lv_obj_t *ui_imgBleDiscon;
 extern lv_obj_t *ui_textBatPercent;
 extern lv_obj_t *ui_imageBat;
 void ui_event_SliderBat( lv_event_t * e);
@@ -74,15 +69,9 @@ extern lv_obj_t *ui_imgLocation;
 extern lv_obj_t *ui____initial_actions0;
 
 LV_IMG_DECLARE( ui_img_background_png);   // assets/background.png
-LV_IMG_DECLARE( ui_img_dir_img_30_png);   // assets/dir_img_30.png
-LV_IMG_DECLARE( ui_img_mengban_png);   // assets/mengban.png
-LV_IMG_DECLARE( ui_img_weixing_disc_png);   // assets/weixing_disc.png
 LV_IMG_DECLARE( ui_img_weixing_ok_png);   // assets/weixing_ok.png
 LV_IMG_DECLARE( ui_img_bluetooth_1_png);   // assets/bluetooth 1.png
-LV_IMG_DECLARE( ui_img_wificon_png);   // assets/wificon.png
 LV_IMG_DECLARE( ui_img_wifiok_png);   // assets/wifiok.png
-LV_IMG_DECLARE( ui_img_wifi_png);   // assets/wifi.png
-LV_IMG_DECLARE( ui_img_bluetooth_disconnect_png);   // assets/bluetooth_disconnect.png
 LV_IMG_DECLARE( ui_img_bat_png);   // assets/bat.png
 LV_IMG_DECLARE( ui_img_guage_bg_png);   // assets/guage bg.png
 LV_IMG_DECLARE( ui_img_speedcolor_png);   // assets/speedColor.png
@@ -92,6 +81,7 @@ LV_IMG_DECLARE( ui_img_gyro_png);   // assets/gyro.png
 LV_IMG_DECLARE( ui_img_gyrobackend_png);   // assets/gyroBackend.png
 LV_IMG_DECLARE( ui_img_1142323638);   // assets/GPS显示 1.png
 LV_IMG_DECLARE( ui_img_frame_1_png);   // assets/Frame 1.png
+LV_IMG_DECLARE( ui_img_dir_img_30_png);   // assets/dir_img_30.png
 
 
 LV_FONT_DECLARE( ui_font_Black_Ops_One);

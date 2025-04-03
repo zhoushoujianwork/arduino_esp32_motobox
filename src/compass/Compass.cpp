@@ -1,19 +1,29 @@
 #include "compass/Compass.h"
 
-Compass::Compass(int sda, int scl) : _sda(sda), _scl(scl), _declination(0.0f) {
+Compass::Compass(int sda, int scl)  {
+    Serial.println("[罗盘] 初始化...");
+    _sda = sda;
+    _scl = scl;
+    _declination = -6.5f; // 江苏磁偏角
+    Serial.printf("[罗盘] 磁偏角: %.2f度\n", _declination);
 }
 
 void Compass::begin() {
-    Serial.println("开始初始化磁力计 sda:" + String(_sda) + " scl:" + String(_scl));
     Wire.begin(_sda, _scl);
     qmc.init();
-    qmc.setMode(0x01, 0x0C, 0x10, 0x00); // 设置连续测量模式，8Hz采样率，2G量程
-    Serial.println("开始初始化磁力计");
+    qmc.setMode(0x01, 0x0C, 0x10, 0x00);
 }
 
 void Compass::loop() {
     qmc.read();
-    updateDeviceState();
+    int16_t x, y, z;
+    getRawData(x, y, z);
+    compass_data_t compassData;
+    compassData.x = x;
+    compassData.y = y;
+    compassData.z = z;
+    compassData.direction = getDirection(x, y, z);
+    device.set_compass_data(&compassData);
 }
 
 bool Compass::calibrate() {
@@ -28,9 +38,7 @@ void Compass::getRawData(int16_t &x, int16_t &y, int16_t &z) {
     z = qmc.getZ();
 }
 
-float Compass::getHeading() {
-    int16_t x, y, z;
-    getRawData(x, y, z);
+float Compass::getHeading(int16_t x, int16_t y, int16_t z) {
     return calculateHeading(x, y);
 }
 
@@ -39,7 +47,10 @@ void Compass::setDeclination(float declination) {
 }
 
 float Compass::calculateHeading(int16_t x, int16_t y) {
+    // 计算航向角（0-360度）
     float heading = atan2(y, x) * 180.0 / PI;
+    
+    // 应用磁偏角校正
     heading += _declination;
     
     // 确保角度在0-360度范围内
@@ -53,8 +64,24 @@ float Compass::calculateHeading(int16_t x, int16_t y) {
     return heading;
 }
 
-void Compass::updateDeviceState() {
-    // 更新设备状态，可以根据需要添加更多功能
-    float heading = getHeading();
-    // TODO: 更新设备状态
+// 获取方向的数值表示 (0-7)
+int Compass::getDirection(int16_t x, int16_t y, int16_t z) {
+    float heading = getHeading(x, y, z);
+    
+    // 将360度分为8个方向，每个方向45度
+    int direction = (int)((heading + 22.5) / 45.0);
+    if (direction >= 8) {
+        direction = 0;
+    }
+
+    return direction;
 }
+
+char* Compass::getDirectionChar(int direction) {
+    static const char* directions[] = {
+        "N", "NE", "E", "SE", "S", "SW", "W", "NW"
+    };
+    return (char*)directions[direction];
+}
+
+

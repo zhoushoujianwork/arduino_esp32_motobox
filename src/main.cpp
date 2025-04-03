@@ -414,7 +414,7 @@ void initializeHardware() {
 
   // 罗盘初始化
   compass.begin();
-  compass.setDeclination(0.0);  // 根据你的地理位置设置磁偏角
+  compass.setDeclination(-6.5);  // 根据你的地理位置设置磁偏角
 }
 
 //============================= ARDUINO框架函数 =============================
@@ -457,6 +457,5 @@ void loop() {
   delay(1000);
 
   // 获取航向角
-  float heading = device.get_compass_data()->heading;
-  Serial.printf("[罗盘] 航向角: %.2f度\n", heading);
+  device.printCompassData();
 }

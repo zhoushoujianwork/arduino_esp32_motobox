@@ -203,7 +203,6 @@ void tft_loop()
     // 如果蓝牙没有连接则显示自己的电池电量！
     if (!device.get_device_state()->bleConnected)
     {
-        lv_img_set_src(ui_imgBle, &ui_img_bluetooth_disconnect_png);
         lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
         lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
 
@@ -225,8 +224,7 @@ void tft_loop()
     }
     else
     {
-        // 显示蓝牙图标 - 已连接状态
-        lv_img_set_src(ui_imgBle, &ui_img_bluetooth_1_png);
+        
         lv_obj_set_style_img_opa(ui_imgBle, LV_OPA_COVER, 0); // 完全不透明
         
         // Wi-Fi图标始终显示，但根据连接状态调整透明度
@@ -238,12 +236,10 @@ void tft_loop()
         // 根据WiFi连接状态更新图标
         if (device.get_device_state()->wifiConnected) {
             // WiFi已连接 - 显示正常图标但完全不透明
-            lv_img_set_src(ui_imgWifi, &ui_img_wificon_png);
-            lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0); // 完全不透明
+            lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0);
         } else {
             // WiFi未连接 - 使用相同图标但半透明
-            lv_img_set_src(ui_imgWifi, &ui_img_wificon_png);
-            lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_50, 0); // 半透明
+            lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_50, 0);
         }
 
         // Show Gps
@@ -277,8 +273,7 @@ void tft_loop()
         lv_label_set_text(ui_textTrip, tripText);
 
         // 依据方向移动Compass
-        lv_obj_set_x(ui_compass, device.get_compass_data()->heading);
-
+        lv_label_set_text(ui_Composs, compass.getDirectionChar(device.get_compass_data()->direction));
         lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
         lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
 

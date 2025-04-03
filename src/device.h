@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "esp_system.h"
 #include <ArduinoJson.h>
+#include "compass/Compass.h"
 
 typedef struct
 {
@@ -55,11 +56,10 @@ typedef struct
 
 typedef struct
 {
-    float heading;     // 航向角 (0-360度)
     float x;          // X轴磁场强度
     float y;          // Y轴磁场强度
     float z;          // Z轴磁场强度
-    bool calibrated;  // 校准状态
+    int direction; // 方向
 } compass_data_t;
 
 typedef struct
