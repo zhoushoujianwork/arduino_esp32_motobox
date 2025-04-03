@@ -47,7 +47,7 @@ GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
 {
     _rxPin = rxPin;
     _txPin = txPin;
-    _hz = 2;
+    device.get_device_state()->gpsHz = 2;
 }
 
 void GPS::begin()
@@ -63,10 +63,10 @@ void GPS::begin()
     }
 
     // 设置频率
-    if (!setHz(_hz)) {
+    if (!setHz(device.get_device_state()->gpsHz)) {
         Serial.println("设置频率失败");
     }else {
-        Serial.println("设置频率成功,频率:" + String(_hz));
+        Serial.println("设置频率成功,频率:" + String(device.get_device_state()->gpsHz));
     }
 
     // 设置双模 ，1北斗，2GPS，3双模
@@ -161,17 +161,17 @@ void GPS::printRawData()
 int GPS::changeHz()
 {
     // 计算下一个目标频率
-    int nextHz = _hz == 1 ? 2 : _hz == 2 ? 5 : _hz == 5 ? 10 : 1;
+    int nextHz = device.get_device_state()->gpsHz == 1 ? 2 : device.get_device_state()->gpsHz == 2 ? 5 : device.get_device_state()->gpsHz == 5 ? 10 : 1;
     
     // 尝试设置新频率
     if (setHz(nextHz)) {
         Serial.println("频率切换成功: " + String(nextHz) + "Hz");
-        _hz = nextHz;  // 只有在设置成功时才更新频率值
+        device.get_device_state()->gpsHz = nextHz;  // 只有在设置成功时才更新频率值
     } else {
-        Serial.println("频率切换失败，保持当前频率: " + String(_hz) + "Hz");
+        Serial.println("频率切换失败，保持当前频率: " + String(device.get_device_state()->gpsHz) + "Hz");
     }
     
-    return _hz;  // 返回实际的频率值
+    return device.get_device_state()->gpsHz;  // 返回实际的频率值
 }
 
 /**

@@ -19,7 +19,6 @@ private:
     TinyGPSPlus gps;  // TinyGPS++ 对象
     int _rxPin;
     int _txPin;
-    int _hz;
     // 构建波特率设置命令
     static String buildBaudrateCmd(int baudRate);
     // 构建工作模式设置命令
