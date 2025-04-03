@@ -70,7 +70,7 @@ void PWMLED::loop() {
     // 每1000ms打印一次loop执行状态
     static unsigned long lastDebugTime = 0;
     if (currentMillis - lastDebugTime >= 1000) {
-        Serial.printf("[PWMLED] Loop执行中 - 当前模式: %s\n", modeToString(_mode));
+        // Serial.printf("[PWMLED] Loop执行中 - 当前模式: %s\n", modeToString(_mode));
         lastDebugTime = currentMillis;
     }
     

@@ -77,3 +77,37 @@ void BTN::loop()
 
     lastButtonState = reading;
 }
+
+BTN::ButtonState BTN::getState()
+{
+    static unsigned long lastClickTime = 0;
+    static bool isFirstClick = true;
+    ButtonState currentState = NONE;
+
+    if (isClicked()) {
+        if (isFirstClick) {
+            isFirstClick = false;
+            lastClickTime = millis();
+        } else {
+            if (millis() - lastClickTime < 500) { // 500ms内第二次点击
+                currentState = DOUBLE_CLICK;
+                isFirstClick = true;
+            } else {
+                currentState = SINGLE_CLICK;
+                isFirstClick = false;
+                lastClickTime = millis();
+            }
+        }
+    } else if (isLongPressed()) {
+        currentState = LONG_PRESS;
+        isFirstClick = true;
+    } else if (!isFirstClick && millis() - lastClickTime >= 500) {
+        currentState = SINGLE_CLICK;
+        isFirstClick = true;
+    }
+
+    if (currentState != NONE) {
+        lastState = currentState;
+    }
+    return currentState;
+}

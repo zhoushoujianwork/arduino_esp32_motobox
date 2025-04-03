@@ -38,18 +38,12 @@
 #define BAT_MIN_VOLTAGE     2900
 #define BAT_MAX_VOLTAGE     3250
 
-
-
 /* LED Configuration */
 #define LED_BLINK_INTERVAL 100
 
 /* IMU Configuration */
 #define IMU_MAX_D          68     /* Marquis GP retention */
 #define IMU_INT1_PIN       1      /* GPIO1 used for IMU interrupt */
-
-/* GPS Configuration */
-#define GPS_DEFAULT_BAUDRATE 9600
-#define GPS_HZ              2      /* Supported: 1, 2, 5, 10 Hz */
 
 /* MQTT Configuration */
 #define MQTT_SERVER        "mq-hub.daboluo.cc"

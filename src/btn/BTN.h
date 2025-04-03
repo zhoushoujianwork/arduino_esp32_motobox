@@ -4,7 +4,15 @@
 class BTN
 {
 public:
+    enum ButtonState {
+        SINGLE_CLICK,
+        DOUBLE_CLICK,
+        LONG_PRESS,
+        NONE
+    };
+
     BTN(int pin);
+    ButtonState getState();
     bool isPressed();
     bool isReleased();
     bool isClicked();
@@ -17,6 +25,7 @@ private:
     unsigned long pressStartTime = 0;
     static const unsigned long LONG_PRESS_TIME = 3000; // 3秒定义为长按
     static const unsigned long DEBOUNCE_DELAY = 50;    // 添加消抖延时常量
+    ButtonState lastState = NONE;
 };
 
 #endif

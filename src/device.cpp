@@ -238,4 +238,31 @@ float Device::getTotalDistanceKm() {
     return totalDistanceKm;
 }
 
+compass_data_t *Device::get_compass_data() {
+    return &compass_data;
+}
+
+void Device::set_compass_data(compass_data_t *data) {
+    compass_data = *data;
+}
+
+String Device::compass_data_to_json() {
+    StaticJsonDocument<200> doc;
+    doc["heading"] = compass_data.heading;
+    doc["x"] = compass_data.x;
+    doc["y"] = compass_data.y;
+    doc["z"] = compass_data.z;
+    doc["calibrated"] = compass_data.calibrated;
+    
+    String output;
+    serializeJson(doc, output);
+    return output;
+}
+
+void Device::printCompassData() {
+    Serial.printf("Compass: Heading=%.1f°, X=%.1f, Y=%.1f, Z=%.1f, Calibrated=%d\n",
+                 compass_data.heading, compass_data.x, compass_data.y, 
+                 compass_data.z, compass_data.calibrated);
+}
+
 

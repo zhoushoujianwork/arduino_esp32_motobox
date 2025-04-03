@@ -25,6 +25,7 @@
 #include "qmi8658/IMU.h"
 #include "wifi/WifiManager.h"
 #include "power/PowerManager.h"
+#include "compass/Compass.h"
 
 //============================= 全局变量 =============================
 
@@ -70,6 +71,8 @@ LED led(LED_PIN);
 
 PowerManager powerManager;
 
+Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
+
 //============================= 函数声明 =============================
 
 /**
@@ -108,20 +111,9 @@ void taskWifi(void *parameter) {
  */
 void taskGps(void *parameter) {
   #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-  // 创建计时器以跟踪GPS数据解析
-  unsigned long lastStatsTime = 0;
-  
   while (true) {
-    // 任选一种方式：
-    // 1. 使用loop函数解析NMEA数据并更新设备GPS信息
-    gps.loop();
-    
-    // 2. 或者使用printRawData直接打印原始NMEA数据（调试用）
-    // gps.printRawData();
-    
-    // 定期打印GPS统计信息，显示接收质量
-    // gps.printGpsStats();
-    
+    // 使用printRawData直接打印原始NMEA数据
+    gps.printRawData();
     delay(5);
   }
   #endif 
@@ -132,9 +124,6 @@ void taskGps(void *parameter) {
  * 负责电源管理、LED状态、按钮处理
  */
 void taskSystem(void *parameter) {
-  // GPS更新率自动调整的时间记录
-  unsigned long lastGpsRateAdjustTime = 0;
-  
   // 添加任务启动提示
   Serial.println("[系统] 系统监控任务启动");
  
@@ -174,21 +163,6 @@ void taskSystem(void *parameter) {
     
     // 按钮处理逻辑
     handleButtonEvents();
-    
-    // 每5秒自动调整GPS更新率
-    if (millis() - lastGpsRateAdjustTime >= 5000) {
-      // 暂停GPS任务以避免数据读取冲突
-      vTaskSuspend(gpsTaskHandle);
-      
-      // 调整GPS更新率
-      gps.autoAdjustUpdateRate();
-      
-      // 恢复GPS任务
-      vTaskResume(gpsTaskHandle);
-      
-      // 更新时间戳
-      lastGpsRateAdjustTime = millis();
-    }
     #endif
 
     // 电源管理 - 始终保持处理
@@ -245,6 +219,9 @@ void taskDataProcessing(void *parameter) {
     }
     #endif
 
+    // 罗盘数据处理
+    compass.loop();
+
     delay(5);
   }
 }
@@ -255,62 +232,29 @@ void taskDataProcessing(void *parameter) {
  * 按钮事件处理
  */
 void handleButtonEvents() {
-  #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-  // 检查是否处于低功耗状态
-  if (powerManager.getPowerState() != POWER_STATE_NORMAL) {
-    if (button.isPressed()) {
-      Serial.println("[按钮] 检测到按钮按下，打断低功耗模式");
-      powerManager.interruptLowPowerMode();
-      
-      // 等待按钮释放，避免重复触发
-      while (button.isPressed()) {
-        delay(10);
-        button.loop();
-      }
+  // 获取按钮状态
+  BTN::ButtonState state = button.getState();
+  
+  // 处理按钮事件
+  switch (state) {
+    case BTN::SINGLE_CLICK: {
+      Serial.println("[按钮] 单击");
+      int hz = gps.changeHz();
+      Serial.printf("[GPS] 当前频率: %dHz\n", hz);
+      break;
     }
-  } 
-  // 正常模式下的按钮处理
-  else {
-    // 点击事件 - 切换GPS刷新率
-    if (button.isClicked()) {
-      Serial.println("[按钮] 检测到点击，切换GPS刷新率");
       
-      // 依次切换可用的频率: 1Hz -> 2Hz -> 5Hz -> 10Hz -> 1Hz...
-      static int hzValues[] = {1, 2, 5, 10};
-      static int hzIndex = 1; // 默认从2Hz开始 (index=1)
+    case BTN::DOUBLE_CLICK:
+      Serial.println("[按钮] 双击");
+      break;
       
-      hzIndex = (hzIndex + 1) % 4; // 循环切换
-      int newHz = hzValues[hzIndex];
+    case BTN::LONG_PRESS:
+      Serial.println("[按钮] 长按");
+      break;
       
-      vTaskSuspend(gpsTaskHandle);
-      delay(100);
-      if (gps.setGpsHz(newHz)) {
-        Serial.printf("[GPS] 手动设置GPS更新率为%dHz\n", newHz);
-      } else {
-        Serial.println("[GPS] 设置GPS更新率失败");
-      }
-      // 恢复GPS任务
-      vTaskResume(gpsTaskHandle);
-    }
-
-    // 长按事件 - 重置WiFi
-    static bool longPressHandled = false;  // 添加静态变量记录长按是否已处理
-    bool currentlyLongPressed = button.isLongPressed();
-    
-    if (currentlyLongPressed && !longPressHandled) {  // 只有未处理过的长按才执行
-      Serial.println("[按钮] 检测到长按，重置WIFI");
-      
-      if (!wifiManager.getConfigMode()) {
-        wifiManager.reset();
-      }
-      
-      longPressHandled = true;  // 标记为已处理
-    } else if (!currentlyLongPressed) {
-      // 不是长按状态时重置标志，以便下次长按可以触发
-      longPressHandled = false;
-    }
+    default:
+      break;
   }
-  #endif
 }
 
 /**
@@ -460,6 +404,10 @@ void initializeHardware() {
   // 蓝牙客户端初始化
   bc.setup();
   #endif
+
+  // 罗盘初始化
+  compass.begin();
+  compass.setDeclination(0.0);  // 根据你的地理位置设置磁偏角
 }
 
 //============================= ARDUINO框架函数 =============================
@@ -499,5 +447,9 @@ void setup() {
 
 void loop() {
   // 主循环留空，所有功能都在RTOS任务中处理
-  delay(10000);
+  delay(1000);
+
+  // 获取航向角
+  float heading = device.get_compass_data()->heading;
+  Serial.printf("[罗盘] 航向角: %.2f度\n", heading);
 }

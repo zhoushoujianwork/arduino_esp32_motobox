@@ -55,6 +55,15 @@ typedef struct
 
 typedef struct
 {
+    float heading;     // 航向角 (0-360度)
+    float x;          // X轴磁场强度
+    float y;          // Y轴磁场强度
+    float z;          // Z轴磁场强度
+    bool calibrated;  // 校准状态
+} compass_data_t;
+
+typedef struct
+{
     int battery_voltage;
     int battery_percentage;
     bool mqttConnected;
@@ -63,8 +72,10 @@ typedef struct
     bool gpsReady;
     int gpsHz; // 0-10HZ
     bool imuReady;
+    bool compassReady;  // 添加罗盘状态
     gps_data_t gpsData;
     imu_data_t imuData;
+    compass_data_t compassData;  // 添加罗盘数据
 } device_state_t;
 
 
@@ -98,10 +109,17 @@ public:
     String imu_data_to_json();
     void printImuData();
 
+    // 罗盘相关方法
+    compass_data_t *get_compass_data();
+    void set_compass_data(compass_data_t *data);
+    String compass_data_to_json();
+    void printCompassData();
+
 private:
     device_state_t device_state;
     gps_data_t gps_data;
     imu_data_t imu_data;
+    compass_data_t compass_data;  // 添加罗盘数据成员
     float totalDistanceKm;
     long lastDistanceTime;
 };
