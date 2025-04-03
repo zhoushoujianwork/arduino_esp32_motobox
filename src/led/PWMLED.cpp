@@ -129,6 +129,23 @@ void PWMLED::updateRainbow() {
     }
 }
 
+/*
+* 切换模式
+* 彩虹模式：RAINBOW
+* 呼吸模式：BREATH
+* 红色模式：RED
+* 绿色模式：GREEN
+* 蓝色模式：BLUE
+* 黄色模式：YELLOW
+* 关闭模式：OFF
+* 按个轮换
+*/
+void PWMLED::changeMode() {
+    _mode = static_cast<Mode>((_mode + 1) % (RAINBOW + 1));
+    setMode(_mode);
+    Serial.printf("[PWMLED] 模式切换: %s\n", modeToString(_mode));
+}
+
 const char* PWMLED::modeToString(Mode mode) {
     switch (mode) {
         case OFF: return "OFF";
@@ -141,3 +158,4 @@ const char* PWMLED::modeToString(Mode mode) {
         default: return "UNKNOWN";
     }
 } 
+

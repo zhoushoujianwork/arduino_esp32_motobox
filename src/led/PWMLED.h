@@ -22,6 +22,7 @@ public:
     void begin();
     void setMode(Mode mode);
     void loop();
+    void changeMode();
 
 private:
     uint8_t _pin;

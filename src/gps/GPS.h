@@ -14,6 +14,8 @@ public:
     int changeHz();
     bool setBaudRate(int baudRate);
     bool setHz(int hz);
+    // 依据卫星数量自动调节频率
+    int autoAdjustHz(uint8_t satellites);
 private:
     SoftwareSerial gpsSerial;
     TinyGPSPlus gps;  // TinyGPS++ 对象
@@ -29,6 +31,7 @@ private:
     static String calculateChecksum(const String& cmd);
     // 发送GPS命令
     bool sendGpsCommand(const String& cmd, int retries, int retryDelay);
+    
 };
 
 extern GPS gps;

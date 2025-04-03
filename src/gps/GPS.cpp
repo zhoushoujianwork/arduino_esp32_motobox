@@ -324,3 +324,25 @@ bool GPS::sendGpsCommand(const String& cmd, int retries, int retryDelay) {
     
     return success;
 }
+
+/*
+* 依据卫星数量自动调节频率，20颗星以上10Hz，10-20颗星5Hz，10颗星以下2Hz，
+* @param satellites 卫星数量
+* @return 调节后的频率
+*/
+int GPS::autoAdjustHz(uint8_t satellites) {
+    const int hz = satellites > 20 ? 10 : satellites > 10 ? 5 : 2;
+
+    if (hz == device.get_device_state()->gpsHz) {
+        // 符合预期直接返回
+        return hz;
+    }
+
+    if (setHz(hz)) {
+        Serial.println("自动调节频率成功: " + String(hz) + "Hz");
+        return hz;
+    } else {
+        Serial.println("自动调节频率失败，保持当前频率: " + String(device.get_device_state()->gpsHz) + "Hz");
+        return device.get_device_state()->gpsHz;
+    }
+}

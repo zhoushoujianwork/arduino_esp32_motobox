@@ -154,7 +154,7 @@ void taskSystem(void *parameter) {
     bool isConnected = device.get_device_state()->mqttConnected && 
                       device.get_device_state()->wifiConnected;
     #ifdef PWM_LED_PIN
-    pwmLed.setMode(isConnected ? PWMLED::BREATH : PWMLED::OFF);
+    pwmLed.setMode(isConnected ? PWMLED::RAINBOW : PWMLED::OFF);
     #else
     led.setMode(isConnected ? LED::BLINK_DUAL : LED::OFF);
     #endif
@@ -190,9 +190,13 @@ void taskDataProcessing(void *parameter) {
     if (millis() - lastGpsPublishTime >= 1000) {
       mqtt.publishGPS(*device.get_gps_data());
       lastGpsPublishTime = millis();
-      
       // 更新GPS就绪状态
-      device.set_gps_ready(device.get_gps_data()->satellites > 3);
+      if (device.get_gps_data()->satellites > 3) {
+        device.set_gps_ready(true);
+        gps.autoAdjustHz(device.get_gps_data()->satellites);
+      } else {
+        device.set_gps_ready(false);
+      }
     }
     
     // IMU数据发布 (2Hz)
@@ -247,10 +251,12 @@ void handleButtonEvents() {
       
     case BTN::DOUBLE_CLICK:
       Serial.println("[按钮] 双击");
+      pwmLed.changeMode();
       break;
       
     case BTN::LONG_PRESS:
       Serial.println("[按钮] 长按");
+      wifiManager.reset();
       break;
       
     default:
