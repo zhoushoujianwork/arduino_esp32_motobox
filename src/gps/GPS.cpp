@@ -1,4 +1,6 @@
 #include "GPS.h"
+#include "device.h"
+#include <TinyGPS++.h>
 
 // \r\n 是回车换行符的组合
 // \r (CR, Carriage Return) - 回车，将光标移动到行首
@@ -32,8 +34,6 @@ $GPTXT,01,01,01,ANTENNA OK*35
 $GPTXT,01,01,01,ANTENNA SHORT*63
 表示天线状态（短路）
 */
-
-
 
 // 定义常用的GPS波特率数组
 const uint32_t BAUD_RATES[] = {9600, 19200, 38400, 57600, 115200};
@@ -79,11 +79,68 @@ void GPS::begin()
 
 void GPS::loop()
 {
-    // 读取并打印原始数据
-    while (gpsSerial.available())
+    while (gpsSerial.available() > 0)
     {
-        char c = gpsSerial.read();
-        Serial.print(c);
+        char c = (char)gpsSerial.read();
+        if (gps.encode(c))  
+        {
+            if (gps.location.isUpdated())
+            {
+                // 使用更高效的时间获取方式
+                auto loc = gps.location;
+                device.get_gps_data()->latitude = loc.lat();
+                device.get_gps_data()->longitude = loc.lng();
+            }
+
+            if (gps.altitude.isUpdated())
+            {
+                auto alt = gps.altitude;
+                device.get_gps_data()->altitude = alt.meters();
+            }
+
+             if (gps.course.isUpdated())
+            {
+                auto course = gps.course;
+                device.get_gps_data()->heading = course.deg();
+            }
+
+            if (gps.time.isUpdated())
+            {
+                auto time = gps.time;
+                device.get_gps_data()->hour = time.hour();
+                device.get_gps_data()->minute = time.minute();
+                device.get_gps_data()->second = time.second();
+                device.get_gps_data()->centisecond = time.centisecond();
+            }
+
+            if (gps.date.isUpdated())
+            {
+                auto date = gps.date;
+                device.get_gps_data()->year = date.year();
+                device.get_gps_data()->month = date.month();
+                device.get_gps_data()->day = date.day();
+            }
+            
+            if (gps.hdop.isUpdated())
+            {
+                // 获取
+                auto hdop = gps.hdop;
+                device.get_gps_data()->hdop = hdop.value();
+            }
+            
+            if (gps.satellites.isUpdated())
+            {
+                auto satellites = gps.satellites;
+                device.get_gps_data()->satellites = satellites.value();
+            }
+            
+            if (gps.speed.isUpdated())
+            {
+                auto speed = gps.speed;
+                device.get_gps_data()->speed = speed.kmph();
+            }
+            
+        }
     }
 }
 
@@ -148,7 +205,6 @@ bool GPS::setHz(int hz)
     // 发送命令
     return sendGpsCommand(cmd, 3, 100);
 }
-
 
 // GPS类的实现
 String GPS::calculateChecksum(const String& cmd) {

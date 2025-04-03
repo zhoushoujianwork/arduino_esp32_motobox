@@ -1,8 +1,8 @@
 #ifndef GPS_H
 #define GPS_H
 
-
 #include <SoftwareSerial.h>
+#include <TinyGPS++.h>
 
 class GPS
 {
@@ -16,6 +16,7 @@ public:
     bool setHz(int hz);
 private:
     SoftwareSerial gpsSerial;
+    TinyGPSPlus gps;  // TinyGPS++ 对象
     int _rxPin;
     int _txPin;
     int _hz;

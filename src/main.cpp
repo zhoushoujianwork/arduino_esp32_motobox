@@ -113,7 +113,8 @@ void taskGps(void *parameter) {
   #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   while (true) {
     // 使用printRawData直接打印原始NMEA数据
-    gps.printRawData();
+    // gps.printRawData();
+    gps.loop();
     delay(5);
   }
   #endif 
