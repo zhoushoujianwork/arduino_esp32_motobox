@@ -37,7 +37,7 @@ extern lv_obj_t *ui_textGpsHz;
 extern lv_obj_t *ui_imgGps;
 extern lv_obj_t *ui_textGpsNu;
 extern lv_obj_t *ui_TopMid;
-extern lv_obj_t *ui_Composs;
+extern lv_obj_t *ui_Compass;
 extern lv_obj_t *ui_topRight;
 extern lv_obj_t *ui_imgBle;
 extern lv_obj_t *ui_imgWifi;

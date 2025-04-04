@@ -251,15 +251,16 @@ String Device::compass_data_to_json() {
     doc["x"] = compass_data.x;
     doc["y"] = compass_data.y;
     doc["z"] = compass_data.z; 
-    doc["direction"] = compass.getDirectionChar(compass_data.direction);
+    doc["heading"] = compass_data.heading;
+    doc["direction"] = compass.getDirectionChar(compass_data.heading);
     String output;
     serializeJson(doc, output);
     return output;
 }
 
 void Device::printCompassData() {
-    Serial.printf("Compass: X=%.1f, Y=%.1f, Z=%.1f, Direction=%s\n",
-                 compass_data.x, compass_data.y, compass_data.z, compass.getDirectionChar(compass_data.direction));
+    Serial.printf("Compass: X=%.1f, Y=%.1f, Z=%.1f, Heading=%.1f, Direction=%s\n",
+                 compass_data.x, compass_data.y, compass_data.z, compass_data.heading, compass.getDirectionChar(compass_data.heading));
 }
 
 

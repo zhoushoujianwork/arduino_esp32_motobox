@@ -22,7 +22,7 @@ void Compass::loop() {
     compassData.x = x;
     compassData.y = y;
     compassData.z = z;
-    compassData.direction = getDirection(x, y, z);
+    compassData.heading = calculateHeading(x, y);
     device.set_compass_data(&compassData);
 }
 
@@ -38,9 +38,6 @@ void Compass::getRawData(int16_t &x, int16_t &y, int16_t &z) {
     z = qmc.getZ();
 }
 
-float Compass::getHeading(int16_t x, int16_t y, int16_t z) {
-    return calculateHeading(x, y);
-}
 
 void Compass::setDeclination(float declination) {
     _declination = declination;
@@ -64,20 +61,12 @@ float Compass::calculateHeading(int16_t x, int16_t y) {
     return heading;
 }
 
-// 获取方向的数值表示 (0-7)
-int Compass::getDirection(int16_t x, int16_t y, int16_t z) {
-    float heading = getHeading(x, y, z);
-    
-    // 将360度分为8个方向，每个方向45度
+char* Compass::getDirectionChar(float heading) {
+     // 将360度分为8个方向，每个方向45度
     int direction = (int)((heading + 22.5) / 45.0);
     if (direction >= 8) {
         direction = 0;
     }
-
-    return direction;
-}
-
-char* Compass::getDirectionChar(int direction) {
     static const char* directions[] = {
         "N", "NE", "E", "SE", "S", "SW", "W", "NW"
     };

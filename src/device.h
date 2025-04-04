@@ -59,7 +59,7 @@ typedef struct
     float x;          // X轴磁场强度
     float y;          // Y轴磁场强度
     float z;          // Z轴磁场强度
-    int direction; // 方向
+    float heading; // 航向角 0-360
 } compass_data_t;
 
 typedef struct

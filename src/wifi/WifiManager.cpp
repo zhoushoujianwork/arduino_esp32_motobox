@@ -51,9 +51,7 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
 {
     String ssid = preferences.getString("ssid", "");
     String password = preferences.getString("password", "");
-    Serial.printf("尝试连接WiFi: %s\n", ssid.c_str());
-    Serial.printf("尝试连接WiFi密码: %s\n", password.c_str());
-
+    
     if (ssid.isEmpty())
     {
         Serial.println("未找到已保存的WiFi配置");
@@ -63,29 +61,46 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
 
     // 增加WiFi连接的健壮性
     WiFi.disconnect(true);  // 确保断开之前的连接
-    delay(200);  // 短暂延迟
+    delay(1000);  // 增加延迟时间，确保完全断开
 
-    WiFi.mode(WIFI_STA);  // 设置为站点模式
-    WiFi.setAutoReconnect(true);  // 启用自动重连
+    // 重置WiFi状态
+    WiFi.mode(WIFI_OFF);
+    delay(100);
+    WiFi.mode(WIFI_STA);
+    delay(100);
+
+    // 设置更保守的连接参数
+    WiFi.setAutoReconnect(false);  // 禁用自动重连，由我们手动控制
+    WiFi.setSleep(false);  // 禁用省电模式，提高稳定性
     
-    // 配置更长的连接超时
-    WiFi.waitForConnectResult(15000);  // 15秒超时
+    Serial.printf("尝试连接WiFi: %s\n", ssid.c_str());
+    Serial.printf("尝试连接WiFi密码: %s\n", password.c_str());
 
-    Serial.println("开始连接WiFi...");
-    WiFi.begin(ssid.c_str(), password.c_str());
+    // 使用临时变量存储凭据，避免直接使用String对象
+    const char* ssid_ptr = ssid.c_str();
+    const char* password_ptr = password.c_str();
+    
+    if (!ssid_ptr || !password_ptr) {
+        Serial.println("WiFi凭据无效");
+        return false;
+    }
 
+    // 开始连接
+    WiFi.begin(ssid_ptr, password_ptr);
+    
+    // 使用更安全的连接等待逻辑
     unsigned long startAttemptTime = millis();
+    const unsigned long CONNECT_TIMEOUT = 20000; // 20秒超时
     
-    // 使用更复杂的连接等待逻辑
     while (WiFi.status() != WL_CONNECTED) 
     {
-        if (millis() - startAttemptTime > 20000) {  // 20秒总超时
-            Serial.println("WiFi连接失败");
+        if (millis() - startAttemptTime > CONNECT_TIMEOUT) {
+            Serial.println("WiFi连接超时");
             WiFi.disconnect(true);
             return false;
         }
 
-        // 打印连接状态
+        // 使用switch语句处理不同的连接状态
         switch(WiFi.status()) {
             case WL_DISCONNECTED:
                 Serial.print(".");
@@ -97,22 +112,33 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
             case WL_NO_SSID_AVAIL:
                 Serial.println("\n未找到指定的WiFi网络");
                 return false;
+            case WL_IDLE_STATUS:
+                Serial.print("i");
+                break;
+            default:
+                Serial.print("?");
+                break;
         }
 
-        delay(500);  // 减少CPU负载
+        delay(500);  // 增加延迟，减少CPU负载
     }
 
-    Serial.printf("\nWiFi连接成功，IP地址: %s\n", WiFi.localIP().toString().c_str());
-    
-    // 验证互联网连接
-    if (!checkInternetConnection()) {
-        Serial.println("互联网连接验证失败");
-        WiFi.disconnect(true);
-        return false;
+    // 连接成功后的处理
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.printf("\nWiFi连接成功，IP地址: %s\n", WiFi.localIP().toString().c_str());
+        
+        // 验证互联网连接
+        if (!checkInternetConnection()) {
+            Serial.println("互联网连接验证失败");
+            WiFi.disconnect(true);
+            return false;
+        }
+
+        device.set_wifi_connected(true);
+        return true;
     }
 
-    device.set_wifi_connected(true);
-    return true;
+    return false;
 }
 
 void WiFiConfigManager::enterConfigMode()

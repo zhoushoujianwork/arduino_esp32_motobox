@@ -21,7 +21,7 @@ lv_obj_t *ui_textGpsHz;
 lv_obj_t *ui_imgGps;
 lv_obj_t *ui_textGpsNu;
 lv_obj_t *ui_TopMid;
-lv_obj_t *ui_Composs;
+lv_obj_t *ui_Compass;
 lv_obj_t *ui_topRight;
 lv_obj_t *ui_imgBle;
 lv_obj_t *ui_imgWifi;

@@ -15,15 +15,8 @@ public:
     
     // 获取原始数据
     void getRawData(int16_t &x, int16_t &y, int16_t &z);
-    
-    // 获取处理后的航向角
-    float getHeading(int16_t x, int16_t y, int16_t z);
-    
-    int getDirection(int16_t x, int16_t y, int16_t z);
-
     // 获取方向的char表示
-    char* getDirectionChar(int direction);
-
+    char* getDirectionChar(float heading);
     // 设置磁偏角校正值
     void setDeclination(float declination);
 

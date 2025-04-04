@@ -196,7 +196,6 @@ void tft_begin()
 
 void tft_loop()
 {
-
     lv_timer_handler(); // let the GUI do its work
 
     // Show battery level
@@ -224,9 +223,7 @@ void tft_loop()
     }
     else
     {
-        
         lv_obj_set_style_img_opa(ui_imgBle, LV_OPA_COVER, 0); // 完全不透明
-        
         // Wi-Fi图标始终显示，但根据连接状态调整透明度
         lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0); // 默认完全不透明
         
@@ -273,7 +270,7 @@ void tft_loop()
         lv_label_set_text(ui_textTrip, tripText);
 
         // 依据方向移动Compass
-        lv_label_set_text(ui_Composs, compass.getDirectionChar(device.get_compass_data()->direction));
+        lv_label_set_text(ui_Compass, compass.getDirectionChar(device.get_compass_data()->heading));
         lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
         lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
 
