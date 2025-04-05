@@ -52,28 +52,28 @@ GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
 
 void GPS::begin()
 {
-    Serial.println("开始初始化GPS txPin:" + String(_txPin) + " rxPin:" + String(_rxPin));
+    Serial.println("[GPS] 开始初始化 txPin:" + String(_txPin) + " rxPin:" + String(_rxPin));
     gpsSerial.begin(9600);
     // delay(1000);设置串口波特率
 
     if (!setBaudRate(GPS_BAUDRATE)) {
-        Serial.println("设置波特率失败");
+        Serial.println("[GPS] 设置波特率失败");
     }else {
-        Serial.println("设置波特率成功,波特率:" + String(GPS_BAUDRATE));
+        Serial.println("[GPS] 设置波特率成功,波特率:" + String(GPS_BAUDRATE));
     }
 
     // 设置频率
     if (!setHz(device.get_device_state()->gpsHz)) {
-        Serial.println("设置频率失败");
+        Serial.println("[GPS] 设置频率失败");
     }else {
-        Serial.println("设置频率成功,频率:" + String(device.get_device_state()->gpsHz));
+        Serial.println("[GPS] 设置频率成功,频率:" + String(device.get_device_state()->gpsHz));
     }
 
     // 设置双模 ，1北斗，2GPS，3双模
     if (!buildModeCmd(3)) {
-        Serial.println("设置双模失败");
+        Serial.println("[GPS] 设置双模失败");
     }else {
-        Serial.println("设置双模成功");
+        Serial.println("[GPS] 设置双模成功");
     }
 }
 
@@ -165,10 +165,10 @@ int GPS::changeHz()
     
     // 尝试设置新频率
     if (setHz(nextHz)) {
-        Serial.println("频率切换成功: " + String(nextHz) + "Hz");
+        Serial.println("[GPS] 频率切换成功: " + String(nextHz) + "Hz");
         device.get_device_state()->gpsHz = nextHz;  // 只有在设置成功时才更新频率值
     } else {
-        Serial.println("频率切换失败，保持当前频率: " + String(device.get_device_state()->gpsHz) + "Hz");
+        Serial.println("[GPS] 频率切换失败，保持当前频率: " + String(device.get_device_state()->gpsHz) + "Hz");
     }
     
     return device.get_device_state()->gpsHz;  // 返回实际的频率值
@@ -192,17 +192,7 @@ bool GPS::setBaudRate(int baudRate)
  */
 bool GPS::setHz(int hz)
 {
-    // 使用PCAS03命令设置输出频率
-    // 我们设置所有消息都以相同频率输出
-    // 1表示每次都输出，0表示不输出
-    String cmd = "$PCAS03,1,1,1,1,1,1,1,1,0,0,,,1,1,,,,1";
-    
-    // 计算校验和
-    String checksum = GPS::calculateChecksum(cmd);
-    cmd += "*" + checksum;
-    cmd += "\r\n";
-
-    // 发送命令
+    String cmd = buildUpdateRateCmd(hz);
     return sendGpsCommand(cmd, 3, 100);
 }
 
@@ -339,10 +329,11 @@ int GPS::autoAdjustHz(uint8_t satellites) {
     }
 
     if (setHz(hz)) {
-        Serial.println("自动调节频率成功: " + String(hz) + "Hz");
+        Serial.println("[GPS] 自动调节频率成功: " + String(hz) + "Hz");
+        device.get_device_state()->gpsHz = hz;
         return hz;
     } else {
-        Serial.println("自动调节频率失败，保持当前频率: " + String(device.get_device_state()->gpsHz) + "Hz");
+        Serial.println("[GPS] 自动调节频率失败，保持当前频率: " + String(device.get_device_state()->gpsHz) + "Hz");
         return device.get_device_state()->gpsHz;
     }
 }
