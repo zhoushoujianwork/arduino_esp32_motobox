@@ -68,7 +68,7 @@ LED led(LED_PIN);
 
 PowerManager powerManager;
 
-#ifdef MODE_ALLINONE || MODE_SERVER
+#ifdef MODE_ALLINONE 
 Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
 #endif
 
@@ -163,7 +163,7 @@ void taskSystem(void *parameter)
 #ifdef PWM_LED_PIN
     pwmLed.setMode(isConnected ? PWMLED::RAINBOW : PWMLED::OFF);
 #else
-    led.setMode(isConnected ? LED::BLINK_DUAL : LED::OFF);
+    led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
 #endif
 
     // 按钮状态更新
@@ -241,7 +241,7 @@ void taskDataProcessing(void *parameter)
     tft_loop();
 #endif
 
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+#if defined(MODE_ALLINONE)
     // 罗盘数据处理
     compass.loop();
 #endif
@@ -448,7 +448,7 @@ void initializeHardware()
 #endif
 
   // 罗盘初始化
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+#if defined(MODE_ALLINONE)
   compass.begin();
   compass.setDeclination(-5.9f); // 根据你的地理位置设置磁偏角
 #endif

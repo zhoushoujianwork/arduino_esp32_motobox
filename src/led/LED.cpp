@@ -94,6 +94,15 @@ void LED::loop()
             _state = false;
             digitalWrite(_pin, HIGH); // LED关闭 (高电平)
         }
+
+        break;
+    case BLINK_5_SECONDS:
+        if (currentMillis - _lastToggle >= 5000)
+        {
+            _state = !_state;
+            digitalWrite(_pin, _state ? LOW : HIGH);
+            _lastToggle = currentMillis;
+        }
         break;
     }
 }
@@ -105,6 +114,7 @@ const char* LED::modeToString(Mode mode) {
         case ON: return "常亮";
         case BLINK_SINGLE: return "单闪";
         case BLINK_DUAL: return "双闪";
+        case BLINK_5_SECONDS: return "5秒闪烁";
         default: return "未知";
     }
 }

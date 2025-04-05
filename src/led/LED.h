@@ -11,7 +11,8 @@ public:
         OFF,       // 关闭
         ON,        // 常亮
         BLINK_SINGLE, // 单闪
-        BLINK_DUAL // 双闪
+        BLINK_DUAL, // 双闪
+        BLINK_5_SECONDS // 5 秒钟闪烁一次
     };
 
     LED(uint8_t pin);
