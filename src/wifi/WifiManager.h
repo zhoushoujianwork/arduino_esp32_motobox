@@ -8,6 +8,7 @@
 #include <WiFiClientSecure.h>
 #include "device.h"
 #include "config.h"
+#include "esp_wifi.h"
 
 class WiFiConfigManager
 {

@@ -26,7 +26,7 @@
 #include "wifi/WifiManager.h"
 #include "power/PowerManager.h"
 #include "compass/Compass.h"
-
+#include "esp_wifi.h"
 //============================= 全局变量 =============================
 
 // 设备管理实例
@@ -49,17 +49,14 @@ unsigned long lastBlePublishTime = 0;
 GPS gps(GPS_RX_PIN, GPS_TX_PIN);
 IMU imu(IMU_SDA_PIN, IMU_SCL_PIN);
 BTN button(BTN_PIN);
-
 MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
+BLES bs;
 #endif
 
 #ifdef MODE_CLIENT
 BLEC bc;
 #endif
 
-#ifdef MODE_SERVER
-BLES bs;
-#endif
 
 BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE);
 
@@ -71,7 +68,9 @@ LED led(LED_PIN);
 
 PowerManager powerManager;
 
+#ifdef MODE_ALLINONE || MODE_SERVER
 Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
+#endif
 
 //============================= 函数声明 =============================
 
@@ -196,6 +195,8 @@ void taskDataProcessing(void *parameter)
     // MQTT数据发布
     mqtt.loop();
 
+    
+
     // GPS数据发布 (1Hz)
     if (millis() - lastGpsPublishTime >= 1000)
     {
@@ -226,13 +227,8 @@ void taskDataProcessing(void *parameter)
     bc.loop();
 #endif
 
-#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
-    // 显示屏更新
-    tft_loop();
-#endif
-
 #ifdef MODE_SERVER
-    // 蓝牙服务器广播 (1Hz)
+// 蓝牙服务器广播 (1Hz)
     if (millis() - lastBlePublishTime >= 1000)
     {
       bs.loop();
@@ -240,12 +236,20 @@ void taskDataProcessing(void *parameter)
     }
 #endif
 
+#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+    // 显示屏更新
+    tft_loop();
+#endif
+
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     // 罗盘数据处理
     compass.loop();
+#endif
 
     delay(5);
   }
 }
+
 
 //============================= 辅助函数 =============================
 
@@ -254,6 +258,7 @@ void taskDataProcessing(void *parameter)
  */
 void handleButtonEvents()
 {
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   // 获取按钮状态
   BTN::ButtonState state = button.getState();
 
@@ -270,7 +275,6 @@ void handleButtonEvents()
 
   case BTN::DOUBLE_CLICK:
     Serial.println("[按钮] 双击");
-    pwmLed.changeMode();
     break;
 
   case BTN::LONG_PRESS:
@@ -281,6 +285,7 @@ void handleButtonEvents()
   default:
     break;
   }
+#endif
 }
 
 /**
@@ -296,13 +301,7 @@ void printWakeupReason()
   {
     // 检查唤醒源是按钮还是IMU
     int wakeup_pin = -1;
-    // 检查哪个引脚为低电平，可能是唤醒源
-    if (BTN_PIN >= 0 && BTN_PIN <= 21 && digitalRead(BTN_PIN) == LOW)
-    {
-      wakeup_pin = BTN_PIN;
-      Serial.printf("[系统] 从按钮唤醒 (GPIO%d)\n", BTN_PIN);
-    }
-    else if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21 && digitalRead(IMU_INT1_PIN) == LOW)
+    if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21 && digitalRead(IMU_INT1_PIN) == LOW)
     {
       wakeup_pin = IMU_INT1_PIN;
       Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT1_PIN);
@@ -359,7 +358,7 @@ void initializeHardware()
     Serial.printf("[系统] 系统正常启动，版本: %s\n", VERSION);
   }
 
-// LED初始化
+  // LED初始化
 #ifdef PWM_LED_PIN
   pwmLed.begin();
   pwmLed.setMode(PWMLED::RAINBOW); // 启动时设置为彩虹模式
@@ -372,6 +371,13 @@ void initializeHardware()
   device.init();
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  // WiFi初始化
+  Serial.println("[系统] 初始化WiFi连接...");
+  wifiManager.begin();
+
+  // 蓝牙服务器初始化
+  bs.setup();
+  
   // IMU初始化
   Serial.println("[系统] 初始化IMU...");
   imu.begin();
@@ -408,10 +414,6 @@ void initializeHardware()
       break;
     }
   }
-
-  // WiFi初始化
-  Serial.println("[系统] 初始化WiFi连接...");
-  wifiManager.begin();
 #endif
 
   // 电源管理初始化
@@ -439,10 +441,6 @@ void initializeHardware()
 // #endif
 #endif
 
-#ifdef MODE_SERVER
-  // 蓝牙服务器初始化
-  bs.setup();
-#endif
 
 #ifdef MODE_CLIENT
   // 蓝牙客户端初始化
@@ -450,8 +448,10 @@ void initializeHardware()
 #endif
 
   // 罗盘初始化
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   compass.begin();
   compass.setDeclination(-5.9f); // 根据你的地理位置设置磁偏角
+#endif
 }
 
 //============================= ARDUINO框架函数 =============================
@@ -486,15 +486,11 @@ void setup()
 
   xTaskCreate(taskSystem, "TaskSystem", 1024 * 10, NULL, 2, NULL);
   xTaskCreate(taskDataProcessing, "TaskData", 1024 * 10, NULL, 1, NULL);
-
   Serial.println("[系统] 初始化完成");
 }
 
 void loop()
 {
   // 主循环留空，所有功能都在RTOS任务中处理
-  delay(200);
-
-  // 获取航向角
-  device.printCompassData();
+  delay(1000);
 }

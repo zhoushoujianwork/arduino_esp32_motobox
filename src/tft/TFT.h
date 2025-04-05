@@ -9,7 +9,6 @@
 #include "config.h"
 #include "gps/GPS.h"
 #include "qmi8658/IMU.h"
-#include "compass/Compass.h"
 #include "device.h"
 
 void tft_begin();

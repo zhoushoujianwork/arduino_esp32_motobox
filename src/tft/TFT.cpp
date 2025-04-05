@@ -270,7 +270,7 @@ void tft_loop()
         lv_label_set_text(ui_textTrip, tripText);
 
         // 依据方向移动Compass
-        lv_label_set_text(ui_Compass, compass.getDirectionChar(device.get_compass_data()->heading));
+        lv_label_set_text(ui_Compass, String(device.get_compass_data()->heading).c_str());
         lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
         lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
 

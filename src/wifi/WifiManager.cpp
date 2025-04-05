@@ -7,6 +7,10 @@ void WiFiConfigManager::begin()
     Serial.println("WiFiConfigManager::begin");
     delay(1000); // 添加启动延迟
 
+    // 配置WiFi modem sleep模式
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+    Serial.println("WiFi modem sleep已启用");
+
     // 配置SSL客户端
     wifiClientSecure.setInsecure();  // 允许自签名证书
     wifiClientSecure.setTimeout(15); // 设置15秒超时
@@ -69,9 +73,13 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
     WiFi.mode(WIFI_STA);
     delay(100);
 
-    // 设置更保守的连接参数
+    // 设置WiFi参数
     WiFi.setAutoReconnect(false);  // 禁用自动重连，由我们手动控制
-    WiFi.setSleep(false);  // 禁用省电模式，提高稳定性
+    WiFi.setSleep(true);  // 启用省电模式
+    
+    // 确保modem sleep模式设置正确
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+    Serial.println("WiFi modem sleep已重新启用");
     
     Serial.printf("尝试连接WiFi: %s\n", ssid.c_str());
     Serial.printf("尝试连接WiFi密码: %s\n", password.c_str());

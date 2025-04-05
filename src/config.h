@@ -76,7 +76,9 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 /* Display Configuration */
 #define TFT_HOR_RES        172
 #define TFT_VER_RES        320
+#ifndef TFT_ROTATION
 #define TFT_ROTATION       1 // 0: 0度, 1: 90度, 2: 180度, 3: 270度
+#endif
 #define UI_MAX_SPEED       199    /* Maximum speed in km/h */
 
 #endif /* CONFIG_H */

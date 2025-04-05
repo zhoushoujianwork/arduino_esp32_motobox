@@ -123,10 +123,10 @@ void PWMLED::updateRainbow() {
     FastLED.show();
     
     // 每100次更新打印一次详细信息
-    static uint32_t printCount = 0;
-    if (++printCount % 100 == 0) {
-        Serial.printf("[PWMLED] 彩虹效果 - 色相: %d\n", _hue);
-    }
+    // static uint32_t printCount = 0;
+    // if (++printCount % 100 == 0) {
+    //     Serial.printf("[PWMLED] 彩虹效果 - 色相: %d\n", _hue);
+    // }
 }
 
 /*
