@@ -212,6 +212,9 @@ void taskDataProcessing(void *parameter)
       {
         device.set_gps_ready(false);
       }
+
+      // 自动调整 gps 频率
+      gps.autoAdjustHz(device.get_gps_data()->satellites);
     }
 
     // IMU数据发布 (2Hz)

@@ -1,6 +1,7 @@
 #define USER_SETUP_ID 147
 
 // https://www.waveshare.net/wiki/ESP32-C6-LCD-1.47
+// 还未找到配置引脚信息
 
 #ifdef USER_SETUP_INFO
 #undef USER_SETUP_INFO
