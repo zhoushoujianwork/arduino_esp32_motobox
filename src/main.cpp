@@ -48,7 +48,9 @@ unsigned long lastBlePublishTime = 0;
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
 GPS gps(GPS_RX_PIN, GPS_TX_PIN);
 IMU imu(IMU_SDA_PIN, IMU_SCL_PIN);
+#ifdef BTN_PIN
 BTN button(BTN_PIN);
+#endif
 MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
 BLES bs;
 #endif
@@ -56,7 +58,6 @@ BLES bs;
 #ifdef MODE_CLIENT
 BLEC bc;
 #endif
-
 
 BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE);
 
@@ -68,7 +69,7 @@ LED led(LED_PIN);
 
 PowerManager powerManager;
 
-#ifdef MODE_ALLINONE 
+#ifdef MODE_ALLINONE
 Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
 #endif
 
@@ -167,10 +168,11 @@ void taskSystem(void *parameter)
 #endif
 
     // 按钮状态更新
+#ifdef BTN_PIN
     button.loop();
-
     // 按钮处理逻辑
     handleButtonEvents();
+#endif
 #endif
 
     // 电源管理 - 始终保持处理
@@ -194,8 +196,6 @@ void taskDataProcessing(void *parameter)
 
     // MQTT数据发布
     mqtt.loop();
-
-    
 
     // GPS数据发布 (1Hz)
     if (millis() - lastGpsPublishTime >= 1000)
@@ -231,7 +231,7 @@ void taskDataProcessing(void *parameter)
 #endif
 
 #ifdef MODE_SERVER
-// 蓝牙服务器广播 (1Hz)
+    // 蓝牙服务器广播 (1Hz)
     if (millis() - lastBlePublishTime >= 1000)
     {
       bs.loop();
@@ -253,7 +253,6 @@ void taskDataProcessing(void *parameter)
   }
 }
 
-
 //============================= 辅助函数 =============================
 
 /**
@@ -261,6 +260,7 @@ void taskDataProcessing(void *parameter)
  */
 void handleButtonEvents()
 {
+#ifdef BTN_PIN
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   // 获取按钮状态
   BTN::ButtonState state = button.getState();
@@ -277,8 +277,12 @@ void handleButtonEvents()
   }
 
   case BTN::DOUBLE_CLICK:
+  {
     Serial.println("[按钮] 双击");
+    int baudRate = gps.changeBaudRate();
+    Serial.printf("[GPS] 当前波特率: %d\n", baudRate);
     break;
+  }
 
   case BTN::LONG_PRESS:
     Serial.println("[按钮] 长按");
@@ -286,8 +290,9 @@ void handleButtonEvents()
     break;
 
   default:
-    break;
-  }
+      break;
+    }
+#endif
 #endif
 }
 
@@ -380,7 +385,7 @@ void initializeHardware()
 
   // 蓝牙服务器初始化
   bs.setup();
-  
+
   // IMU初始化
   Serial.println("[系统] 初始化IMU...");
   imu.begin();
@@ -391,23 +396,7 @@ void initializeHardware()
     switch (wakeup_reason)
     {
     case ESP_SLEEP_WAKEUP_EXT0:
-      // 如果是按钮唤醒，立即激活LED指示
-      if (BTN_PIN >= 0 && BTN_PIN <= 21 && digitalRead(BTN_PIN) == LOW)
-      {
-#ifdef PWM_LED_PIN
-        pwmLed.setMode(PWMLED::RED);
-#else
-        led.setMode(LED::BLINK_SINGLE);
-#endif
-        Serial.println("[系统] 按钮唤醒检测到，准备恢复系统");
-      }
-      // 如果是IMU唤醒，处理运动事件
-      else if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21 && digitalRead(IMU_INT1_PIN) == LOW)
-      {
-        Serial.println("[系统] IMU运动唤醒检测到，记录运动事件");
-        // 这里可以添加运动事件处理代码
-        // 例如：记录唤醒时间、记录运动状态等
-      }
+      Serial.println("[系统] IMU运动唤醒检测到，记录运动事件");
       break;
     case ESP_SLEEP_WAKEUP_TIMER:
       Serial.println("[系统] 定时器唤醒，检查系统状态");
@@ -443,7 +432,6 @@ void initializeHardware()
 //   tft_show_notification("Sleep Disabled", "", 3000);
 // #endif
 #endif
-
 
 #ifdef MODE_CLIENT
   // 蓝牙客户端初始化

@@ -36,11 +36,11 @@ $GPTXT,01,01,01,ANTENNA SHORT*63
 */
 
 // 定义常用的GPS波特率数组
-const uint32_t BAUD_RATES[] = {9600, 19200, 38400, 57600, 115200};
-const int NUM_BAUD_RATES = 5;
+const uint32_t BAUD_RATES[] = {9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600};
+const int NUM_BAUD_RATES = 8;
 
-#ifndef GPS_BAUDRATE
-#define GPS_BAUDRATE 9600
+#ifndef GPS_DEFAULT_BAUDRATE
+    #define GPS_DEFAULT_BAUDRATE 9600
 #endif
 
 GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
@@ -53,14 +53,16 @@ GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
 void GPS::begin()
 {
     Serial.println("[GPS] 开始初始化 txPin:" + String(_txPin) + " rxPin:" + String(_rxPin));
-    gpsSerial.begin(9600);
     // delay(1000);设置串口波特率
-
+    gpsSerial.begin(GPS_DEFAULT_BAUDRATE);
+    _currentBaudRate = GPS_DEFAULT_BAUDRATE;
+#ifdef GPS_BAUDRATE
     if (!setBaudRate(GPS_BAUDRATE)) {
         Serial.println("[GPS] 设置波特率失败");
     }else {
         Serial.println("[GPS] 设置波特率成功,波特率:" + String(GPS_BAUDRATE));
     }
+#endif
 
     // 设置频率
     if (!setHz(device.get_device_state()->gpsHz)) {
@@ -176,13 +178,17 @@ int GPS::changeHz()
 
 /**
  * NMEA 语法设置波特率
- * @param baudRate 目标波特率 (支持 9600, 19200, 38400, 57600, 115200)
+ * @param baudRate 目标波特率 (支持 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600)
  * @return bool 设置是否成功
  */
 bool GPS::setBaudRate(int baudRate)
 {
     String cmd = buildBaudrateCmd(baudRate);
-    return sendGpsCommand(cmd, 3, 100);
+    if (sendGpsCommand(cmd, 3, 100)) {
+        _currentBaudRate = baudRate;
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -227,6 +233,9 @@ String GPS::buildBaudrateCmd(int baudRate) {
         case 38400:  cmd = "$PCAS01,3"; break;
         case 57600:  cmd = "$PCAS01,4"; break;
         case 115200: cmd = "$PCAS01,5"; break;
+        case 230400: cmd = "$PCAS01,6"; break;
+        case 460800: cmd = "$PCAS01,7"; break;
+        case 921600: cmd = "$PCAS01,8"; break;
         default:     return ""; // 不支持的波特率返回空字符串
     }
     
@@ -311,7 +320,6 @@ bool GPS::sendGpsCommand(const String& cmd, int retries, int retryDelay) {
     } else {
         Serial.println("[GPS] 命令发送失败");
     }
-    
     return success;
 }
 
@@ -336,4 +344,18 @@ int GPS::autoAdjustHz(uint8_t satellites) {
         Serial.println("[GPS] 自动调节频率失败，保持当前频率: " + String(device.get_device_state()->gpsHz) + "Hz");
         return device.get_device_state()->gpsHz;
     }
+}
+
+/*
+外部按键切换波特率
+*/
+int GPS::changeBaudRate() {
+    // 获取当前波特率，并切换到下一个波特率
+    int currentBaudRate = _currentBaudRate;
+    int nextBaudRate = currentBaudRate == 9600 ? 19200 : currentBaudRate == 19200 ? 38400 : currentBaudRate == 38400 ? 57600 : currentBaudRate == 57600 ? 115200 : currentBaudRate == 115200 ? 230400 : currentBaudRate == 230400 ? 460800 : currentBaudRate == 460800 ? 921600 : 9600;
+    if (setBaudRate(nextBaudRate)) {
+        _currentBaudRate = nextBaudRate;
+        return nextBaudRate;
+    }
+    return currentBaudRate;
 }

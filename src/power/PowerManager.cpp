@@ -219,6 +219,7 @@ void PowerManager::configureWakeupSources() {
     
     #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     // 优先使用按钮作为唤醒源
+#ifdef BTN_PIN
     if (BTN_PIN >= 0 && BTN_PIN <= 21) {
         Serial.printf("[电源管理] 尝试配置按钮唤醒 (GPIO%d)\n", BTN_PIN);
         
@@ -250,6 +251,7 @@ void PowerManager::configureWakeupSources() {
         Serial.printf("[电源管理] 警告：BTN_PIN (GPIO%d) 不是有效的RTC GPIO，无法用作唤醒源\n", BTN_PIN);
         Serial.println("[电源管理] ESP32-S3只有GPIO0-GPIO21能用作RTC GPIO");
     }
+    #endif
     
     // 如果按钮唤醒配置失败，尝试使用IMU运动检测
     if (!wakeupSourceConfigured && IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21) {
