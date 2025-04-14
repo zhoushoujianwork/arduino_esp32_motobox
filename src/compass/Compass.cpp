@@ -8,6 +8,7 @@ Compass::Compass(int sda, int scl)  {
     Serial.printf("[罗盘] 磁偏角: %.2f度\n", _declination);
 }
 
+// 库使用的Wire 这里必须用这个
 void Compass::begin() {
     Wire.begin(_sda, _scl);
     qmc.init();

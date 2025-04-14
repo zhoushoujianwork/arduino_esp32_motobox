@@ -254,28 +254,28 @@ void PowerManager::configureWakeupSources() {
     #endif
     
     // 如果按钮唤醒配置失败，尝试使用IMU运动检测
-    if (!wakeupSourceConfigured && IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21) {
-        Serial.printf("[电源管理] 尝试配置IMU运动唤醒 (GPIO%d)\n", IMU_INT1_PIN);
+    if (!wakeupSourceConfigured && IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
+        Serial.printf("[电源管理] 尝试配置IMU运动唤醒 (GPIO%d)\n", IMU_INT_PIN);
         
         // 配置IMU中断
         extern IMU imu;
-        bool result = imu.enableMotionDetection(IMU_INT1_PIN, 0.05); // 设置较低的阈值提高灵敏度
+        bool result = imu.enableMotionDetection(IMU_INT_PIN, 0.05); // 设置较低的阈值提高灵敏度
         
         if (result) {
             Serial.println("[电源管理] IMU运动检测已配置成功");
             
             // 初始化RTC GPIO
-            rtc_gpio_init((gpio_num_t)IMU_INT1_PIN);
+            rtc_gpio_init((gpio_num_t)IMU_INT_PIN);
             // 设置GPIO模式为输入
-            rtc_gpio_set_direction((gpio_num_t)IMU_INT1_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+            rtc_gpio_set_direction((gpio_num_t)IMU_INT_PIN, RTC_GPIO_MODE_INPUT_ONLY);
             // 启用内部上拉电阻，避免悬空状态
-            rtc_gpio_pullup_en((gpio_num_t)IMU_INT1_PIN);
-            rtc_gpio_pulldown_dis((gpio_num_t)IMU_INT1_PIN);
+            rtc_gpio_pullup_en((gpio_num_t)IMU_INT_PIN);
+            rtc_gpio_pulldown_dis((gpio_num_t)IMU_INT_PIN);
             // 配置为低电平触发唤醒
-            esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT1_PIN, 0); 
+            esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT_PIN, 0); 
             
             // 检查当前中断状态，确保不会立即唤醒
-            if (digitalRead(IMU_INT1_PIN) == LOW) {
+            if (digitalRead(IMU_INT_PIN) == LOW) {
                 Serial.println("[电源管理] 警告：IMU中断引脚当前为低电平，不使用IMU唤醒源");
                 esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_EXT0);
             } else {

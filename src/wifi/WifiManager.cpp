@@ -37,16 +37,12 @@ void WiFiConfigManager::loop()
     {
         if (WiFi.status() != WL_CONNECTED)
         {
+            device.set_wifi_connected(false);
             // 尝试连接
             if (tryConnectWithSavedCredentials())
             {
                 Serial.println("\nWiFi连接成功!");
                 device.set_wifi_connected(true);
-            }
-            else
-            {
-                Serial.println("\nWiFi连接失败,稍后重试");
-                device.set_wifi_connected(false);
             }
         }
     }

@@ -47,12 +47,14 @@ unsigned long lastBlePublishTime = 0;
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
 GPS gps(GPS_RX_PIN, GPS_TX_PIN);
-IMU imu(IMU_SDA_PIN, IMU_SCL_PIN);
-#ifdef BTN_PIN
-BTN button(BTN_PIN);
-#endif
+IMU imu(IMU_SDA_PIN, IMU_SCL_PIN, IMU_INT_PIN);
+
 MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
 BLES bs;
+#endif
+
+#ifdef BTN_PIN
+BTN button(BTN_PIN);
 #endif
 
 #ifdef MODE_CLIENT
@@ -157,7 +159,6 @@ void taskSystem(void *parameter)
     bat.loop();
 #endif
 
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     // LED状态设置 - 连接状态指示
     bool isConnected = device.get_device_state()->mqttConnected &&
                        device.get_device_state()->wifiConnected;
@@ -172,7 +173,6 @@ void taskSystem(void *parameter)
     button.loop();
     // 按钮处理逻辑
     handleButtonEvents();
-#endif
 #endif
 
     // 电源管理 - 始终保持处理
@@ -309,10 +309,10 @@ void printWakeupReason()
   {
     // 检查唤醒源是按钮还是IMU
     int wakeup_pin = -1;
-    if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21 && digitalRead(IMU_INT1_PIN) == LOW)
+    if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21 && digitalRead(IMU_INT_PIN) == LOW)
     {
-      wakeup_pin = IMU_INT1_PIN;
-      Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT1_PIN);
+      wakeup_pin = IMU_INT_PIN;
+      Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT_PIN);
     }
     else
     {

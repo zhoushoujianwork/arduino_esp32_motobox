@@ -13,7 +13,7 @@
 class IMU
 {
 public:
-    IMU(int sda, int scl); // 默认I2C引脚
+    IMU(int sda, int scl, int motionIntPin); // 默认I2C引脚
     void begin();
     void loop();
     

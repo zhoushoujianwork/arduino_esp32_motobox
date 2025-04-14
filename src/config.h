@@ -43,7 +43,9 @@
 
 /* IMU Configuration */
 #define IMU_MAX_D          68     /* Marquis GP retention */
-#define IMU_INT1_PIN       1      /* GPIO1 used for IMU interrupt */
+#ifndef IMU_INT_PIN
+#define IMU_INT_PIN       -1      /* GPIO1 used for IMU interrupt */
+#endif
 
 /* MQTT Configuration */
 #define MQTT_SERVER        "mq-hub.daboluo.cc"

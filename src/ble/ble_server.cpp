@@ -101,6 +101,9 @@ void BLES::setup()
     // 等待广播稳定
     delay(500);
 
+    // debug 先关掉Scan
+    return;
+
     // 服务器完全初始化后再启动扫描
     startScan();
 

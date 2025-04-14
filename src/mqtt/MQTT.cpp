@@ -22,6 +22,12 @@ MQTT::MQTT(const char *server, int port, const char *user, const char *password)
 
 bool MQTT::reconnect()
 {
+    if (!device.get_device_state()->wifiConnected)
+    {
+        Serial.println("WiFi未连接，MQTT连接失败");
+        return false;
+    }
+
     Serial.println("正在连接MQTT服务器...");
     Serial.print("尝试SSL连接到服务器: ");
     Serial.print(mqtt_server);

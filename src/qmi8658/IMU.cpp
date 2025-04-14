@@ -2,11 +2,11 @@
 
 #define USE_WIRE
 
-IMU::IMU(int sda, int scl)
+IMU::IMU(int sda, int scl, int motionIntPin = -1)
 {
     this->sda = sda;
     this->scl = scl;
-    this->motionIntPin = -1; // 默认不使用中断引脚
+    this->motionIntPin = motionIntPin;
 }
 
 void IMU::begin()
@@ -20,8 +20,6 @@ void IMU::begin()
         while (1)
         {
             delay(5000);
-            Serial.println("IMU init failed, restart");
-            esp_restart();
         }
     }
 #else
