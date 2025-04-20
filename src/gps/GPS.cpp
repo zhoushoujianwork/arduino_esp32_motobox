@@ -47,7 +47,7 @@ GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
 {
     _rxPin = rxPin;
     _txPin = txPin;
-    device.get_device_state()->gpsHz = 2;
+    device.get_gps_data()->gpsHz = 2;
 }
 
 void GPS::begin()
@@ -65,10 +65,10 @@ void GPS::begin()
 #endif
 
     // 设置频率
-    if (!setHz(device.get_device_state()->gpsHz)) {
+    if (!setHz(device.get_gps_data()->gpsHz)) {
         Serial.println("[GPS] 设置频率失败");
     }else {
-        Serial.println("[GPS] 设置频率成功,频率:" + String(device.get_device_state()->gpsHz));
+        Serial.println("[GPS] 设置频率成功,频率:" + String(device.get_gps_data()->gpsHz));
     }
 
     // 设置双模 ，1北斗，2GPS，3双模
@@ -163,17 +163,17 @@ void GPS::printRawData()
 int GPS::changeHz()
 {
     // 计算下一个目标频率
-    int nextHz = device.get_device_state()->gpsHz == 1 ? 2 : device.get_device_state()->gpsHz == 2 ? 5 : device.get_device_state()->gpsHz == 5 ? 10 : 1;
+    int nextHz = device.get_gps_data()->gpsHz == 1 ? 2 : device.get_gps_data()->gpsHz == 2 ? 5 : device.get_gps_data()->gpsHz == 5 ? 10 : 1;
     
     // 尝试设置新频率
     if (setHz(nextHz)) {
         Serial.println("[GPS] 频率切换成功: " + String(nextHz) + "Hz");
-        device.get_device_state()->gpsHz = nextHz;  // 只有在设置成功时才更新频率值
+        device.get_gps_data()->gpsHz = nextHz;  // 只有在设置成功时才更新频率值
     } else {
-        Serial.println("[GPS] 频率切换失败，保持当前频率: " + String(device.get_device_state()->gpsHz) + "Hz");
+        Serial.println("[GPS] 频率切换失败，保持当前频率: " + String(device.get_gps_data()->gpsHz) + "Hz");
     }
     
-    return device.get_device_state()->gpsHz;  // 返回实际的频率值
+    return device.get_gps_data()->gpsHz;  // 返回实际的频率值
 }
 
 /**
@@ -329,20 +329,25 @@ bool GPS::sendGpsCommand(const String& cmd, int retries, int retryDelay) {
 * @return 调节后的频率
 */
 int GPS::autoAdjustHz(uint8_t satellites) {
+    // 波特率在 9600 的时候不启用
+    if (_currentBaudRate == 9600) {
+        return device.get_gps_data()->gpsHz;
+    }
+
     const int hz = satellites > 20 ? 10 : satellites > 10 ? 5 : 2;
 
-    if (hz == device.get_device_state()->gpsHz) {
+    if (hz == device.get_gps_data()->gpsHz) {
         // 符合预期直接返回
         return hz;
     }
 
     if (setHz(hz)) {
         Serial.println("[GPS] 自动调节频率成功: " + String(hz) + "Hz");
-        device.get_device_state()->gpsHz = hz;
+        device.get_gps_data()->gpsHz = hz;
         return hz;
     } else {
-        Serial.println("[GPS] 自动调节频率失败，保持当前频率: " + String(device.get_device_state()->gpsHz) + "Hz");
-        return device.get_device_state()->gpsHz;
+        Serial.println("[GPS] 自动调节频率失败，保持当前频率: " + String(device.get_gps_data()->gpsHz) + "Hz");
+        return device.get_gps_data()->gpsHz;
     }
 }
 

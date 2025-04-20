@@ -5,6 +5,7 @@
 #include "esp_system.h"
 #include <ArduinoJson.h>
 #include "compass/Compass.h"
+#include "config.h"
 
 typedef struct
 {
@@ -32,6 +33,8 @@ typedef struct
     double speed;       // 速度，单位：千米/小时
     double heading;     // 航向角，单位：度 (0°~360°)
     uint8_t satellites; // 可见卫星数量
+    
+    uint8_t gpsHz;      // GPS更新频率
 } gps_data_t;
 
 typedef struct
@@ -64,18 +67,16 @@ typedef struct
 
 typedef struct
 {
+    // version
+    String version;
     int battery_voltage;
     int battery_percentage;
-    bool mqttConnected;
     bool wifiConnected;
     bool bleConnected;
     bool gpsReady;
-    int gpsHz; // 0-10HZ
     bool imuReady;
+
     bool compassReady;  // 添加罗盘状态
-    gps_data_t gpsData;
-    imu_data_t imuData;
-    compass_data_t compassData;  // 添加罗盘数据
 } device_state_t;
 
 
@@ -84,7 +85,6 @@ class Device
 public:
     Device();
     void init();
-    void set_mqtt_connected(bool connected);
     void set_wifi_connected(bool connected);
     void set_ble_connected(bool connected);
     void set_gps_ready(bool ready);

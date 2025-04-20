@@ -172,14 +172,7 @@ void PowerManager::disablePeripherals() {
         WiFi.disconnect(true);
         WiFi.mode(WIFI_OFF);
         device.set_wifi_connected(false);
-        
-        // 断开MQTT连接
-        if (device.get_device_state()->mqttConnected) {
-            Serial.println("[电源管理] 断开MQTT连接...");
-            device.set_mqtt_connected(false);
-        }
-        
-        Serial.println("[电源管理] WiFi和MQTT已断开");
+        Serial.println("[电源管理] WiFi已断开");
     }
 #endif
     

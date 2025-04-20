@@ -27,6 +27,7 @@
 #include "power/PowerManager.h"
 #include "compass/Compass.h"
 #include "esp_wifi.h"
+#include "version.h"
 //============================= 全局变量 =============================
 
 // 设备管理实例
@@ -42,7 +43,7 @@ TaskHandle_t gpsTaskHandle = NULL;
 unsigned long lastGpsPublishTime = 0;
 unsigned long lastImuPublishTime = 0;
 unsigned long lastBlePublishTime = 0;
-
+unsigned long lastDeviceInfoPublishTime = 0;
 //============================= 设备实例 =============================
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
@@ -160,8 +161,8 @@ void taskSystem(void *parameter)
 #endif
 
     // LED状态设置 - 连接状态指示
-    bool isConnected = device.get_device_state()->mqttConnected &&
-                       device.get_device_state()->wifiConnected;
+    bool isConnected = device.get_device_state()->wifiConnected &&
+                       device.get_device_state()->bleConnected;
 #ifdef PWM_LED_PIN
     pwmLed.setMode(isConnected ? PWMLED::RAINBOW : PWMLED::OFF);
 #else
@@ -197,6 +198,13 @@ void taskDataProcessing(void *parameter)
     // MQTT数据发布
     mqtt.loop();
 
+    // deviceinfo 数据发布 2000ms
+    if (millis() - lastDeviceInfoPublishTime >= 2000)
+    {
+      mqtt.publishDeviceInfo(*device.get_device_state());
+      lastDeviceInfoPublishTime = millis();
+    }
+
     // GPS数据发布 (1Hz)
     if (millis() - lastGpsPublishTime >= 1000)
     {
@@ -212,9 +220,6 @@ void taskDataProcessing(void *parameter)
       {
         device.set_gps_ready(false);
       }
-
-      // 自动调整 gps 频率
-      gps.autoAdjustHz(device.get_gps_data()->satellites);
     }
 
     // IMU数据发布 (2Hz)
@@ -363,7 +368,7 @@ void initializeHardware()
   }
   else
   {
-    Serial.printf("[系统] 系统正常启动，版本: %s\n", VERSION);
+    Serial.printf("[系统] 系统正常启动，版本: %s\n", getVersionInfo().version);
   }
 
   // LED初始化

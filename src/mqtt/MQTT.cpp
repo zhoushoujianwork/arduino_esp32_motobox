@@ -64,7 +64,6 @@ void MQTT::loop()
     if (!device.get_device_state()->wifiConnected)
     {
         // Serial.println("WiFi未连接，MQTT连接失败");
-        device.set_mqtt_connected(false);
         return;
     }
 
@@ -74,20 +73,17 @@ void MQTT::loop()
         if (!reconnect())
         {
             Serial.println("MQTT连接失败");
-            device.set_mqtt_connected(false);
             return;
         }
         else
         {
             Serial.println("MQTT连接成功");
-            device.set_mqtt_connected(true);
         }
     }
 
     if (!mqttClient.loop())
     {
         Serial.println("MQTT循环失败");
-        device.set_mqtt_connected(false);
     }
 }
 
@@ -128,6 +124,10 @@ void MQTT::publishDeviceInfo(device_state_t device_state)
         if (!mqttClient.publish(mqtt_topic_device_info.c_str(), device.device_state_to_json().c_str()))
         {
             Serial.println("设备信息发布失败");
+        }
+        else
+        {
+            Serial.println("设备信息发布成功");
         }
     }
     else

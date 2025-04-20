@@ -6,30 +6,27 @@ Device::Device()
 
 void Device::init()
 {
+    device_state.version = VERSION;
     device_state.wifiConnected = false;
 #ifdef MODE_CLIENT
     device_state.bleConnected = false;
 #else
     device_state.bleConnected = true; // 如果定义了MODE_CLIENT，则默认蓝牙连接 因为这个开关控制 TFT 的显示
 #endif
-    device_state.mqttConnected = false;
     device_state.battery_voltage = 0;
     device_state.battery_percentage = 0;
     device_state.gpsReady = false;
     device_state.imuReady = false;
-    device_state.gpsHz = 1;
 }
 
 void Device::print_device_info()
 {
     Serial.print("Device Info:");
-    Serial.printf("MQTT Connected: %d\t", device_state.mqttConnected);
     Serial.printf("WiFi Connected: %d\t", device_state.wifiConnected);
     Serial.printf("BLE Connected: %d\t", device_state.bleConnected);
     Serial.printf("Battery Voltage: %d\t", device_state.battery_voltage);
     Serial.printf("Battery Percentage: %d\t", device_state.battery_percentage);
     Serial.printf("GPS Ready: %d\t", device_state.gpsReady);
-    Serial.printf("GPS Hz: %d\t", device_state.gpsHz);
     Serial.printf("IMU Ready: %d\n", device_state.imuReady);
 }
 
@@ -43,13 +40,6 @@ String Device::get_device_id()
     return String(device_id);
 }
 
-void Device::set_mqtt_connected(bool connected)
-{
-    if (device_state.mqttConnected != connected) {
-        Serial.printf("MQTT状态变更: %d -> %d\n", device_state.mqttConnected, connected);
-        device_state.mqttConnected = connected;
-    }
-}
 
 void Device::set_wifi_connected(bool connected)
 {
@@ -96,14 +86,14 @@ void Device::set_device_state(device_state_t *state)
 String Device::device_state_to_json()
 {
     StaticJsonDocument<200> doc;
-    doc["mqttConnected"] = device_state.mqttConnected;
-    doc["wifiConnected"] = device_state.wifiConnected;
-    doc["bleConnected"] = device_state.bleConnected;
-    doc["gpsReady"] = device_state.gpsReady;
-    doc["gpsHz"] = device_state.gpsHz;
-    doc["imuReady"] = device_state.imuReady;
-    doc["batteryVoltage"] = device_state.battery_voltage;
-    doc["batteryPercentage"] = device_state.battery_percentage;
+    doc["version"] = device_state.version;
+    doc["wifi_connected"] = device_state.wifiConnected;
+    doc["ble_connected"] = device_state.bleConnected;
+    doc["gps_ready"] = device_state.gpsReady;
+    doc["imu_ready"] = device_state.imuReady;
+    doc["compass_ready"] = device_state.compassReady;
+    doc["battery_voltage"] = device_state.battery_voltage;
+    doc["battery_percentage"] = device_state.battery_percentage;
     return doc.as<String>();
 }
 

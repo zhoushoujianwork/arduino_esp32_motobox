@@ -245,7 +245,7 @@ void tft_loop()
         lv_label_set_text(ui_textGpsNu, gpsTextnu);
 
         char gpsTextHz[4]; // 增加缓冲区大小以容纳两位数字和结束符
-        snprintf(gpsTextHz, sizeof(gpsTextHz), "%d", device.get_device_state()->gpsHz);
+        snprintf(gpsTextHz, sizeof(gpsTextHz), "%d", device.get_gps_data()->gpsHz);
         lv_label_set_text(ui_textGpsHz, gpsTextHz);
 
         char gpsTextTime[20]; // 2024-09-05 10:00:00

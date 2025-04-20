@@ -1,9 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-/* Version Information */
-#define VERSION "2.0.0"
-
 /*
  * Device Operation Mode Configuration
  * Modes are now defined in platformio.ini build_flags:
@@ -19,6 +16,14 @@
  */
 #ifndef ENABLE_SLEEP
 #define ENABLE_SLEEP 0 
+#endif
+
+#ifndef VERSION
+#define VERSION "unset"
+#endif
+
+#ifndef PIOENV
+#define PIOENV "unset"
 #endif
 
 /*
