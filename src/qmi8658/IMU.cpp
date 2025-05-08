@@ -13,6 +13,7 @@ void IMU::begin()
 {
     Serial.println("IMU init start");
 #ifdef USE_WIRE
+    Serial.printf("IMU SDA: %d, SCL: %d\n", sda, scl);
     // Using WIRE !!
     if (!qmi.begin(Wire1, QMI8658_L_SLAVE_ADDRESS, sda, scl))
     {

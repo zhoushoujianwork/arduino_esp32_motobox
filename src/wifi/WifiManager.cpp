@@ -1,11 +1,45 @@
 #include "WifiManager.h"
 
+// WiFi事件回调函数
+unsigned long wifiConnectedTime = 0;
+bool needCheckInternet = false;
+
+void WiFiEvent(WiFiEvent_t event) {
+    switch(event) {
+        case SYSTEM_EVENT_STA_CONNECTED:
+            Serial.println("WiFi已连接");
+            device.set_wifi_connected(true);
+            wifiConnectedTime = millis();
+            needCheckInternet = true;
+            break;
+        case SYSTEM_EVENT_STA_DISCONNECTED:
+            Serial.println("WiFi已断开");
+            device.set_wifi_connected(false);
+            break;
+        case SYSTEM_EVENT_STA_GOT_IP:
+            Serial.printf("获取到IP地址: %s\n", WiFi.localIP().toString().c_str());
+            break;
+        case SYSTEM_EVENT_AP_START:
+            Serial.println("AP模式已启动");
+            device.set_wifi_connected(false);
+            break;
+        case SYSTEM_EVENT_AP_STOP:
+            Serial.println("AP模式已停止");
+            break;
+        default:
+            break;
+    }
+}
+
 WiFiConfigManager wifiManager;
 
 void WiFiConfigManager::begin()
 {
     Serial.println("WiFiConfigManager::begin");
     delay(1000); // 添加启动延迟
+
+    // 注册WiFi事件回调
+    WiFi.onEvent(WiFiEvent);
 
     // 配置WiFi modem sleep模式
     esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
@@ -45,6 +79,18 @@ void WiFiConfigManager::loop()
                 device.set_wifi_connected(true);
             }
         }
+        else
+        {
+            // WiFi已连接，延迟检测互联网和MQTT
+            if (needCheckInternet && millis() - wifiConnectedTime > 2000) {
+                needCheckInternet = false;
+                if (!checkInternetConnection()) {
+                    Serial.println("互联网连接验证失败");
+                } else {
+                    Serial.println("互联网连接正常");
+                }
+            }
+        }
     }
 }
 bool WiFiConfigManager::tryConnectWithSavedCredentials()
@@ -55,6 +101,7 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
     if (ssid.isEmpty())
     {
         Serial.println("未找到已保存的WiFi配置");
+        device.set_wifi_connected(false);  // 确保状态更新
         enterConfigMode();
         return false;
     }
@@ -86,6 +133,7 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
     
     if (!ssid_ptr || !password_ptr) {
         Serial.println("WiFi凭据无效");
+        device.set_wifi_connected(false);  // 确保状态更新
         return false;
     }
 
@@ -101,6 +149,7 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
         if (millis() - startAttemptTime > CONNECT_TIMEOUT) {
             Serial.println("WiFi连接超时");
             WiFi.disconnect(true);
+            device.set_wifi_connected(false);  // 确保状态更新
             return false;
         }
 
@@ -112,9 +161,11 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
             case WL_CONNECT_FAILED:
                 Serial.println("\n连接失败，可能是密码错误");
                 WiFi.disconnect(true);
+                device.set_wifi_connected(false);  // 确保状态更新
                 return false;
             case WL_NO_SSID_AVAIL:
                 Serial.println("\n未找到指定的WiFi网络");
+                device.set_wifi_connected(false);  // 确保状态更新
                 return false;
             case WL_IDLE_STATUS:
                 Serial.print("i");
@@ -135,13 +186,16 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
         if (!checkInternetConnection()) {
             Serial.println("互联网连接验证失败");
             WiFi.disconnect(true);
+            device.set_wifi_connected(false);  // 确保状态更新
             return false;
         }
 
-        device.set_wifi_connected(true);
+        // 注意：这里不需要设置 device.set_wifi_connected(true)
+        // 因为 WiFiEvent 回调函数会在连接成功时自动设置
         return true;
     }
 
+    device.set_wifi_connected(false);  // 确保状态更新
     return false;
 }
 
@@ -151,6 +205,8 @@ void WiFiConfigManager::enterConfigMode()
     delay(100);
 
     isConfigMode = true;
+    device.set_wifi_connected(false);  // 确保在进入配置模式时设置为未连接状态
+    
     setupAP();
     setupDNS();
     setupWebServer();
@@ -371,62 +427,24 @@ void WiFiConfigManager::saveWiFiCredentials(const String &ssid, const String &pa
     }
 }
 
+// 检查MQTT服务器连通性（使用config.h配置）
+// 特性：仅检测TCP连接，不做完整MQTT握手，地址端口由config.h宏定义
 bool WiFiConfigManager::checkInternetConnection()
 {
-    // 使用IP地址替代域名来避免DNS解析问题
-    IPAddress serverIP(220, 181, 38, 148); // baidu.com的一个IP地址
-    const uint16_t port = 80;
-
-    Serial.printf("正在验证互联网连接...\n");
-
     WiFiClient client;
-    if (!client.connect(serverIP, port))
-    {
-        Serial.println("互联网连接失败！");
+    Serial.printf("检测MQTT服务器连通性: %s:%d\n", MQTT_SERVER, MQTT_PORT);
+
+    // 尝试连接
+    if (!client.connect(MQTT_SERVER, MQTT_PORT)) {
+        Serial.println("MQTT服务器连接失败！");
         return false;
     }
 
-    // 发送 HTTP 请求
-    client.print("GET / HTTP/1.1\r\n"
-                 "Host: www.baidu.com\r\n"
-                 "Connection: close\r\n\r\n");
-
-    // 等待响应，设置更长的超时时间（10秒）
-    unsigned long timeout = millis();
-    while (client.available() == 0)
-    {
-        if (millis() - timeout > 10000)
-        {
-            Serial.println("请求超时！");
-            client.stop();
-            return false;
-        }
-        delay(100); // 添加短暂延时，减少CPU负载
-    }
-
-    // 如果有响应数据，则说明连接成功
-    if (client.available())
-    {
-        Serial.println("互联网连接成功！");
-        client.stop();
-        return true;
-    }
-
+    Serial.println("MQTT服务器连接成功！");
     client.stop();
-    return false;
+    return true;
 }
 
-// 添加新的辅助方法来检测Captive Portal请求
-bool WiFiConfigManager::captivePortalRequest()
-{
-    String host = server.hostHeader();
-    if (host.length() > 0 && !isIp(host))
-    {
-        Serial.println("Captive Portal 请求: " + host);
-        return true;
-    }
-    return false;
-}
 
 // 添加新的辅助方法来检查是否是IP地址
 bool WiFiConfigManager::isIp(String str)

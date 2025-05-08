@@ -63,7 +63,8 @@ void MQTT::loop()
 {
     if (!device.get_device_state()->wifiConnected)
     {
-        // Serial.println("WiFi未连接，MQTT连接失败");
+        // set mqttClient to disconnected
+        mqttClient.disconnect();
         return;
     }
 
@@ -127,7 +128,7 @@ void MQTT::publishDeviceInfo(device_state_t device_state)
         }
         else
         {
-            Serial.println("设备信息发布成功");
+            // Serial.println("设备信息发布成功");
         }
     }
     else
