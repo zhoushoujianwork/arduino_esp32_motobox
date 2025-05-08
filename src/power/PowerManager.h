@@ -24,6 +24,7 @@ public:
     void loop();
     void enterLowPowerMode();
     void configureWakeupSources();
+    bool setupIMUWakeupSource(int intPin, float threshold = 0.05);
     bool isDeviceIdle();
     
     // 新增：打断低功耗模式进入过程

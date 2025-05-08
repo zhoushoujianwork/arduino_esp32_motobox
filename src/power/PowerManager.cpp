@@ -10,7 +10,7 @@ RTC_DATA_ATTR bool PowerManager::sleepEnabled = false; // 默认禁用休眠功�
 
 PowerManager::PowerManager() {
     // 设置默认值
-    idleThreshold = 60000; // 默认1分钟无活动进入低功耗模式
+    idleThreshold = 10000; // 默认1分钟无活动进入低功耗模式
     motionThreshold = 0.1; // 加速度变化阈值，根据实际调整
     lastMotionTime = 0;
     powerState = POWER_STATE_NORMAL;
@@ -188,9 +188,8 @@ void PowerManager::disablePeripherals() {
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     extern IMU imu;
     Serial.println("[电源管理] 配置IMU为低功耗模式，保持运动检测...");
-    // 对IMU进行特殊配置，禁用陀螺仪，但保持加速度计运动检测
-    // 注意：我们无法直接访问IMU的私有成员，这里假设IMU已经完成配置
-    Serial.println("[电源管理] IMU: 保留加速度计用于运动检测，其他功能进入低功耗");
+    // 配置IMU进入低功耗模式，但保持运动检测功能
+    // imu.configureForDeepSleep();
 #endif
 
     // 关闭TFT显示
@@ -204,98 +203,7 @@ void PowerManager::disablePeripherals() {
 }
 
 void PowerManager::configureWakeupSources() {
-    // 配置唤醒源 - 优先级：按钮 > IMU运动检测 > 定时器
-    // 每次只配置一个唤醒源
-    Serial.println("[电源管理] 配置唤醒源...");
-    
-    bool wakeupSourceConfigured = false;
-    
-    #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    // 优先使用按钮作为唤醒源
-#ifdef BTN_PIN
-    if (BTN_PIN >= 0 && BTN_PIN <= 21) {
-        Serial.printf("[电源管理] 尝试配置按钮唤醒 (GPIO%d)\n", BTN_PIN);
-        
-        // 检查按钮当前状态，避免无限重启
-        extern BTN button;
-        if (!button.isPressed()) {
-            // 初始化RTC GPIO
-            rtc_gpio_init((gpio_num_t)BTN_PIN);
-            // 设置GPIO模式为输入
-            rtc_gpio_set_direction((gpio_num_t)BTN_PIN, RTC_GPIO_MODE_INPUT_ONLY);
-            // 启用内部上拉电阻，确保按钮未按下时为高电平
-            rtc_gpio_pullup_en((gpio_num_t)BTN_PIN);
-            rtc_gpio_pulldown_dis((gpio_num_t)BTN_PIN);
-            // 配置为低电平触发唤醒
-            esp_sleep_enable_ext0_wakeup((gpio_num_t)BTN_PIN, 0); 
-            
-            // 检查GPIO状态，如果已经是低电平，则禁用此唤醒源
-            if (rtc_gpio_get_level((gpio_num_t)BTN_PIN) == 0) {
-                Serial.println("[电源管理] 警告：按钮引脚处于低电平，不使用按钮唤醒源");
-                esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_EXT0);
-            } else {
-                Serial.println("[电源管理] 已配置按钮为唤醒源");
-                wakeupSourceConfigured = true;
-            }
-        } else {
-            Serial.println("[电源管理] 警告：按钮当前处于按下状态，跳过按钮唤醒配置");
-        }
-    } else {
-        Serial.printf("[电源管理] 警告：BTN_PIN (GPIO%d) 不是有效的RTC GPIO，无法用作唤醒源\n", BTN_PIN);
-        Serial.println("[电源管理] ESP32-S3只有GPIO0-GPIO21能用作RTC GPIO");
-    }
-    #endif
-    
-    // 如果按钮唤醒配置失败，尝试使用IMU运动检测
-    if (!wakeupSourceConfigured && IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
-        Serial.printf("[电源管理] 尝试配置IMU运动唤醒 (GPIO%d)\n", IMU_INT_PIN);
-        
-        // 配置IMU中断
-        extern IMU imu;
-        bool result = imu.enableMotionDetection(IMU_INT_PIN, 0.05); // 设置较低的阈值提高灵敏度
-        
-        if (result) {
-            Serial.println("[电源管理] IMU运动检测已配置成功");
-            
-            // 初始化RTC GPIO
-            rtc_gpio_init((gpio_num_t)IMU_INT_PIN);
-            // 设置GPIO模式为输入
-            rtc_gpio_set_direction((gpio_num_t)IMU_INT_PIN, RTC_GPIO_MODE_INPUT_ONLY);
-            // 启用内部上拉电阻，避免悬空状态
-            rtc_gpio_pullup_en((gpio_num_t)IMU_INT_PIN);
-            rtc_gpio_pulldown_dis((gpio_num_t)IMU_INT_PIN);
-            // 配置为低电平触发唤醒
-            esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT_PIN, 0); 
-            
-            // 检查当前中断状态，确保不会立即唤醒
-            if (digitalRead(IMU_INT_PIN) == LOW) {
-                Serial.println("[电源管理] 警告：IMU中断引脚当前为低电平，不使用IMU唤醒源");
-                esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_EXT0);
-            } else {
-                Serial.println("[电源管理] 已配置IMU运动检测为唤醒源");
-                wakeupSourceConfigured = true;
-            }
-        } else {
-            Serial.println("[电源管理] IMU运动检测配置失败");
-        }
-    } else if (!wakeupSourceConfigured) {
-        Serial.println("[电源管理] IMU中断引脚无效或已配置其他唤醒源");
-    }
-    #endif
-    
-    // 如果以上唤醒源都配置失败，则使用定时器作为最后的备选
-    if (!wakeupSourceConfigured) {
-        const uint64_t WAKEUP_INTERVAL_US = 60 * 1000000ULL; // 60秒
-        Serial.printf("[电源管理] 配置定时器唤醒：%llu 微秒后\n", WAKEUP_INTERVAL_US);
-        esp_sleep_enable_timer_wakeup(WAKEUP_INTERVAL_US);
-        Serial.println("[电源管理] 已配置定时器为唤醒源");
-    } else {
-        // 配置一个更长的定时器作为备用唤醒源，防止设备完全无法唤醒
-        const uint64_t BACKUP_INTERVAL_US = 10 * 60 * 1000000ULL; // 10分钟
-        Serial.printf("[电源管理] 配置备用定时器唤醒：%llu 微秒后\n", BACKUP_INTERVAL_US);
-        esp_sleep_enable_timer_wakeup(BACKUP_INTERVAL_US);
-        Serial.println("[电源管理] 已配置备用定时器唤醒源");
-    }
+    // 配置IMU运动唤醒
 }
 
 void PowerManager::enterLowPowerMode() {
@@ -436,3 +344,6 @@ void PowerManager::enterLowPowerMode() {
     // 此后的代码不会被执行，因为设备已进入深度睡眠
 #endif
 } 
+bool PowerManager::setupIMUWakeupSource(int intPin, float threshold) {
+    return false;
+}

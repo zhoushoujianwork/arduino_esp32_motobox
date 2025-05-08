@@ -48,7 +48,7 @@ unsigned long lastDeviceInfoPublishTime = 0;
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
 GPS gps(GPS_RX_PIN, GPS_TX_PIN);
-IMU imu(IMU_SDA_PIN, IMU_SCL_PIN, IMU_INT_PIN);
+IMU imu(IMU_SDA_PIN, IMU_SCL_PIN, IMU_INT1_PIN);
 
 MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
 BLES bs;
@@ -314,10 +314,10 @@ void printWakeupReason()
   {
     // 检查唤醒源是按钮还是IMU
     int wakeup_pin = -1;
-    if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21 && digitalRead(IMU_INT_PIN) == LOW)
+    if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21 && digitalRead(IMU_INT1_PIN) == LOW)
     {
-      wakeup_pin = IMU_INT_PIN;
-      Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT_PIN);
+      wakeup_pin = IMU_INT1_PIN;
+      Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT1_PIN);
     }
     else
     {
@@ -490,3 +490,32 @@ void loop()
   // 主循环留空，所有功能都在RTOS任务中处理
   delay(1000);
 }
+// 检查唤醒原因并处理
+void checkWakeupCause() {
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  
+  switch(wakeup_reason) {
+    case ESP_SLEEP_WAKEUP_EXT0:
+      Serial.println("[系统] 通过外部中断唤醒 (EXT0)");
+      // 检查是否是IMU中断引脚唤醒
+      if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21) {
+        if (digitalRead(IMU_INT1_PIN) == LOW) {
+          Serial.println("[系统] 检测到IMU运动唤醒");
+          // 这里可以添加特定的运动唤醒处理逻辑
+        } else {
+          Serial.println("[系统] 检测到按钮唤醒");
+          // 这里可以添加特定的按钮唤醒处理逻辑
+        }
+      }
+      break;
+    case ESP_SLEEP_WAKEUP_TIMER:
+      Serial.println("[系统] 通过定时器唤醒");
+      break;
+    default:
+      Serial.printf("[系统] 唤醒原因: %d\n", wakeup_reason);
+      break;
+  }
+}
+
+// 在setup函数开始处添加以下代码:
+// checkWakeupCause();
