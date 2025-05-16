@@ -66,8 +66,9 @@ BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE);
 
 #ifdef PWM_LED_PIN
 PWMLED pwmLed(PWM_LED_PIN);
-#else
-LED led(LED_PIN);
+#endif
+#ifdef LED_PIN
+    led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
 #endif
 
 PowerManager powerManager;
@@ -140,14 +141,10 @@ void taskSystem(void *parameter)
   {
 // LED状态更新
 #ifdef PWM_LED_PIN
-    static unsigned long lastLedDebugTime = 0;
-    if (millis() - lastLedDebugTime >= 1000)
-    {
-      lastLedDebugTime = millis();
-    }
     pwmLed.loop();
-#else
-    led.loop();
+#endif
+#ifdef LED_PIN
+    led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
 #endif
 
 // 电池监控
@@ -165,7 +162,9 @@ void taskSystem(void *parameter)
                        device.get_device_state()->bleConnected;
 #ifdef PWM_LED_PIN
     pwmLed.setMode(isConnected ? PWMLED::RAINBOW : PWMLED::OFF);
-#else
+#endif
+
+#ifdef LED_PIN
     led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
 #endif
 
@@ -375,9 +374,9 @@ void initializeHardware()
 #ifdef PWM_LED_PIN
   pwmLed.begin();
   pwmLed.setMode(PWMLED::RAINBOW); // 启动时设置为彩虹模式
-#else
-  led.begin();
-  led.setMode(LED::OFF);
+#endif
+#ifdef LED_PIN
+    led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
 #endif
 
   // 初始化设备
