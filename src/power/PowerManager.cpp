@@ -191,14 +191,6 @@ void PowerManager::disablePeripherals() {
     // 配置IMU进入低功耗模式，但保持运动检测功能
     // imu.configureForDeepSleep();
 #endif
-
-    // 关闭TFT显示
-#ifdef MODE_ALLINONE
-    // 使用新增的TFT睡眠函数
-    Serial.println("[电源管理] 关闭显示屏...");
-    tft_sleep();
-#endif
-
     Serial.println("[电源管理] 所有外设已关闭");
 }
 

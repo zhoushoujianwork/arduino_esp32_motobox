@@ -4,6 +4,9 @@
 #include <Arduino.h>
 #include <FastLED.h>
 
+// 定义一个无效的引脚常量，用于动态设置引脚
+#define PIN_UNDEFINED 255
+
 class PWMLED {
 public:
     enum Mode {

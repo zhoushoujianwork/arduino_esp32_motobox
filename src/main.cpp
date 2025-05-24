@@ -21,13 +21,17 @@
 #include "led/LED.h"
 #include "led/PWMLED.h"
 #include "mqtt/MQTT.h"
-#include "tft/TFT.h"
+#include "power/PowerManager.h"
 #include "qmi8658/IMU.h"
 #include "wifi/WifiManager.h"
-#include "power/PowerManager.h"
 #include "compass/Compass.h"
 #include "esp_wifi.h"
 #include "version.h"
+
+// 仅在未定义DISABLE_TFT时包含TFT相关头文件
+#ifndef DISABLE_TFT
+#include "tft/TFT.h"
+#endif
 //============================= 全局变量 =============================
 
 // 设备管理实例

@@ -12,8 +12,8 @@ PWMLED::PWMLED(uint8_t pin)
 }
 
 void PWMLED::begin() {
-    // 初始化 FastLED
-    FastLED.addLeds<WS2812, 45, GRB>(_leds, NUM_LEDS);
+    // 初始化 FastLED，直接使用传入的引脚
+    FastLED.addLeds<WS2812, PWM_LED_PIN, GRB>(_leds, NUM_LEDS);
     Serial.printf("[PWMLED] FastLED 初始化完成，引脚: %d\n", _pin);
     
     // 测试LED
