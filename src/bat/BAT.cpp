@@ -14,6 +14,8 @@ BAT::BAT(int pin, int min_voltage, int max_voltage)
 {
     // 使用memset初始化缓冲区更高效
     memset(voltage_buffer, 0, sizeof(voltage_buffer));
+    Serial.println("[BAT] 初始化开始");
+    Serial.printf("[BAT] 引脚: %d, 最小电压: %d, 最大电压: %d\n", pin, min_voltage, max_voltage);
 }
 
 void BAT::loop()

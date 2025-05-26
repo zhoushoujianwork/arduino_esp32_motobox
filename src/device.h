@@ -129,6 +129,6 @@ extern Device device;
 #endif
 
 // 添加IMU中断引脚定义
-#ifndef IMU_INT1_PIN
-#define IMU_INT1_PIN 4  // 默认使用GPIO4作为IMU中断引脚，请根据实际硬件修改
+#ifndef IMU_INT_PIN
+#define IMU_INT_PIN 4  // 默认使用GPIO4作为IMU中断引脚，请根据实际硬件修改
 #endif

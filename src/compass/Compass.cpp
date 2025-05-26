@@ -5,6 +5,7 @@ Compass::Compass(int sda, int scl)  {
     _sda = sda;
     _scl = scl;
     _declination = -6.5f; // 江苏磁偏角
+    Serial.println("[罗盘] sda: " + String(_sda) + " scl: " + String(_scl));
     Serial.printf("[罗盘] 磁偏角: %.2f度\n", _declination);
 }
 

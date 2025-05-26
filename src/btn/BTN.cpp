@@ -6,6 +6,8 @@ BTN::BTN(int pin)
     this->pin = pin;
     pinMode(pin, INPUT_PULLUP); // 设置为上拉输入模式
     currentState = digitalRead(pin); // 初始化 currentState
+    Serial.println("[BTN] 初始化开始");
+    Serial.printf("[BTN] 引脚: %d\n", pin);
 }
 
 bool BTN::isPressed()

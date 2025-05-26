@@ -58,8 +58,8 @@ void configureWakeupSources();
 
 ```cpp
 // 在device.h中定义
-#ifndef IMU_INT1_PIN
-#define IMU_INT1_PIN 4  // 默认使用GPIO4作为IMU中断引脚，请根据实际硬件修改
+#ifndef IMU_INT_PIN
+#define IMU_INT_PIN 4  // 默认使用GPIO4作为IMU中断引脚，请根据实际硬件修改
 #endif
 ```
 
@@ -80,8 +80,8 @@ void checkWakeupCause() {
     case ESP_SLEEP_WAKEUP_EXT0:
       Serial.println("[系统] 通过外部中断唤醒 (EXT0)");
       // 检查是否是IMU中断引脚唤醒
-      if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21) {
-        if (digitalRead(IMU_INT1_PIN) == LOW) {
+      if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
+        if (digitalRead(IMU_INT_PIN) == LOW) {
           Serial.println("[系统] 检测到IMU运动唤醒");
           // 这里可以添加特定的运动唤醒处理逻辑
         } else {
@@ -115,7 +115,7 @@ void checkWakeupCause() {
 
 ## 硬件连接
 
-确保IMU中断引脚正确连接到ESP32-S3的RTC GPIO引脚，并根据实际硬件修改`IMU_INT1_PIN`定义。
+确保IMU中断引脚正确连接到ESP32-S3的RTC GPIO引脚，并根据实际硬件修改`IMU_INT_PIN`定义。
 
 ## 功能测试
 

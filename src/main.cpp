@@ -52,7 +52,7 @@ unsigned long lastDeviceInfoPublishTime = 0;
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
 GPS gps(GPS_RX_PIN, GPS_TX_PIN);
-IMU imu(IMU_SDA_PIN, IMU_SCL_PIN, IMU_INT1_PIN);
+IMU imu(IMU_SDA_PIN, IMU_SCL_PIN, IMU_INT_PIN);
 
 MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
 BLES bs;
@@ -161,11 +161,18 @@ void taskSystem(void *parameter)
     bat.loop();
 #endif
 
-    // LED状态设置 - 连接状态指示
-    bool isConnected = device.get_device_state()->wifiConnected &&
-                       device.get_device_state()->bleConnected;
+// LED状态设置
+// - WiFi连接时显示黄色
+// - MQTT连接时显示蓝色
+// - 无连接时显示红色
 #ifdef PWM_LED_PIN
-    pwmLed.setMode(isConnected ? PWMLED::RAINBOW : PWMLED::OFF);
+    if (device.get_device_state()->wifiConnected) {
+        pwmLed.setMode(PWMLED::GREEN,5);
+    // } else if (device.get_device_state()->bleConnected) {
+    //     pwmLed.setMode(PWMLED::GREEN);
+    } else {
+        pwmLed.setMode(PWMLED::RED,10);
+    }
 #endif
 
 #ifdef LED_PIN
@@ -317,10 +324,10 @@ void printWakeupReason()
   {
     // 检查唤醒源是按钮还是IMU
     int wakeup_pin = -1;
-    if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21 && digitalRead(IMU_INT1_PIN) == LOW)
+    if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21 && digitalRead(IMU_INT_PIN) == LOW)
     {
-      wakeup_pin = IMU_INT1_PIN;
-      Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT1_PIN);
+      wakeup_pin = IMU_INT_PIN;
+      Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT_PIN);
     }
     else
     {
@@ -371,13 +378,13 @@ void initializeHardware()
   }
   else
   {
-    Serial.printf("[系统] 系统正常启动，版本: %s\n", getVersionInfo().version);
+    Serial.printf("[系统] 系统正常启动，版本: %s, 环境: %s\n", getVersionInfo().version, getVersionInfo().buildEnv);
   }
 
   // LED初始化
 #ifdef PWM_LED_PIN
   pwmLed.begin();
-  pwmLed.setMode(PWMLED::RAINBOW); // 启动时设置为彩虹模式
+  pwmLed.setMode(PWMLED::OFF); // 启动时设置为彩虹模式
 #endif
 #ifdef LED_PIN
     led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
@@ -501,8 +508,8 @@ void checkWakeupCause() {
     case ESP_SLEEP_WAKEUP_EXT0:
       Serial.println("[系统] 通过外部中断唤醒 (EXT0)");
       // 检查是否是IMU中断引脚唤醒
-      if (IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21) {
-        if (digitalRead(IMU_INT1_PIN) == LOW) {
+      if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
+        if (digitalRead(IMU_INT_PIN) == LOW) {
           Serial.println("[系统] 检测到IMU运动唤醒");
           // 这里可以添加特定的运动唤醒处理逻辑
         } else {

@@ -31,7 +31,7 @@
 
 ### 睡眠模式唤醒源优先级
 - **按钮唤醒**: 最高优先级，通过BTN_PIN配置
-- **IMU运动检测唤醒**: 次优先级，通过IMU_INT1_PIN配置
+- **IMU运动检测唤醒**: 次优先级，通过IMU_INT_PIN配置
 - **定时器唤醒**: 最低优先级，作为兜底唤醒机制
 
 ### 唤醒处理流程
@@ -48,11 +48,11 @@ void PowerManager::setupWakeupSources() {
   }
   
   // 如果按钮无法配置，检查IMU中断引脚
-  if (!_wakeupSourceConfigured && IMU_INT1_PIN >= 0 && IMU_INT1_PIN <= 21) {
-    rtc_gpio_init((gpio_num_t)IMU_INT1_PIN);
-    rtc_gpio_set_direction((gpio_num_t)IMU_INT1_PIN, RTC_GPIO_MODE_INPUT_ONLY);
-    rtc_gpio_pulldown_en((gpio_num_t)IMU_INT1_PIN);
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT1_PIN, 1);
+  if (!_wakeupSourceConfigured && IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
+    rtc_gpio_init((gpio_num_t)IMU_INT_PIN);
+    rtc_gpio_set_direction((gpio_num_t)IMU_INT_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pulldown_en((gpio_num_t)IMU_INT_PIN);
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT_PIN, 1);
     _wakeupSourceConfigured = true;
   }
   

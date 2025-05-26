@@ -12,6 +12,8 @@ IMU::IMU(int sda, int scl, int motionIntPin)
     this->sda = sda;
     this->scl = scl;
     this->motionIntPin = motionIntPin;
+    Serial.println("[IMU] 初始化开始");
+    Serial.printf("[IMU] SDA: %d, SCL: %d, 中断引脚: %d\n", sda, scl, motionIntPin);
 }
 
 void IMU::begin()

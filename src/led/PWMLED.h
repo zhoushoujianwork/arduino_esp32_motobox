@@ -19,13 +19,15 @@ public:
         RAINBOW        // 彩虹效果
     };
 
-    static const uint8_t MAX_BRIGHTNESS = 128;  // 固定最大亮度为 50%
+    static const uint8_t MAX_BRIGHTNESS = 255;  // 最大亮度值
+    static const uint8_t DEFAULT_BRIGHTNESS = 128;  // 默认亮度为 50%
 
     PWMLED(uint8_t pin);
     void begin();
-    void setMode(Mode mode);
+    void setMode(Mode mode, uint8_t brightness = 0);  // 0表示使用默认亮度
     void loop();
     void changeMode();
+    void setBrightness(uint8_t brightness);  // 单独设置亮度
 
 private:
     uint8_t _pin;

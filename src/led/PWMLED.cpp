@@ -9,6 +9,8 @@ PWMLED::PWMLED(uint8_t pin)
     , _increasing(true)
     , _hue(0)
 {
+    Serial.println("[PWMLED] 初始化开始");
+    Serial.printf("[PWMLED] 引脚: %d\n", _pin);
 }
 
 void PWMLED::begin() {
@@ -26,17 +28,25 @@ void PWMLED::begin() {
     Serial.println("[PWMLED] 初始化测试完成");
 }
 
-void PWMLED::setMode(Mode mode) {
-    if (_mode != mode) {
+void PWMLED::setMode(Mode mode, uint8_t brightness) {
+    if (_mode != mode || brightness > 0) {
         _lastMode = _mode;
         _mode = mode;
-        _brightness = 0;
+        
+        // 设置亮度，如果传入0则使用默认亮度
+        if (brightness > 0) {
+            _brightness = min(brightness, MAX_BRIGHTNESS);
+        } else {
+            _brightness = DEFAULT_BRIGHTNESS;
+        }
+        
         _increasing = true;
         _hue = 0;
         
-        Serial.printf("[PWMLED] 模式切换: %s -> %s\n", 
-                     modeToString(_lastMode), 
-                     modeToString(mode));
+        // Serial.printf("[PWMLED] 模式切换: %s -> %s, 亮度: %d\n", 
+        //              modeToString(_lastMode), 
+        //              modeToString(mode),
+        //              _brightness);
         
         // 根据模式设置初始颜色
         switch (mode) {
@@ -44,18 +54,21 @@ void PWMLED::setMode(Mode mode) {
                 _leds[0] = CRGB::Black;
                 break;
             case RED:
-                _leds[0].setHSV(0, 255, MAX_BRIGHTNESS);
+                _leds[0].setHSV(0, 255, _brightness);
                 break;
             case GREEN:
-                _leds[0].setHSV(96, 255, MAX_BRIGHTNESS);
+                _leds[0].setHSV(96, 255, _brightness);
                 break;
             case BLUE:
-                _leds[0].setHSV(160, 255, MAX_BRIGHTNESS);
+                _leds[0].setHSV(160, 255, _brightness);
                 break;
             case YELLOW:
-                _leds[0].setHSV(64, 255, MAX_BRIGHTNESS);
+                _leds[0].setHSV(64, 255, _brightness);
                 break;
             case BREATH:
+                _brightness = 0;  // 呼吸模式从0开始
+                _leds[0] = CRGB::Black;
+                break;
             case RAINBOW:
                 _leds[0] = CRGB::Black;
                 break;
@@ -119,7 +132,7 @@ void PWMLED::updateBreath() {
 void PWMLED::updateRainbow() {
     // 使用 FastLED 的 HSV 转换
     _hue = (_hue + RAINBOW_STEP) % 256;
-    _leds[0].setHSV(_hue, 255, MAX_BRIGHTNESS);
+    _leds[0].setHSV(_hue, 255, _brightness);  // 使用当前亮度
     FastLED.show();
     
     // 每100次更新打印一次详细信息
@@ -142,7 +155,7 @@ void PWMLED::updateRainbow() {
 */
 void PWMLED::changeMode() {
     _mode = static_cast<Mode>((_mode + 1) % (RAINBOW + 1));
-    setMode(_mode);
+    setMode(_mode, DEFAULT_BRIGHTNESS);  // 使用默认亮度
     Serial.printf("[PWMLED] 模式切换: %s\n", modeToString(_mode));
 }
 
@@ -159,3 +172,34 @@ const char* PWMLED::modeToString(Mode mode) {
     }
 } 
 
+void PWMLED::setBrightness(uint8_t brightness) {
+    if (brightness > 0 && brightness <= MAX_BRIGHTNESS) {
+        _brightness = brightness;
+        
+        // 如果当前模式不是呼吸模式，立即应用新亮度
+        if (_mode != BREATH && _mode != OFF) {
+            switch (_mode) {
+                case RED:
+                    _leds[0].setHSV(0, 255, _brightness);
+                    break;
+                case GREEN:
+                    _leds[0].setHSV(96, 255, _brightness);
+                    break;
+                case BLUE:
+                    _leds[0].setHSV(160, 255, _brightness);
+                    break;
+                case YELLOW:
+                    _leds[0].setHSV(64, 255, _brightness);
+                    break;
+                case RAINBOW:
+                    _leds[0].setHSV(_hue, 255, _brightness);
+                    break;
+                default:
+                    break;
+            }
+            FastLED.show();
+        }
+        
+        Serial.printf("[PWMLED] 亮度设置为: %d\n", _brightness);
+    }
+}
