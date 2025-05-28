@@ -6,7 +6,8 @@ Device::Device()
 
 void Device::init()
 {
-    device_state.version = VERSION;
+    device_state.device_firmware_version = FIRMWARE_VERSION;
+    device_state.device_hardware_version = HARDWARE_VERSION;
     device_state.wifiConnected = false;
 #ifdef MODE_CLIENT
     device_state.bleConnected = false;
@@ -86,7 +87,8 @@ void Device::set_device_state(device_state_t *state)
 String Device::device_state_to_json()
 {
     StaticJsonDocument<200> doc;
-    doc["version"] = device_state.version;
+    doc["device_firmware_version"] = device_state.device_firmware_version;
+    doc["device_hardware_version"] = device_state.device_hardware_version;
     doc["wifi_connected"] = device_state.wifiConnected;
     doc["ble_connected"] = device_state.bleConnected;
     doc["gps_ready"] = device_state.gpsReady;

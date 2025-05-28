@@ -373,7 +373,8 @@ void initializeHardware()
   }
   else
   {
-    Serial.printf("[系统] 系统正常启动，版本: %s, 环境: %s\n", getVersionInfo().version, getVersionInfo().buildEnv);
+    Serial.printf("[系统] 系统正常启动，硬件版本: %s, 固件版本: %s, 编译时间: %s\n", getVersionInfo().hardware_version,
+     getVersionInfo().firmware_version, getVersionInfo().build_time);
   }
 
   // LED初始化

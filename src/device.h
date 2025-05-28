@@ -67,8 +67,9 @@ typedef struct
 
 typedef struct
 {
-    // version
-    String version;
+    String device_id; // 设备ID
+    String device_firmware_version; // 固件版本
+    String device_hardware_version; // 硬件版本
     int battery_voltage;
     int battery_percentage;
     bool wifiConnected;
@@ -126,9 +127,4 @@ private:
 
 extern Device device;
 
-#endif
-
-// 添加IMU中断引脚定义
-#ifndef IMU_INT_PIN
-#define IMU_INT_PIN 4  // 默认使用GPIO4作为IMU中断引脚，请根据实际硬件修改
 #endif

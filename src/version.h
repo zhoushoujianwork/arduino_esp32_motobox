@@ -5,9 +5,9 @@
 
 // 版本信息结构体
 struct VersionInfo {
-    const char* version;      // 版本号
-    const char* buildTime;    // 编译时间
-    const char* buildEnv;     // 编译环境
+    const char* hardware_version;      // 硬件版本
+    const char* firmware_version;    // 固件版本
+    const char* build_time;    // 编译时间
 };
 
 // 获取版本信息

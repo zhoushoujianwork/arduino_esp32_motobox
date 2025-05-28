@@ -18,12 +18,12 @@
 #define ENABLE_SLEEP 0 
 #endif
 
-#ifndef VERSION
-#define VERSION "2.0.0"
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "2.0.0"
 #endif
 
-#ifndef PIOENV
-#define PIOENV "unset"
+#ifndef HARDWARE_VERSION
+#define HARDWARE_VERSION "unknown"
 #endif
 
 /*
