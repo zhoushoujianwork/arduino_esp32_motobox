@@ -159,6 +159,15 @@ void PowerManager::disablePeripherals() {
         device.set_wifi_connected(false);
         Serial.println("[电源管理] WiFi已完全关闭");
     }
+    // 新增：终止WiFi任务
+    #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    extern TaskHandle_t wifiTaskHandle;
+    if (wifiTaskHandle != NULL) {
+        vTaskDelete(wifiTaskHandle);
+        wifiTaskHandle = NULL;
+        Serial.println("[电源管理] WiFi任务已停止");
+    }
+    #endif
     
     // 蓝牙完全关闭
     btStop();

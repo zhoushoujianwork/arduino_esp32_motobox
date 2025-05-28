@@ -42,6 +42,7 @@ RTC_DATA_ATTR int bootCount = 0;
 
 // 任务句柄
 TaskHandle_t gpsTaskHandle = NULL;
+TaskHandle_t wifiTaskHandle = NULL;
 
 // 发布时间记录
 unsigned long lastGpsPublishTime = 0;
@@ -460,7 +461,7 @@ void setup()
 
 // 创建任务
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-  xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 1, NULL);
+  xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 1, &wifiTaskHandle);
   xTaskCreatePinnedToCore(taskGps, "TaskGps", 1024 * 10, NULL, 1, &gpsTaskHandle, 1);
 #endif
 
