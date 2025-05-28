@@ -322,16 +322,11 @@ void printWakeupReason()
   {
   case ESP_SLEEP_WAKEUP_EXT0:
   {
-    // 检查唤醒源是按钮还是IMU
-    int wakeup_pin = -1;
-    if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21 && digitalRead(IMU_INT_PIN) == LOW)
-    {
-      wakeup_pin = IMU_INT_PIN;
+    // 由于我们只配置了一个EXT0唤醒源（IMU_INT_PIN），所以直接识别为IMU唤醒
+    if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
       Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT_PIN);
-    }
-    else
-    {
-      Serial.println("[系统] 从外部RTC_IO唤醒，但无法确定具体引脚");
+    } else {
+      Serial.println("[系统] 从外部RTC_IO唤醒，但IMU引脚配置无效");
     }
     break;
   }
@@ -425,28 +420,6 @@ void initializeHardware()
 
   // 电源管理初始化
   powerManager.begin();
-
-#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
-  // 如果从深度睡眠唤醒，设置标志位跳过动画
-  if (isWakeFromDeepSleep)
-  {
-    tft_is_waking_from_sleep = true;
-    Serial.println("[系统] 设置显示屏唤醒标志");
-  }
-
-  // 显示屏初始化
-  Serial.println("[系统] 初始化显示屏...");
-  tft_begin();
-
-  // 在TFT完全初始化后显示休眠功能状态通知
-  delay(100); // 短暂延迟确保UI已准备好
-// 修改为英文显示
-// #if ENABLE_SLEEP
-//   tft_show_notification("Sleep Enabled", "", 3000);
-// #else
-//   tft_show_notification("Sleep Disabled", "", 3000);
-// #endif
-#endif
 
 #ifdef MODE_CLIENT
   // 蓝牙客户端初始化

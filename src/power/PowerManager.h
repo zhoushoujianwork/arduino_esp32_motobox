@@ -43,8 +43,16 @@ private:
     bool interruptRequested;      // 是否请求打断低功耗模式
     RTC_DATA_ATTR static bool sleepEnabled;  // 是否启用休眠功能（RTC内存，由编译时配置决定）
     
+    // 新增：运动检测相关变量
+    static const int SAMPLE_COUNT = 5;  // 运动检测采样次数
+    float lastAccelMagnitude;    // 上次加速度幅值
+    float accumulatedDelta;      // 累积变化量
+    int sampleIndex;             // 采样索引
+    
     bool detectMotion();          // 检测设备是否在运动
     void disablePeripherals();    // 关闭外设
+    void handleWakeup();          // 处理唤醒事件
+    void configurePowerDomains(); // 配置电源域
 };
 
 extern PowerManager powerManager;
