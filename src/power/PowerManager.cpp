@@ -304,8 +304,6 @@ void PowerManager::disablePeripherals() {
     
     // 关闭不必要的时钟
     periph_module_disable(PERIPH_LEDC_MODULE);
-    periph_module_disable(PERIPH_SPI2_MODULE);
-    periph_module_disable(PERIPH_SPI3_MODULE);
     periph_module_disable(PERIPH_I2S0_MODULE);
     periph_module_disable(PERIPH_I2S1_MODULE);
     periph_module_disable(PERIPH_UART1_MODULE);

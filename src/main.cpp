@@ -213,6 +213,7 @@ void taskDataProcessing(void *parameter)
     if (millis() - lastDeviceInfoPublishTime >= 2000)
     {
       mqtt.publishDeviceInfo(*device.get_device_state());
+      device.printImuData();
       lastDeviceInfoPublishTime = millis();
     }
 
