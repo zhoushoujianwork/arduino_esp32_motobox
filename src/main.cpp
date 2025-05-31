@@ -84,21 +84,6 @@ Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
 
 //============================= 函数声明 =============================
 
-/**
- * 按钮事件处理
- */
-void handleButtonEvents();
-
-/**
- * 打印唤醒原因
- */
-void printWakeupReason();
-
-/**
- * 初始化所有硬件和模块
- */
-void initializeHardware();
-
 //============================= 任务定义 =============================
 
 /**
@@ -183,8 +168,7 @@ void taskSystem(void *parameter)
     // 按钮状态更新
 #ifdef BTN_PIN
     button.loop();
-    // 按钮处理逻辑
-    handleButtonEvents();
+    BTN::handleButtonEvents();
 #endif
 
     // 电源管理 - 始终保持处理
@@ -213,7 +197,7 @@ void taskDataProcessing(void *parameter)
     if (millis() - lastDeviceInfoPublishTime >= 2000)
     {
       mqtt.publishDeviceInfo(*device.get_device_state());
-      device.printImuData();
+      device.print_device_info();
       lastDeviceInfoPublishTime = millis();
     }
 
@@ -221,6 +205,7 @@ void taskDataProcessing(void *parameter)
     if (millis() - lastGpsPublishTime >= 1000)
     {
       mqtt.publishGPS(*device.get_gps_data());
+      // device.printGpsData();
       lastGpsPublishTime = millis();
       // 更新GPS就绪状态
       if (device.get_gps_data()->satellites > 3)
@@ -272,170 +257,6 @@ void taskDataProcessing(void *parameter)
 
 //============================= 辅助函数 =============================
 
-/**
- * 按钮事件处理
- */
-void handleButtonEvents()
-{
-#ifdef BTN_PIN
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-  // 获取按钮状态
-  BTN::ButtonState state = button.getState();
-
-  // 处理按钮事件
-  switch (state)
-  {
-  case BTN::SINGLE_CLICK:
-  {
-    Serial.println("[按钮] 单击");
-    int hz = gps.changeHz();
-    Serial.printf("[GPS] 当前频率: %dHz\n", hz);
-    break;
-  }
-
-  case BTN::DOUBLE_CLICK:
-  {
-    Serial.println("[按钮] 双击");
-    int baudRate = gps.changeBaudRate();
-    Serial.printf("[GPS] 当前波特率: %d\n", baudRate);
-    break;
-  }
-
-  case BTN::LONG_PRESS:
-    Serial.println("[按钮] 长按");
-    wifiManager.reset();
-    break;
-
-  default:
-      break;
-    }
-#endif
-#endif
-}
-
-/**
- * 打印唤醒原因
- */
-void printWakeupReason()
-{
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-
-  switch (wakeup_reason)
-  {
-  case ESP_SLEEP_WAKEUP_EXT0:
-  {
-    // 由于我们只配置了一个EXT0唤醒源（IMU_INT_PIN），所以直接识别为IMU唤醒
-    if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
-      Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT_PIN);
-    } else {
-      Serial.println("[系统] 从外部RTC_IO唤醒，但IMU引脚配置无效");
-    }
-    break;
-  }
-  case ESP_SLEEP_WAKEUP_EXT1:
-    // ESP_SLEEP_WAKEUP_EXT1使用位掩码，但我们的代码没有使用此方式
-    Serial.println("[系统] 从外部RTC_CNTL唤醒");
-    break;
-  case ESP_SLEEP_WAKEUP_TIMER:
-    Serial.println("[系统] 从定时器唤醒");
-    break;
-  case ESP_SLEEP_WAKEUP_TOUCHPAD:
-    Serial.println("[系统] 从触摸唤醒");
-    break;
-  case ESP_SLEEP_WAKEUP_ULP:
-    Serial.println("[系统] 从ULP唤醒");
-    break;
-  default:
-    Serial.printf("[系统] 从非深度睡眠唤醒，原因代码: %d\n", wakeup_reason);
-    break;
-  }
-
-  // 打印系统信息
-  Serial.printf("[系统] ESP32-S3芯片ID: %llX\n", ESP.getEfuseMac());
-  Serial.printf("[系统] 总运行内存: %d KB\n", ESP.getHeapSize() / 1024);
-  Serial.printf("[系统] 可用运行内存: %d KB\n", ESP.getFreeHeap() / 1024);
-  Serial.printf("[系统] CPU频率: %d MHz\n", ESP.getCpuFreqMHz());
-}
-
-/**
- * 初始化所有硬件和模块
- *
- *
- */
-void initializeHardware()
-{
-  // 检查是否从深度睡眠唤醒
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  bool isWakeFromDeepSleep = (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED);
-
-  // 打印启动信息
-  if (isWakeFromDeepSleep)
-  {
-    Serial.println("[系统] 从深度睡眠唤醒，重新初始化系统...");
-  }
-  else
-  {
-    Serial.printf("[系统] 系统正常启动，硬件版本: %s, 固件版本: %s, 编译时间: %s\n", getVersionInfo().hardware_version,
-     getVersionInfo().firmware_version, getVersionInfo().build_time);
-  }
-
-  // LED初始化
-#ifdef PWM_LED_PIN
-  pwmLed.begin();
-  pwmLed.setMode(PWMLED::OFF); // 启动时设置为彩虹模式
-#endif
-#ifdef LED_PIN
-    led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
-#endif
-
-  // 初始化设备
-  device.init();
-
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-  // WiFi初始化
-  Serial.println("[系统] 初始化WiFi连接...");
-  wifiManager.begin();
-
-  // 蓝牙服务器初始化
-  bs.setup();
-
-  // IMU初始化
-  Serial.println("[系统] 初始化IMU...");
-  imu.begin();
-
-  // 如果是从深度睡眠唤醒，检查唤醒原因
-  if (isWakeFromDeepSleep)
-  {
-    switch (wakeup_reason)
-    {
-    case ESP_SLEEP_WAKEUP_EXT0:
-      Serial.println("[系统] IMU运动唤醒检测到，记录运动事件");
-      break;
-    case ESP_SLEEP_WAKEUP_TIMER:
-      Serial.println("[系统] 定时器唤醒，检查系统状态");
-      // 这里可以添加定期状态检查代码
-      break;
-    default:
-      break;
-    }
-  }
-#endif
-
-  // 电源管理初始化
-  powerManager.begin();
-
-#ifdef MODE_CLIENT
-  // 蓝牙客户端初始化
-  bc.setup();
-#endif
-
-  // 罗盘初始化
-#if defined(MODE_ALLINONE)
-  compass.begin();
-  compass.setDeclination(-5.9f); // 根据你的地理位置设置磁偏角
-#endif
-}
-
 //============================= ARDUINO框架函数 =============================
 
 void setup()
@@ -449,10 +270,13 @@ void setup()
   Serial.println("[系统] 启动次数: " + String(bootCount));
 
   // 打印唤醒原因
-  printWakeupReason();
+  powerManager.printWakeupReason();
+
+  // 检查唤醒原因并处理
+  powerManager.checkWakeupCause();
 
   // 初始化硬件
-  initializeHardware();
+  device.initializeHardware();
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   // 显示屏初始化完成后，再初始化 GPS
@@ -476,32 +300,3 @@ void loop()
   // 主循环留空，所有功能都在RTOS任务中处理
   delay(1000);
 }
-// 检查唤醒原因并处理
-void checkWakeupCause() {
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  
-  switch(wakeup_reason) {
-    case ESP_SLEEP_WAKEUP_EXT0:
-      Serial.println("[系统] 通过外部中断唤醒 (EXT0)");
-      // 检查是否是IMU中断引脚唤醒
-      if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
-        if (digitalRead(IMU_INT_PIN) == LOW) {
-          Serial.println("[系统] 检测到IMU运动唤醒");
-          // 这里可以添加特定的运动唤醒处理逻辑
-        } else {
-          Serial.println("[系统] 检测到按钮唤醒");
-          // 这里可以添加特定的按钮唤醒处理逻辑
-        }
-      }
-      break;
-    case ESP_SLEEP_WAKEUP_TIMER:
-      Serial.println("[系统] 通过定时器唤醒");
-      break;
-    default:
-      Serial.printf("[系统] 唤醒原因: %d\n", wakeup_reason);
-      break;
-  }
-}
-
-// 在setup函数开始处添加以下代码:
-// checkWakeupCause();

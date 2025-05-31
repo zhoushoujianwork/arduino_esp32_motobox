@@ -1,4 +1,35 @@
 #include "device.h"
+#include "led/PWMLED.h"
+#include "led/LED.h"
+#include "wifi/WifiManager.h"
+#include "ble/ble_server.h"
+#include "qmi8658/IMU.h"
+#include "power/PowerManager.h"
+#include "ble/ble_client.h"
+#include "compass/Compass.h"
+#include "version.h"
+
+#ifdef PWM_LED_PIN
+extern PWMLED pwmLed;
+#endif
+#ifdef LED_PIN
+extern LED led;
+extern bool isConnected;
+#endif
+#ifdef MODE_ALLINONE
+extern Compass compass;
+#endif
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+extern WiFiConfigManager wifiManager;
+extern BLES bs;
+extern IMU imu;
+#endif
+#ifdef MODE_CLIENT
+extern BLEC bc;
+#endif
+extern PowerManager powerManager;
+
+extern const VersionInfo& getVersionInfo();
 
 Device::Device()
 {
@@ -253,6 +284,79 @@ String Device::compass_data_to_json() {
 void Device::printCompassData() {
     Serial.printf("Compass: X=%.1f, Y=%.1f, Z=%.1f, Heading=%.1f, Direction=%s\n",
                  compass_data.x, compass_data.y, compass_data.z, compass_data.heading, compass.getDirectionChar(compass_data.heading));
+}
+
+void Device::initializeHardware() {
+    // 检查是否从深度睡眠唤醒
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    bool isWakeFromDeepSleep = (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED);
+
+    // 打印启动信息
+    if (isWakeFromDeepSleep)
+    {
+        Serial.println("[系统] 从深度睡眠唤醒，重新初始化系统...");
+    }
+    else
+    {
+        Serial.printf("[系统] 系统正常启动，硬件版本: %s, 固件版本: %s, 编译时间: %s\n", getVersionInfo().hardware_version,
+            getVersionInfo().firmware_version, getVersionInfo().build_time);
+    }
+
+    // LED初始化
+#ifdef PWM_LED_PIN
+    pwmLed.begin();
+    pwmLed.setMode(PWMLED::OFF); // 启动时设置为彩虹模式
+#endif
+#ifdef LED_PIN
+    led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
+#endif
+
+    // 初始化设备
+    this->init();
+
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    // WiFi初始化
+    Serial.println("[系统] 初始化WiFi连接...");
+    wifiManager.begin();
+
+    // 蓝牙服务器初始化
+    bs.setup();
+
+    // IMU初始化
+    Serial.println("[系统] 初始化IMU...");
+    imu.begin();
+
+    // 如果是从深度睡眠唤醒，检查唤醒原因
+    if (isWakeFromDeepSleep)
+    {
+        switch (wakeup_reason)
+        {
+        case ESP_SLEEP_WAKEUP_EXT0:
+            Serial.println("[系统] IMU运动唤醒检测到，记录运动事件");
+            break;
+        case ESP_SLEEP_WAKEUP_TIMER:
+            Serial.println("[系统] 定时器唤醒，检查系统状态");
+            // 这里可以添加定期状态检查代码
+            break;
+        default:
+            break;
+        }
+    }
+#endif
+
+    // 电源管理初始化
+    powerManager.begin();
+
+#ifdef MODE_CLIENT
+    // 蓝牙客户端初始化
+    bc.setup();
+#endif
+
+    // 罗盘初始化
+#if defined(MODE_ALLINONE)
+    compass.begin();
+    compass.setDeclination(-5.9f); // 根据你的地理位置设置磁偏角
+#endif
 }
 
 

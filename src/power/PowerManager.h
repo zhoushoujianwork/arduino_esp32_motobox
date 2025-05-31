@@ -35,6 +35,10 @@ public:
     // 检查休眠功能是否启用（由编译时配置决定）
     bool isSleepEnabled() { return sleepEnabled; }
 
+    // 新增：唤醒原因打印与处理
+    void printWakeupReason();
+    void checkWakeupCause();
+
 private:
     unsigned long lastMotionTime; // 最后一次检测到运动的时间
     unsigned long idleThreshold;  // 进入低功耗模式的空闲时间阈值（毫秒）

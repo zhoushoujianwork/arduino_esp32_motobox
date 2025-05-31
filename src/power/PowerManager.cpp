@@ -18,7 +18,7 @@ RTC_DATA_ATTR bool PowerManager::sleepEnabled = false; // 默认禁用休眠功�
 
 PowerManager::PowerManager() {
     // 设置默认值
-    idleThreshold = 10000; // 默认1分钟无活动进入低功耗模式
+    idleThreshold = 600000; // 默认10分钟无活动进入低功耗模式（600000毫秒）
     motionThreshold = 0.1; // 加速度变化阈值，根据实际调整
     lastMotionTime = 0;
     powerState = POWER_STATE_NORMAL;
@@ -592,4 +592,66 @@ bool PowerManager::setupIMUWakeupSource(int intPin, float threshold) {
     
     Serial.printf("[电源管理] IMU运动检测已配置: GPIO%d, 阈值=%.3fg\n", intPin, threshold);
     return true;
+}
+
+/**
+ * 打印唤醒原因
+ */
+void PowerManager::printWakeupReason() {
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    switch (wakeup_reason) {
+        case ESP_SLEEP_WAKEUP_EXT0:
+            if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
+                Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT_PIN);
+            } else {
+                Serial.println("[系统] 从外部RTC_IO唤醒，但IMU引脚配置无效");
+            }
+            break;
+        case ESP_SLEEP_WAKEUP_EXT1:
+            Serial.println("[系统] 从外部RTC_CNTL唤醒");
+            break;
+        case ESP_SLEEP_WAKEUP_TIMER:
+            Serial.println("[系统] 从定时器唤醒");
+            break;
+        case ESP_SLEEP_WAKEUP_TOUCHPAD:
+            Serial.println("[系统] 从触摸唤醒");
+            break;
+        case ESP_SLEEP_WAKEUP_ULP:
+            Serial.println("[系统] 从ULP唤醒");
+            break;
+        default:
+            Serial.printf("[系统] 从非深度睡眠唤醒，原因代码: %d\n", wakeup_reason);
+            break;
+    }
+    Serial.printf("[系统] ESP32-S3芯片ID: %llX\n", ESP.getEfuseMac());
+    Serial.printf("[系统] 总运行内存: %d KB\n", ESP.getHeapSize() / 1024);
+    Serial.printf("[系统] 可用运行内存: %d KB\n", ESP.getFreeHeap() / 1024);
+    Serial.printf("[系统] CPU频率: %d MHz\n", ESP.getCpuFreqMHz());
+}
+
+/**
+ * 检查唤醒原因并处理
+ */
+void PowerManager::checkWakeupCause() {
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    switch(wakeup_reason) {
+        case ESP_SLEEP_WAKEUP_EXT0:
+            Serial.println("[系统] 通过外部中断唤醒 (EXT0)");
+            if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
+                if (digitalRead(IMU_INT_PIN) == LOW) {
+                    Serial.println("[系统] 检测到IMU运动唤醒");
+                    // 这里可以添加特定的运动唤醒处理逻辑
+                } else {
+                    Serial.println("[系统] 检测到按钮唤醒");
+                    // 这里可以添加特定的按钮唤醒处理逻辑
+                }
+            }
+            break;
+        case ESP_SLEEP_WAKEUP_TIMER:
+            Serial.println("[系统] 通过定时器唤醒");
+            break;
+        default:
+            Serial.printf("[系统] 唤醒原因: %d\n", wakeup_reason);
+            break;
+    }
 }

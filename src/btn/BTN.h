@@ -19,6 +19,9 @@ public:
     bool isLongPressed();
     void loop();
 
+    // 新增：静态按钮事件处理函数
+    static void handleButtonEvents();
+
 private:
     int pin;
     bool currentState = 1;  // 初始化为 HIGH

@@ -116,6 +116,9 @@ public:
     String compass_data_to_json();
     void printCompassData();
 
+    // 新增：硬件初始化
+    void initializeHardware();
+
 private:
     device_state_t device_state;
     gps_data_t gps_data;

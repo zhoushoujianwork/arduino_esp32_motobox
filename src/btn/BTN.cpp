@@ -1,5 +1,7 @@
 #include "BTN.h"
 #include <Arduino.h>
+#include "gps/GPS.h"
+#include "wifi/WifiManager.h"
 
 BTN::BTN(int pin)
 {
@@ -112,4 +114,45 @@ BTN::ButtonState BTN::getState()
         lastState = currentState;
     }
     return currentState;
+}
+
+// 新增：静态按钮事件处理函数
+void BTN::handleButtonEvents() {
+#ifdef BTN_PIN
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    // 获取按钮状态
+    extern BTN button;
+    extern GPS gps;
+    extern WiFiConfigManager wifiManager;
+    BTN::ButtonState state = button.getState();
+
+    // 处理按钮事件
+    switch (state)
+    {
+    case BTN::SINGLE_CLICK:
+    {
+        Serial.println("[按钮] 单击");
+        int hz = gps.changeHz();
+        Serial.printf("[GPS] 当前频率: %dHz\n", hz);
+        break;
+    }
+
+    case BTN::DOUBLE_CLICK:
+    {
+        Serial.println("[按钮] 双击");
+        int baudRate = gps.changeBaudRate();
+        Serial.printf("[GPS] 当前波特率: %d\n", baudRate);
+        break;
+    }
+
+    case BTN::LONG_PRESS:
+        Serial.println("[按钮] 长按");
+        wifiManager.reset();
+        break;
+
+    default:
+        break;
+    }
+#endif
+#endif
 }
