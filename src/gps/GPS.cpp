@@ -62,14 +62,13 @@ void GPS::begin()
     }else {
         Serial.println("[GPS] 设置波特率成功,波特率:" + String(GPS_BAUDRATE));
     }
-#endif
-
     // 设置频率
     if (!setHz(device.get_gps_data()->gpsHz)) {
         Serial.println("[GPS] 设置频率失败");
     }else {
         Serial.println("[GPS] 设置频率成功,频率:" + String(device.get_gps_data()->gpsHz));
     }
+#endif
 
     // 设置双模 ，1北斗，2GPS，3双模
     if (!buildModeCmd(3)) {

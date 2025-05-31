@@ -92,9 +92,15 @@ void MQTT::publishGPS(gps_data_t gps_data)
 {
     if (WiFi.status() == WL_CONNECTED)
     {
+       
         if (!mqttClient.publish(mqtt_topic_gps.c_str(), device.gps_data_to_json().c_str()))
         {
             Serial.println("GPS数据发布失败");
+            device.printGpsData();
+            Serial.println("publishGPS");
+            Serial.println(mqtt_topic_gps.c_str());
+            Serial.println(device.gps_data_to_json().c_str());
+            Serial.println(device.gps_data_to_json().length());
         }
     }
     else
@@ -122,13 +128,16 @@ void MQTT::publishDeviceInfo(device_state_t device_state)
 {
     if (WiFi.status() == WL_CONNECTED)
     {
-        if (!mqttClient.publish(mqtt_topic_device_info.c_str(), device.device_state_to_json().c_str()))
+        if (!mqttClient.publish(mqtt_topic_device_info.c_str(), device.device_state_to_json().c_str(), true))
         {
+            Serial.println(mqtt_topic_device_info.c_str());
+            Serial.println(device.device_state_to_json().c_str());
+            Serial.println(device.device_state_to_json().length());
             Serial.println("设备信息发布失败");
         }
         else
         {
-            // Serial.println("设备信息发布成功");
+            // Serial.println(mqttClient.connected() ? "MQTT已连接" : "MQTT未连接");
         }
     }
     else

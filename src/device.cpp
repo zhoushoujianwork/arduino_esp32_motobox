@@ -115,18 +115,20 @@ void Device::set_device_state(device_state_t *state)
     device_state = *state;
 }
 
+// 生成精简版设备状态JSON
+// fw: 固件版本, hw: 硬件版本, wifi/ble/gps/imu/compass: 各模块状态, bat_v: 电池电压, bat_pct: 电池百分比
 String Device::device_state_to_json()
 {
-    StaticJsonDocument<200> doc;
-    doc["device_firmware_version"] = device_state.device_firmware_version;
-    doc["device_hardware_version"] = device_state.device_hardware_version;
-    doc["wifi_connected"] = device_state.wifiConnected;
-    doc["ble_connected"] = device_state.bleConnected;
-    doc["gps_ready"] = device_state.gpsReady;
-    doc["imu_ready"] = device_state.imuReady;
-    doc["compass_ready"] = device_state.compassReady;
-    doc["battery_voltage"] = device_state.battery_voltage;
-    doc["battery_percentage"] = device_state.battery_percentage;
+    StaticJsonDocument<256> doc; // 精简后更小即可
+    doc["fw"] = device_state.device_firmware_version;
+    doc["hw"] = device_state.device_hardware_version;
+    doc["wifi"] = device_state.wifiConnected;
+    doc["ble"] = device_state.bleConnected;
+    doc["gps"] = device_state.gpsReady;
+    doc["imu"] = device_state.imuReady;
+    doc["compass"] = device_state.compassReady;
+    doc["bat_v"] = device_state.battery_voltage;
+    doc["bat_pct"] = device_state.battery_percentage;
     return doc.as<String>();
 }
 
@@ -134,7 +136,7 @@ String Device::device_state_to_json()
 String Device::gps_data_to_json()
 {
     // 使用ArduinoJson库将gps_data转换为JSON字符串
-    StaticJsonDocument<200> doc;
+    StaticJsonDocument<256> doc;
     doc["lat"] = gps_data.latitude;
     doc["lon"] = gps_data.longitude;
     doc["alt"] = gps_data.altitude;
@@ -147,8 +149,6 @@ String Device::gps_data_to_json()
     doc["hour"] = gps_data.hour;
     doc["minute"] = gps_data.minute;
     doc["second"] = gps_data.second;
-    
-    // HDOP信息
     doc["hdop"] = gps_data.hdop;
     
     String jsonString;
@@ -156,18 +156,24 @@ String Device::gps_data_to_json()
     return jsonString;
 }
 
-// 将imu_data_t结构体转换为JSON字符串
+// 生成精简版IMU数据JSON
 String Device::imu_data_to_json()
 {
-    // 使用ArduinoJson库将imu_data转换为JSON字符串
-    StaticJsonDocument<200> doc;
-    doc["roll"] = imu_data.roll;
-    doc["pitch"] = imu_data.pitch;
-    doc["yaw"] = imu_data.yaw;
-    doc["temperature"] = imu_data.temperature;
-    String jsonString;
-    serializeJson(doc, jsonString);
-    return jsonString;
+    StaticJsonDocument<256> doc;
+    doc["ax"] = imu_data.accel_x;          // X轴加速度
+    doc["ay"] = imu_data.accel_y;          // Y轴加速度
+    doc["az"] = imu_data.accel_z;          // Z轴加速度
+    doc["gx"] = imu_data.gyro_x;           // X轴角速度
+    doc["gy"] = imu_data.gyro_y;           // Y轴角速度
+    doc["gz"] = imu_data.gyro_z;           // Z轴角速度
+    // doc["mx"] = imu_data.mag_x;            // X轴磁场
+    // doc["my"] = imu_data.mag_y;            // Y轴磁场
+    // doc["mz"] = imu_data.mag_z;            // Z轴磁场
+    doc["roll"] = imu_data.roll;           // 横滚角
+    doc["pitch"] = imu_data.pitch;         // 俯仰角
+    doc["yaw"] = imu_data.yaw;             // 航向角
+    doc["temp"] = imu_data.temperature;    // 温度
+    return doc.as<String>();
 }
 
 void Device::printGpsData()
