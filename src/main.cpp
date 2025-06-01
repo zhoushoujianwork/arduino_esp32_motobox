@@ -78,7 +78,7 @@ PWMLED pwmLed(PWM_LED_PIN);
 
 PowerManager powerManager;
 
-#ifdef MODE_ALLINONE
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
 Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
 #endif
 
@@ -246,7 +246,7 @@ void taskDataProcessing(void *parameter)
     tft_loop();
 #endif
 
-#if defined(MODE_ALLINONE)
+#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     // 罗盘数据处理
     compass.loop();
 #endif
@@ -278,11 +278,7 @@ void setup()
   // 初始化硬件
   device.initializeHardware();
 
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-  // 显示屏初始化完成后，再初始化 GPS
-  Serial.println("[系统] 初始化GPS...");
-  gps.begin();
-#endif
+
 
 // 创建任务
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
@@ -299,4 +295,5 @@ void loop()
 {
   // 主循环留空，所有功能都在RTOS任务中处理
   delay(1000);
+  device.printCompassData();
 }

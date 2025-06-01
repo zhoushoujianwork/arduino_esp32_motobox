@@ -29,7 +29,7 @@ extern BLEC bc;
 #endif
 extern PowerManager powerManager;
 
-extern const VersionInfo& getVersionInfo();
+extern const VersionInfo &getVersionInfo();
 
 Device::Device()
 {
@@ -72,10 +72,10 @@ String Device::get_device_id()
     return String(device_id);
 }
 
-
 void Device::set_wifi_connected(bool connected)
 {
-    if (device_state.wifiConnected != connected) {
+    if (device_state.wifiConnected != connected)
+    {
         Serial.printf("WiFi状态变更: %d -> %d\n", device_state.wifiConnected, connected);
         device_state.wifiConnected = connected;
     }
@@ -83,7 +83,8 @@ void Device::set_wifi_connected(bool connected)
 
 void Device::set_ble_connected(bool connected)
 {
-    if (device_state.bleConnected != connected) {
+    if (device_state.bleConnected != connected)
+    {
         Serial.printf("BLE状态变更: %d -> %d\n", device_state.bleConnected, connected);
         device_state.bleConnected = connected;
     }
@@ -91,7 +92,8 @@ void Device::set_ble_connected(bool connected)
 
 void Device::set_gps_ready(bool ready)
 {
-    if (device_state.gpsReady != ready) {
+    if (device_state.gpsReady != ready)
+    {
         Serial.printf("GPS状态变更: %d -> %d\n", device_state.gpsReady, ready);
         device_state.gpsReady = ready;
     }
@@ -99,7 +101,8 @@ void Device::set_gps_ready(bool ready)
 
 void Device::set_imu_ready(bool ready)
 {
-    if (device_state.imuReady != ready) {
+    if (device_state.imuReady != ready)
+    {
         Serial.printf("IMU状态变更: %d -> %d\n", device_state.imuReady, ready);
         device_state.imuReady = ready;
     }
@@ -150,7 +153,7 @@ String Device::gps_data_to_json()
     doc["minute"] = gps_data.minute;
     doc["second"] = gps_data.second;
     doc["hdop"] = gps_data.hdop;
-    
+
     String jsonString;
     serializeJson(doc, jsonString);
     return jsonString;
@@ -160,19 +163,19 @@ String Device::gps_data_to_json()
 String Device::imu_data_to_json()
 {
     StaticJsonDocument<256> doc;
-    doc["ax"] = imu_data.accel_x;          // X轴加速度
-    doc["ay"] = imu_data.accel_y;          // Y轴加速度
-    doc["az"] = imu_data.accel_z;          // Z轴加速度
-    doc["gx"] = imu_data.gyro_x;           // X轴角速度
-    doc["gy"] = imu_data.gyro_y;           // Y轴角速度
-    doc["gz"] = imu_data.gyro_z;           // Z轴角速度
+    doc["ax"] = imu_data.accel_x; // X轴加速度
+    doc["ay"] = imu_data.accel_y; // Y轴加速度
+    doc["az"] = imu_data.accel_z; // Z轴加速度
+    doc["gx"] = imu_data.gyro_x;  // X轴角速度
+    doc["gy"] = imu_data.gyro_y;  // Y轴角速度
+    doc["gz"] = imu_data.gyro_z;  // Z轴角速度
     // doc["mx"] = imu_data.mag_x;            // X轴磁场
     // doc["my"] = imu_data.mag_y;            // Y轴磁场
     // doc["mz"] = imu_data.mag_z;            // Z轴磁场
-    doc["roll"] = imu_data.roll;           // 横滚角
-    doc["pitch"] = imu_data.pitch;         // 俯仰角
-    doc["yaw"] = imu_data.yaw;             // 航向角
-    doc["temp"] = imu_data.temperature;    // 温度
+    doc["roll"] = imu_data.roll;        // 横滚角
+    doc["pitch"] = imu_data.pitch;      // 俯仰角
+    doc["yaw"] = imu_data.yaw;          // 航向角
+    doc["temp"] = imu_data.temperature; // 温度
     return doc.as<String>();
 }
 
@@ -192,19 +195,28 @@ void Device::printGpsData()
                    String(gps_data.satellites));
 
     // 添加HDOP状态显示
-    const char* hdopStatus = "";
-    if (gps_data.hdop == 0) {
+    const char *hdopStatus = "";
+    if (gps_data.hdop == 0)
+    {
         hdopStatus = "无数据";
-    } else if(gps_data.hdop < 1.0) {
+    }
+    else if (gps_data.hdop < 1.0)
+    {
         hdopStatus = "优秀";
-    } else if(gps_data.hdop < 2.0) {
+    }
+    else if (gps_data.hdop < 2.0)
+    {
         hdopStatus = "良好";
-    } else if(gps_data.hdop < 5.0) {
+    }
+    else if (gps_data.hdop < 5.0)
+    {
         hdopStatus = "一般";
-    } else {
+    }
+    else
+    {
         hdopStatus = "较差";
     }
-    
+
     Serial.println("HDOP: " + String(gps_data.hdop, 1) + " (" + hdopStatus + ")");
 }
 
@@ -234,12 +246,14 @@ void Device::set_imu_data(imu_data_t *data)
 }
 
 // getTotalDistanceKm
-float Device::getTotalDistanceKm() {
+float Device::getTotalDistanceKm()
+{
     // 获取当前GPS数据
-    gps_data_t* currentGpsData = get_gps_data();
-    
+    gps_data_t *currentGpsData = get_gps_data();
+
     // 如果没有有效的GPS数据或卫星数量不足，返回当前累积距离
-    if (currentGpsData->satellites < 3) {
+    if (currentGpsData->satellites < 3)
+    {
         return totalDistanceKm;
     }
 
@@ -247,7 +261,8 @@ float Device::getTotalDistanceKm() {
     unsigned long currentTime = millis();
 
     // 如果是第一次计算，初始化lastDistanceTime
-    if (lastDistanceTime == 0) {
+    if (lastDistanceTime == 0)
+    {
         lastDistanceTime = currentTime;
         return totalDistanceKm;
     }
@@ -267,19 +282,22 @@ float Device::getTotalDistanceKm() {
     return totalDistanceKm;
 }
 
-compass_data_t *Device::get_compass_data() {
+compass_data_t *Device::get_compass_data()
+{
     return &compass_data;
 }
 
-void Device::set_compass_data(compass_data_t *data) {
+void Device::set_compass_data(compass_data_t *data)
+{
     compass_data = *data;
 }
 
-String Device::compass_data_to_json() {
+String Device::compass_data_to_json()
+{
     StaticJsonDocument<200> doc;
     doc["x"] = compass_data.x;
     doc["y"] = compass_data.y;
-    doc["z"] = compass_data.z; 
+    doc["z"] = compass_data.z;
     doc["heading"] = compass_data.heading;
     doc["direction"] = compass.getDirectionChar(compass_data.heading);
     String output;
@@ -287,12 +305,14 @@ String Device::compass_data_to_json() {
     return output;
 }
 
-void Device::printCompassData() {
+void Device::printCompassData()
+{
     Serial.printf("Compass: X=%.1f, Y=%.1f, Z=%.1f, Heading=%.1f, Direction=%s\n",
-                 compass_data.x, compass_data.y, compass_data.z, compass_data.heading, compass.getDirectionChar(compass_data.heading));
+                  compass_data.x, compass_data.y, compass_data.z, compass_data.heading, compass.getDirectionChar(compass_data.heading));
 }
 
-void Device::initializeHardware() {
+void Device::initializeHardware()
+{
     // 检查是否从深度睡眠唤醒
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
     bool isWakeFromDeepSleep = (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED);
@@ -305,7 +325,7 @@ void Device::initializeHardware() {
     else
     {
         Serial.printf("[系统] 系统正常启动，硬件版本: %s, 固件版本: %s, 编译时间: %s\n", getVersionInfo().hardware_version,
-            getVersionInfo().firmware_version, getVersionInfo().build_time);
+                      getVersionInfo().firmware_version, getVersionInfo().build_time);
     }
 
     // LED初始化
@@ -328,8 +348,14 @@ void Device::initializeHardware() {
     // 蓝牙服务器初始化
     bs.setup();
 
+    // 显示屏初始化完成后，再初始化 GPS
+    Serial.println("[系统] 初始化GPS...");
+    Wire.begin(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
+    gps.begin();
+    compass.begin();
+    compass.setDeclination(-5.9f);
+
     // IMU初始化
-    Serial.println("[系统] 初始化IMU...");
     imu.begin();
 
     // 如果是从深度睡眠唤醒，检查唤醒原因
@@ -357,12 +383,4 @@ void Device::initializeHardware() {
     // 蓝牙客户端初始化
     bc.setup();
 #endif
-
-    // 罗盘初始化
-#if defined(MODE_ALLINONE)
-    compass.begin();
-    compass.setDeclination(-5.9f); // 根据你的地理位置设置磁偏角
-#endif
 }
-
-

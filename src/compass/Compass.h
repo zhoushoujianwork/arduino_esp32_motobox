@@ -5,20 +5,59 @@
 #include "device.h"
 #include <QMC5883LCompass.h>
 
-
+/**
+ * @brief QMC5883L 罗盘传感器驱动
+ * 支持初始化、数据读取、方向获取、校准等功能
+ */
 class Compass {
 public:
+    /**
+     * @brief 构造函数，指定I2C引脚
+     * @param sda I2C SDA引脚
+     * @param scl I2C SCL引脚
+     */
     Compass(int sda, int scl);
+
+    /**
+     * @brief 初始化罗盘模块
+     */
     void begin();
+
+    /**
+     * @brief 读取罗盘数据并更新到 device
+     */
     void loop();
-    bool calibrate();  // 校准函数
-    
-    // 获取原始数据
+
+    /**
+     * @brief 启动校准流程（需手动调用，按提示旋转模块）
+     * @return 是否成功
+     */
+    bool calibrate();
+
+    /**
+     * @brief 设置校准参数（建议校准后将参数写入代码）
+     */
+    void setCalibration(int xOffset, int yOffset, int zOffset, float xScale, float yScale, float zScale);
+
+    /**
+     * @brief 获取原始磁场数据
+     */
     void getRawData(int16_t &x, int16_t &y, int16_t &z);
-    // 获取方向的char表示
+
+    /**
+     * @brief 获取方向字符串（如"N", "NE"等）
+     */
     char* getDirectionChar(float heading);
-    // 设置磁偏角校正值
+
+    /**
+     * @brief 设置磁偏角（单位：度）
+     */
     void setDeclination(float declination);
+
+    /**
+     * @brief 获取磁偏角
+     */
+    float getDeclination();
 
 private:
     int _sda;
