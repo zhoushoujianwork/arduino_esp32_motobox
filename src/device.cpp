@@ -348,12 +348,21 @@ void Device::initializeHardware()
     // 蓝牙服务器初始化
     bs.setup();
 
+#if defined(GPS_COMPASS_SDA) && defined(GPS_COMPASS_SCL)
     // 显示屏初始化完成后，再初始化 GPS
     Serial.println("[系统] 初始化GPS...");
     Wire.begin(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
-    gps.begin();
     compass.begin();
     compass.setDeclination(-5.9f);
+#endif
+
+#ifdef GPS_WAKE_PIN
+    rtc_gpio_hold_dis((gpio_num_t)GPS_WAKE_PIN);
+    Serial.println("[电源管理] GPS_WAKE_PIN 保持已解除");
+#endif
+
+    gps.begin();
+    
 
     // IMU初始化
     imu.begin();

@@ -24,7 +24,6 @@
 #include "power/PowerManager.h"
 #include "qmi8658/IMU.h"
 #include "wifi/WifiManager.h"
-#include "compass/Compass.h"
 #include "esp_wifi.h"
 #include "version.h"
 
@@ -78,7 +77,8 @@ PWMLED pwmLed(PWM_LED_PIN);
 
 PowerManager powerManager;
 
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+#if defined(GPS_COMPASS_SDA) && defined(GPS_COMPASS_SCL)
+#include "compass/Compass.h"
 Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
 #endif
 
@@ -246,7 +246,7 @@ void taskDataProcessing(void *parameter)
     tft_loop();
 #endif
 
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+#if defined(GPS_COMPASS_SDA) && defined(GPS_COMPASS_SCL)
     // 罗盘数据处理
     compass.loop();
 #endif
@@ -295,5 +295,4 @@ void loop()
 {
   // 主循环留空，所有功能都在RTOS任务中处理
   delay(1000);
-  device.printCompassData();
 }

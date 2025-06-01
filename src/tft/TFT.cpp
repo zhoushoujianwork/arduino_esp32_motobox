@@ -11,9 +11,9 @@ bool tft_is_waking_from_sleep = false; // 默认为false，表示不是从睡眠
 
 // 添加背光控制通道（假设使用PWM控制）
 #ifdef TFT_BL
-  static const int backlightChannel = 0; // 使用第一个PWM通道
-  static const int backlightFreq = 5000; // 5KHz
-  static const int backlightResolution = 8; // 8位分辨率 (0-255)
+static const int backlightChannel = 0;    // 使用第一个PWM通道
+static const int backlightFreq = 5000;    // 5KHz
+static const int backlightResolution = 8; // 8位分辨率 (0-255)
 #endif
 
 #if LV_USE_LOG != 0
@@ -118,7 +118,7 @@ void tft_begin()
 
     // 检查是否已经从睡眠中唤醒
     bool isWakingFromSleep = tft_is_waking_from_sleep;
-    
+
     // 初始化LVGL
     lv_init();
 
@@ -127,24 +127,25 @@ void tft_begin()
 #endif
 
     // 初始化显示屏
-    tft.begin(); /* TFT init */
+    tft.begin();                   /* TFT init */
     tft.setRotation(TFT_ROTATION); /* Landscape orientation, flipped */
 
-    // 初始化背光
-    #ifdef TFT_BL
+// 初始化背光
+#ifdef TFT_BL
     // 配置LEDC通道
     ledcSetup(backlightChannel, backlightFreq, backlightResolution);
     ledcAttachPin(TFT_BL, backlightChannel);
     // 设置默认亮度为最大
     ledcWrite(backlightChannel, 250);
     Serial.println("[TFT] 背光初始化完成，亮度设为最大");
-    #endif
+#endif
 
     // 如果是从睡眠中唤醒，执行唤醒命令
-    if (isWakingFromSleep) {
+    if (isWakingFromSleep)
+    {
         Serial.println("[TFT] 从睡眠中唤醒，发送唤醒命令");
         tft.writecommand(0x11); // SLPOUT - 退出睡眠模式
-        delay(120); // 等待唤醒
+        delay(120);             // 等待唤醒
         tft.writecommand(0x29); // DISPON - 打开显示
         delay(50);
     }
@@ -171,12 +172,15 @@ void tft_begin()
 
     // 初始化UI
     ui_init();
-    
+
     // 如果不是从睡眠唤醒，则执行初始化动画
-    if (!isWakingFromSleep) {
+    if (!isWakingFromSleep)
+    {
         Serial.println("[TFT] 执行仪表盘初始化动画");
         init_dashboard();
-    } else {
+    }
+    else
+    {
         Serial.println("[TFT] 从睡眠模式唤醒，跳过初始化动画");
         // 重置仪表为零值
         lv_slider_set_value(ui_SliderSpeed, 0, LV_ANIM_OFF);
@@ -184,13 +188,13 @@ void tft_begin()
         lv_slider_set_value(ui_SliderGyro, 0, LV_ANIM_OFF);
         lv_event_send(ui_SliderGyro, LV_EVENT_VALUE_CHANGED, NULL);
     }
-    
+
     // 重置唤醒标志
     tft_is_waking_from_sleep = false;
-    
+
     // 确保界面刷新
     lv_timer_handler();
-    
+
     Serial.println("[TFT] 设置完成");
 }
 
@@ -206,9 +210,9 @@ void tft_loop()
         lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
 
         // 其他归零
-        lv_obj_set_style_img_opa(ui_imgBle, LV_OPA_TRANSP, 0); // 完全透明
+        lv_obj_set_style_img_opa(ui_imgBle, LV_OPA_TRANSP, 0);  // 完全透明
         lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_TRANSP, 0); // 完全透明
-        lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_TRANSP, 0); // 完全透明
+        lv_obj_set_style_img_opa(ui_imgGps, LV_OPA_TRANSP, 0);  // 完全透明
 
         // 数据归零
         lv_label_set_text(ui_textGpsNu, "-");
@@ -226,15 +230,18 @@ void tft_loop()
         lv_obj_set_style_img_opa(ui_imgBle, LV_OPA_COVER, 0); // 完全不透明
         // Wi-Fi图标始终显示，但根据连接状态调整透明度
         lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0); // 默认完全不透明
-        
+
         // GPS图标根据数据有效性显示
         lv_obj_set_style_img_opa(ui_imgGps, device.get_device_state()->gpsReady ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
 
         // 根据WiFi连接状态更新图标
-        if (device.get_device_state()->wifiConnected) {
+        if (device.get_device_state()->wifiConnected)
+        {
             // WiFi已连接 - 显示正常图标但完全不透明
             lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0);
-        } else {
+        }
+        else
+        {
             // WiFi未连接 - 使用相同图标但半透明
             lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_50, 0);
         }
@@ -259,21 +266,24 @@ void tft_loop()
 
         // 处理GPS无数据的情况
         int currentSpeedValue = device.get_gps_data()->speed;
-        if (!device.get_device_state()->gpsReady) {
+        if (!device.get_device_state()->gpsReady)
+        {
             currentSpeedValue = 0;
         }
-        
+
         lv_slider_set_value(ui_SliderSpeed, currentSpeedValue, LV_ANIM_OFF);
         lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
-        char tripText[20];                             // Ensure this buffer is large enough for your number
+        char tripText[20]; // Ensure this buffer is large enough for your number
         snprintf(tripText, sizeof(tripText), "Trip:%.0f km", device.getTotalDistanceKm());
         lv_label_set_text(ui_textTrip, tripText);
 
+#if defined(GPS_COMPASS_SDA) && defined(GPS_COMPASS_SCL)
         // 依据方向移动Compass
         // 0-360度角度显示, 0度为北, 90度为东, 180度为南, 270度为西 不用小数
         char compassText[20];
         snprintf(compassText, sizeof(compassText), "%d", (int)device.get_compass_data()->heading);
         lv_label_set_text(ui_Compass, compassText);
+#endif
         lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
         lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
 
@@ -305,134 +315,145 @@ void tft_loop()
     }
 }
 
-void tft_sleep() {
+void tft_sleep()
+{
     Serial.println("[TFT] 进入睡眠模式");
-    
-    // 首先将亮度逐渐降低到0
-    #ifdef TFT_BL
+
+// 首先将亮度逐渐降低到0
+#ifdef TFT_BL
     // 以10步逐渐降低亮度
-    for (int brightness = 255; brightness >= 0; brightness -= 2) {
+    for (int brightness = 255; brightness >= 0; brightness -= 2)
+    {
         tft_set_brightness(brightness);
         delay(2); // 短暂延迟以实现渐变效果
     }
     // 最后确保亮度为0
     tft_set_brightness(0);
-    #endif
-    
+#endif
+
     // 发送指令使显示器进入睡眠模式
     tft.writecommand(0x10); // 发送睡眠命令
 }
 
-void tft_wakeup() {
+void tft_wakeup()
+{
     Serial.println("[TFT] 唤醒显示屏");
-    
+
     // 设置唤醒标志，告知tft_begin跳过初始化动画
     tft_is_waking_from_sleep = true;
-    
+
     // 发送指令唤醒显示器
     tft.writecommand(0x11); // 发送唤醒命令
-    delay(120); // ST7789等显示器需要等待一段时间
-    
+    delay(120);             // ST7789等显示器需要等待一段时间
+
     // 设置MADCTL寄存器，修复颜色和方向问题
     tft.writecommand(TFT_MADCTL);
     // 反转颜色顺序：从BGR改为RGB或从RGB改为BGR
     tft.writedata(TFT_MAD_MX | TFT_MAD_MY | TFT_MAD_RGB); // 使用RGB顺序
     delay(10);
-    
+
     // 打开显示
     tft.writecommand(0x29); // DISPON - 打开显示
     delay(50);
-    
+
     // 设置屏幕旋转方向
     tft.setRotation(3); // Landscape orientation, flipped
     Serial.println("[TFT] 重新设置屏幕方向为横屏模式");
-    
-    // 逐渐增加亮度
-    #ifdef TFT_BL
+
+// 逐渐增加亮度
+#ifdef TFT_BL
     // 确保亮度初始为0
     tft_set_brightness(0);
     // 以10步逐渐提高亮度
-    for (int brightness = 0; brightness <= 255; brightness += 25) {
+    for (int brightness = 0; brightness <= 255; brightness += 25)
+    {
         tft_set_brightness(brightness);
         delay(20); // 短暂延迟以实现渐变效果
     }
     // 最后确保亮度为最大
     tft_set_brightness(255);
-    #endif
-    
+#endif
+
     // 刷新LVGL界面，确保显示正常
     lv_timer_handler();
     Serial.println("[TFT] 显示屏唤醒完成");
 }
 
-void tft_set_brightness(uint8_t brightness) {
-  #ifdef TFT_BL
+void tft_set_brightness(uint8_t brightness)
+{
+#ifdef TFT_BL
     // 使用ledc设置PWM值控制亮度
-    if (brightness > 255) brightness = 255;
-    
+    if (brightness > 255)
+        brightness = 255;
+
     // 检查是否已经初始化过PWM
     static bool pwm_initialized = false;
-    if (!pwm_initialized) {
-      // 配置LEDC通道
-      ledcSetup(backlightChannel, backlightFreq, backlightResolution);
-      ledcAttachPin(TFT_BL, backlightChannel);
-      pwm_initialized = true;
+    if (!pwm_initialized)
+    {
+        // 配置LEDC通道
+        ledcSetup(backlightChannel, backlightFreq, backlightResolution);
+        ledcAttachPin(TFT_BL, backlightChannel);
+        pwm_initialized = true;
     }
-    
+
     // 设置亮度
     ledcWrite(backlightChannel, brightness);
     Serial.printf("[TFT] 设置亮度为 %d/255\n", brightness);
-  #else
+#else
     Serial.println("[TFT] 未定义TFT_BL引脚，无法调整亮度");
-  #endif
+#endif
 }
 
-void tft_show_notification(const char *title, const char *message, uint32_t duration) {
-    #if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+void tft_show_notification(const char *title, const char *message, uint32_t duration)
+{
+#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
     // 创建通知对话框
     static lv_obj_t *notification = NULL;
-    
+
     // 如果已经有通知，先删除旧的
-    if (notification != NULL) {
+    if (notification != NULL)
+    {
         lv_obj_del(notification);
         notification = NULL;
     }
-    
+
     // 创建新通知对话框
     notification = lv_obj_create(lv_scr_act());
-    
+
     // 设置通知样式
     lv_obj_set_size(notification, 150, 80);
     lv_obj_align(notification, LV_ALIGN_TOP_MID, 0, 10);
     lv_obj_set_style_bg_color(notification, lv_color_hex(0x2196F3), LV_PART_MAIN); // 蓝色背景
-    lv_obj_set_style_radius(notification, 10, LV_PART_MAIN); // 圆角
-    lv_obj_set_style_shadow_width(notification, 10, LV_PART_MAIN); // 添加阴影
+    lv_obj_set_style_radius(notification, 10, LV_PART_MAIN);                       // 圆角
+    lv_obj_set_style_shadow_width(notification, 10, LV_PART_MAIN);                 // 添加阴影
     lv_obj_set_style_shadow_color(notification, lv_color_hex(0x000000), LV_PART_MAIN);
     lv_obj_set_style_shadow_opa(notification, 50, LV_PART_MAIN);
-    
+
     // 创建标题
     lv_obj_t *title_label = lv_label_create(notification);
     lv_label_set_text(title_label, title);
     lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 5);
     lv_obj_set_style_text_color(title_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN); // 白色文字
-    
+
     // 创建内容
     lv_obj_t *msg_label = lv_label_create(notification);
     lv_label_set_text(msg_label, message);
     lv_obj_align(msg_label, LV_ALIGN_CENTER, 0, 10);
     lv_obj_set_style_text_color(msg_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN); // 白色文字
-    
+
     // 设置动画效果
     lv_obj_fade_in(notification, 300, 0);
-    
+
     // 创建定时器自动关闭通知
     static lv_timer_t *close_timer = NULL;
-    if (close_timer != NULL) {
+    if (close_timer != NULL)
+    {
         lv_timer_del(close_timer);
     }
-    
+
     // 设置通知自动关闭
-    close_timer = lv_timer_create([](lv_timer_t *timer) {
+    close_timer = lv_timer_create([](lv_timer_t *timer)
+                                  {
         lv_obj_t *notif = (lv_obj_t*)timer->user_data;
         lv_obj_fade_out(notif, 300, 0);
         lv_timer_t *close_timer = lv_timer_create([](lv_timer_t *timer) {
@@ -441,12 +462,11 @@ void tft_show_notification(const char *title, const char *message, uint32_t dura
             lv_timer_del(timer);
         }, 300, notif);
         lv_timer_set_repeat_count(close_timer, 1);
-        lv_timer_del(timer);
-    }, duration, notification);
-    
+        lv_timer_del(timer); }, duration, notification);
+
     lv_timer_set_repeat_count(close_timer, 1);
-    
+
     // 刷新显示
     lv_timer_handler();
-    #endif
+#endif
 }
