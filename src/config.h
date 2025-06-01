@@ -19,7 +19,7 @@
 #endif
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "2.0.0"
+#define FIRMWARE_VERSION "2.1.0"
 #endif
 
 #ifndef HARDWARE_VERSION

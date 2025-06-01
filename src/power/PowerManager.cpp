@@ -267,7 +267,7 @@ void PowerManager::disablePeripherals()
 // 关闭IMU I2C（但保持IMU的WakeOnMotion功能）
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     extern IMU imu;
-    imu.configureForDeepSleep(); // 使用WakeOnMotion配置
+    // imu.configureForDeepSleep(); // 使用WakeOnMotion配置（已移至configureWakeupSources，避免重复配置导致超时）
 
 // 保守地关闭其他I2C设备
 // Wire.end();    // 暂时注释，可能影响IMU
