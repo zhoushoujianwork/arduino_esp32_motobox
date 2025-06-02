@@ -135,57 +135,32 @@ void IMU::disableMotionDetection() {
 }
 
 bool IMU::configureForDeepSleep() {
-    // 禁用当前的运动检测中断
+    setGyroEnabled(false); // 先关闭陀螺仪
     if (motionIntPin >= 0) {
         detachInterrupt(motionIntPin);
     }
-    
-    // 使用官方的WakeOnMotion配置，专门用于深度睡眠唤醒
-    // 参数：255mg阈值（uint8_t最大值），低功耗128Hz，使用中断引脚1，默认引脚值1，抑制时间0x30
-    int result = qmi.configWakeOnMotion(
-        255,                                   // 255mg阈值，uint8_t最大值，比默认200mg更保守
-        SensorQMI8658::ACC_ODR_LOWPOWER_128Hz, // 低功耗模式
-        SensorQMI8658::INTERRUPT_PIN_1,        // 使用中断引脚1
-        1,                                      // 默认引脚值为1
-        0x30                                   // 增加抑制时间，减少误触发
-    );
-    
-    if (result != DEV_WIRE_NONE) {
-        Serial.println("[IMU] WakeOnMotion配置失败");
-        return false;
+    if (!qmi.configWakeOnMotion(255, SensorQMI8658::ACC_ODR_LOWPOWER_128Hz, SensorQMI8658::INTERRUPT_PIN_1, 1, 0x30)) {
+        Serial.println("[IMU] WakeOnMotion配置失败，尝试reset+begin");
+        qmi.reset();
+        // 重新初始化
+        begin();
+        // 再次尝试
+        if (!qmi.configWakeOnMotion(255, SensorQMI8658::ACC_ODR_LOWPOWER_128Hz, SensorQMI8658::INTERRUPT_PIN_1, 1, 0x30)) {
+            Serial.println("[IMU] WakeOnMotion依然失败");
+            return false;
+        }
     }
-    
-    // 重新配置中断引脚为CHANGE触发（官方例子的方式）
     if (motionIntPin >= 0) {
         pinMode(motionIntPin, INPUT_PULLUP);
-        attachInterrupt(motionIntPin, IMU::motionISR, CHANGE);  // 使用CHANGE而非特定边沿
+        attachInterrupt(motionIntPin, IMU::motionISR, CHANGE);
     }
-    
     Serial.println("[IMU] 已配置为WakeOnMotion深度睡眠模式 (阈值=255mg, 低功耗128Hz)");
     return true;
 }
 
 bool IMU::restoreFromDeepSleep() {
-    // 从WakeOnMotion模式恢复到正常模式需要重新初始化
-    
-    // 重置设备
-    if (!qmi.reset()) {
-        Serial.println("[IMU] 重置失败");
-        return false;
-    }
-    
-    // 重新配置正常的加速度计
-    qmi.configAccelerometer(SensorQMI8658::ACC_RANGE_4G, SensorQMI8658::ACC_ODR_500Hz);
-    qmi.enableAccelerometer();
-    
-    // 重新启用陀螺仪
-    setGyroEnabled(true);
-    
-    // 恢复正常的运动检测配置（如果之前启用了的话）
-    if (motionDetectionEnabled) {
-        configureMotionDetection(motionThreshold);
-    }
-    
+    // 唤醒后重新初始化
+    begin();
     Serial.println("[IMU] 已从WakeOnMotion模式恢复到正常模式");
     return true;
 }
