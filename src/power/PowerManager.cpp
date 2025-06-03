@@ -402,61 +402,70 @@ bool PowerManager::detectMotion()
 
 void PowerManager::loop()
 {
-    // 如果已请求打断低功耗模式，则在此处理
-    if (interruptRequested)
-    {
-        if (powerState != POWER_STATE_NORMAL)
+    static unsigned long lastMotionCheck = 0;
+    unsigned long now = millis();
+
+    // 只每隔200ms检测一次运动
+    if (now - lastMotionCheck >= 200) {
+        lastMotionCheck = now;
+
+        // 如果已请求打断低功耗模式，则在此处理 
+        if (interruptRequested)
         {
-            Serial.println("[电源管理] 低功耗模式已被打断");
-            powerState = POWER_STATE_NORMAL;
+            if (powerState != POWER_STATE_NORMAL)
+            {
+                Serial.println("[电源管理] 低功耗模式已被打断");
+                powerState = POWER_STATE_NORMAL;
+            }
+            interruptRequested = false;
+            lastMotionTime = millis(); // 重置最后一次运动时间
+            return;
         }
-        interruptRequested = false;
-        lastMotionTime = millis(); // 重置最后一次运动时间
-        return;
-    }
 
 #if !ENABLE_SLEEP
-    // 如果编译时禁用了休眠功能，始终保持在正常状态
-    if (powerState != POWER_STATE_NORMAL)
-    {
-        powerState = POWER_STATE_NORMAL;
-    }
-    return;
-#else
-    // 编译时启用了休眠功能，但需要检查运行时状态
-    if (!sleepEnabled)
-    {
-        // 保持在正常状态，不进入休眠
+        // 如果编译时禁用了休眠功能，始终保持在正常状态
         if (powerState != POWER_STATE_NORMAL)
         {
             powerState = POWER_STATE_NORMAL;
         }
         return;
-    }
-
-    // 仅在正常工作状态下检测运动和空闲状态
-    if (powerState == POWER_STATE_NORMAL)
-    {
-        // 检测设备是否有运动
-        if (detectMotion())
+#else
+        // 编译时启用了休眠功能，但需要检查运行时状态
+        if (!sleepEnabled)
         {
-            // 如果有运动，更新最后一次运动时间
-            lastMotionTime = millis();
-        }
-        else
-        {
-            // 检查设备是否空闲足够长的时间
-            if (isDeviceIdle())
+            // 保持在正常状态，不进入休眠
+            if (powerState != POWER_STATE_NORMAL)
             {
-                Serial.println("[电源管理] 设备已静止超过1分钟，准备进入低功耗模式...");
-                Serial.printf("[电源管理] 电池状态: %d%%, 电压: %dmV\n",
-                              device.get_device_state()->battery_percentage,
-                              device.get_device_state()->battery_voltage);
-                enterLowPowerMode();
+                powerState = POWER_STATE_NORMAL;
+            }
+            return;
+        }
+
+        // 仅在正常工作状态下检测运动和空闲状态
+        if (powerState == POWER_STATE_NORMAL)
+        {
+            // 检测设备是否有运动
+            if (detectMotion())
+            {
+                // 如果有运动，更新最后一次运动时间
+                lastMotionTime = millis();
+            }
+            else
+            {
+                // 检查设备是否空闲足够长的时间
+                if (isDeviceIdle())
+                {
+                    Serial.println("[电源管理] 设备已静止超过1分钟，准备进入低功耗模式...");
+                    Serial.printf("[电源管理] 电池状态: %d%%, 电压: %dmV\n",
+                                  device.get_device_state()->battery_percentage,
+                                  device.get_device_state()->battery_voltage);
+                    enterLowPowerMode();
+                }
             }
         }
-    }
 #endif
+    }
+    // 其他低频逻辑可以继续执行
 }
 
 // 新增：打断低功耗模式进入过程
@@ -570,7 +579,7 @@ void PowerManager::enterLowPowerMode()
                 return; // 退出函数，不进入低功耗模式
             }
 
-            delay(50); // 小间隔检查，更快响应
+            delay(500); // 小间隔检查，更快响应
         }
     }
 
