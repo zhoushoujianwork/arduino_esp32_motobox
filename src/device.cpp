@@ -341,6 +341,7 @@ void Device::initializeHardware()
     this->init();
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    delay(200);
     // WiFi初始化
     Serial.println("[系统] 初始化WiFi连接...");
     wifiManager.begin();

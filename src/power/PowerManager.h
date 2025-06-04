@@ -39,6 +39,7 @@ public:
     void printWakeupReason();
     void checkWakeupCause();
 
+
     // ==== 参数集中定义 ====
     static constexpr unsigned long DEFAULT_IDLE_THRESHOLD = 300000; // 5分钟
     static constexpr float DEFAULT_MOTION_THRESHOLD = 0.1;         // 加速度变化阈值
@@ -61,6 +62,7 @@ private:
     void disablePeripherals();    // 关闭外设
     void handleWakeup();          // 处理唤醒事件
     void configurePowerDomains(); // 配置电源域
+    void safeDisableWiFi();      // 安全关闭WiFi
 };
 
 extern PowerManager powerManager;
