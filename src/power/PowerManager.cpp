@@ -19,8 +19,8 @@ RTC_DATA_ATTR bool PowerManager::sleepEnabled = false; // 默认禁用休眠功�
 PowerManager::PowerManager()
 {
     // 设置默认值
-    idleThreshold = 60000; // 默认1分钟无活动进入低功耗模式（60000毫秒）
-    motionThreshold = 0.1; // 加速度变化阈值，根据实际调整
+    idleThreshold = DEFAULT_IDLE_THRESHOLD; // 默认1分钟无活动进入低功耗模式
+    motionThreshold = DEFAULT_MOTION_THRESHOLD; // 加速度变化阈值
     lastMotionTime = 0;
     powerState = POWER_STATE_NORMAL;
     interruptRequested = false;

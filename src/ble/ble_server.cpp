@@ -42,6 +42,25 @@ class ScanCallbacks : public NimBLEAdvertisedDeviceCallbacks {
     }
 };
 
+// 用于设备状态特征的回调，支持写入命令
+class DeviceCharacteristicCallbacks : public NimBLECharacteristicCallbacks
+{
+    void onWrite(NimBLECharacteristic *pCharacteristic)
+    {
+        std::string value = pCharacteristic->getValue();
+        if (!value.empty() && value[0] == 0x01) {
+            Serial.println("收到 BLE 重置 WiFi 命令");
+            wifiManager.reset();
+        }else if (!value.empty() && value[0] == 0x02) {
+            Serial.println("收到 BLE 进入配网模式命令");
+            wifiManager.enterConfigMode();
+        } else if (!value.empty() && value[0] == 0x03) {
+            Serial.println("收到 BLE 退出配网模式命令");
+            wifiManager.exitConfigMode();
+        }
+    }
+};
+
 BLES::BLES()
 {
     pServer = NULL;
@@ -70,7 +89,8 @@ void BLES::setup()
     // 创建设备状态特征值
     pCharacteristic = pService->createCharacteristic(
         DEVICE_CHAR_UUID,
-        NIMBLE_PROPERTY::NOTIFY); // 根据需要设置属性
+        NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::WRITE); // 增加 WRITE 属性
+    pCharacteristic->setCallbacks(new DeviceCharacteristicCallbacks());
 
     // 创建GPS特征值
     pGPSCharacteristic = pService->createCharacteristic(

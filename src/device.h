@@ -119,6 +119,9 @@ public:
     // 新增：硬件初始化
     void initializeHardware();
 
+    // 新增：重置WiFi配置并重启设备
+    void reset_wifi();
+
 private:
     device_state_t device_state;
     gps_data_t gps_data;

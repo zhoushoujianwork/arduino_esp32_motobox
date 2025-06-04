@@ -1,37 +1,44 @@
 #include "WifiManager.h"
+#include "power/PowerManager.h"
+#include "wifi/wifi_config_page.h"
 
 // WiFi事件回调函数
 unsigned long wifiConnectedTime = 0;
 bool needCheckInternet = false;
 
-void WiFiEvent(WiFiEvent_t event) {
-    switch(event) {
-        case SYSTEM_EVENT_STA_CONNECTED:
-            Serial.println("WiFi已连接");
-            device.set_wifi_connected(true);
-            wifiConnectedTime = millis();
-            needCheckInternet = true;
-            break;
-        case SYSTEM_EVENT_STA_DISCONNECTED:
-            Serial.println("WiFi已断开");
-            device.set_wifi_connected(false);
-            break;
-        case SYSTEM_EVENT_STA_GOT_IP:
-            Serial.printf("获取到IP地址: %s\n", WiFi.localIP().toString().c_str());
-            break;
-        case SYSTEM_EVENT_AP_START:
-            Serial.println("AP模式已启动");
-            device.set_wifi_connected(false);
-            break;
-        case SYSTEM_EVENT_AP_STOP:
-            Serial.println("AP模式已停止");
-            break;
-        default:
-            break;
+void WiFiEvent(WiFiEvent_t event)
+{
+    switch (event)
+    {
+    case SYSTEM_EVENT_STA_CONNECTED:
+        Serial.println("WiFi已连接");
+        device.set_wifi_connected(true);
+        wifiConnectedTime = millis();
+        needCheckInternet = true;
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        Serial.println("WiFi已断开");
+        device.set_wifi_connected(false);
+        break;
+    case SYSTEM_EVENT_STA_GOT_IP:
+        Serial.printf("获取到IP地址: %s\n", WiFi.localIP().toString().c_str());
+        break;
+    case SYSTEM_EVENT_AP_START:
+        Serial.println("AP模式已启动");
+        device.set_wifi_connected(false);
+        break;
+    case SYSTEM_EVENT_AP_STOP:
+        Serial.println("AP模式已停止");
+        break;
+    default:
+        break;
     }
 }
 
 WiFiConfigManager wifiManager;
+
+// 在类成员变量中添加
+unsigned long lastConnectAttempt = 0;
 
 void WiFiConfigManager::begin()
 {
@@ -64,7 +71,6 @@ void WiFiConfigManager::loop()
 {
     if (isConfigMode)
     {
-        // 处理WiFi客户端
         handleClient();
     }
     else
@@ -72,141 +78,83 @@ void WiFiConfigManager::loop()
         if (WiFi.status() != WL_CONNECTED)
         {
             device.set_wifi_connected(false);
-            // 尝试连接
-            if (tryConnectWithSavedCredentials())
+
+            // 每5秒重试一次
+            if (millis() - lastConnectAttempt > 5000)
             {
-                Serial.println("\nWiFi连接成功!");
-                device.set_wifi_connected(true);
-            }
-        }
-        else
-        {
-            // WiFi已连接，延迟检测互联网和MQTT
-            if (needCheckInternet && millis() - wifiConnectedTime > 2000) {
-                needCheckInternet = false;
-                if (!checkInternetConnection()) {
-                    Serial.println("互联网连接验证失败");
-                } else {
-                    Serial.println("互联网连接正常");
+                lastConnectAttempt = millis();
+                if (tryConnectWithSavedCredentials())
+                {
+                    Serial.println("\nWiFi连接成功!");
+                    device.set_wifi_connected(true);
                 }
             }
         }
     }
+
+    if (isConfigMode && WiFi.getMode() != WIFI_AP) {
+        WiFi.mode(WIFI_AP);
+        Serial.println("WiFi模式已切换为AP");
+    }
 }
+
+// 修改 tryConnectWithSavedCredentials
+// 特性：如果没有已保存的WiFi，返回false，通知外部进入配网模式
 bool WiFiConfigManager::tryConnectWithSavedCredentials()
 {
-    String ssid = preferences.getString("ssid", "");
-    String password = preferences.getString("password", "");
-    
-    if (ssid.isEmpty())
+    String wifiListStr = preferences.getString("wifi_list", "[]");
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, wifiListStr);
+    JsonArray arr = doc.as<JsonArray>();
+
+    if (arr.size() == 0)
     {
         Serial.println("未找到已保存的WiFi配置");
-        device.set_wifi_connected(false);  // 确保状态更新
         enterConfigMode();
         return false;
     }
 
-    // 增加WiFi连接的健壮性
-    WiFi.disconnect(true);  // 确保断开之前的连接
-    delay(1000);  // 增加延迟时间，确保完全断开
-
-    // 重置WiFi状态
-    WiFi.mode(WIFI_OFF);
-    delay(100);
-    WiFi.mode(WIFI_STA);
-    delay(100);
-
-    // 设置WiFi参数
-    WiFi.setAutoReconnect(false);  // 禁用自动重连，由我们手动控制
-    WiFi.setSleep(true);  // 启用省电模式
-    
-    // 确保modem sleep模式设置正确
-    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
-    Serial.println("WiFi modem sleep已重新启用");
-    
-    Serial.printf("尝试连接WiFi: %s\n", ssid.c_str());
-    Serial.printf("尝试连接WiFi密码: %s\n", password.c_str());
-
-    // 使用临时变量存储凭据，避免直接使用String对象
-    const char* ssid_ptr = ssid.c_str();
-    const char* password_ptr = password.c_str();
-    
-    if (!ssid_ptr || !password_ptr) {
-        Serial.println("WiFi凭据无效");
-        device.set_wifi_connected(false);  // 确保状态更新
-        return false;
-    }
-
-    // 开始连接
-    WiFi.begin(ssid_ptr, password_ptr);
-    
-    // 使用更安全的连接等待逻辑
-    unsigned long startAttemptTime = millis();
-    const unsigned long CONNECT_TIMEOUT = 20000; // 20秒超时
-    
-    while (WiFi.status() != WL_CONNECTED) 
+    for (JsonObject obj : arr)
     {
-        if (millis() - startAttemptTime > CONNECT_TIMEOUT) {
-            Serial.println("WiFi连接超时");
-            WiFi.disconnect(true);
-            device.set_wifi_connected(false);  // 确保状态更新
+        if (isConfigMode) {
+            Serial.println("已在配网模式，忽略连接请求");
             return false;
         }
-
-        // 使用switch语句处理不同的连接状态
-        switch(WiFi.status()) {
-            case WL_DISCONNECTED:
-                Serial.print(".");
-                break;
-            case WL_CONNECT_FAILED:
-                Serial.println("\n连接失败，可能是密码错误");
-                WiFi.disconnect(true);
-                device.set_wifi_connected(false);  // 确保状态更新
-                return false;
-            case WL_NO_SSID_AVAIL:
-                Serial.println("\n未找到指定的WiFi网络");
-                device.set_wifi_connected(false);  // 确保状态更新
-                return false;
-            case WL_IDLE_STATUS:
-                Serial.print("i");
-                break;
-            default:
-                Serial.print("?");
-                break;
+        String ssid = obj["ssid"].as<String>();
+        String password = obj["password"].as<String>();
+        Serial.printf("尝试连接WiFi: %s, 密码: %s\n", ssid.c_str(), password.c_str());
+        if (tryConnectSingle(ssid, password))
+        {
+            Serial.printf("\nWiFi连接成功: %s\n", ssid.c_str());
+            return true;
         }
-
-        delay(500);  // 增加延迟，减少CPU负载
     }
-
-    // 连接成功后的处理
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.printf("\nWiFi连接成功，IP地址: %s\n", WiFi.localIP().toString().c_str());
-        
-        // 验证互联网连接
-        if (!checkInternetConnection()) {
-            Serial.println("互联网连接验证失败");
-            WiFi.disconnect(true);
-            device.set_wifi_connected(false);  // 确保状态更新
-            return false;
-        }
-
-        // 注意：这里不需要设置 device.set_wifi_connected(true)
-        // 因为 WiFiEvent 回调函数会在连接成功时自动设置
-        return true;
-    }
-
-    device.set_wifi_connected(false);  // 确保状态更新
+    Serial.println("所有已保存WiFi均连接失败");
     return false;
 }
 
 void WiFiConfigManager::enterConfigMode()
 {
-    WiFi.disconnect(true); // 确保断开任何现有连接
+    if (isConfigMode) {
+        Serial.println("已在配网模式，忽略重复进入请求");
+        return;
+    }
+    // 关闭 WebServer 和 DNS Server
+    server.stop();
+    dnsServer.stop();
+    delay(100);
+
+    // 彻底断开STA并忘记所有连接
+    WiFi.disconnect(true, true); // 第二个参数true表示"忘记所有已保存的STA配置"
+    delay(200);
+
+    // 强制只做AP
+    WiFi.mode(WIFI_AP);
     delay(100);
 
     isConfigMode = true;
-    device.set_wifi_connected(false);  // 确保在进入配置模式时设置为未连接状态
-    
+    device.set_wifi_connected(false);
+
     setupAP();
     setupDNS();
     setupWebServer();
@@ -217,7 +165,7 @@ void WiFiConfigManager::setupAP()
     WiFi.disconnect(true);
     delay(100);
 
-    apSSID = String(AP_PREFIX) + device.get_device_id();
+    apSSID = String(APP_NAME) + "-" + String(device.get_device_id());
 
     WiFi.mode(WIFI_AP);
     delay(100);
@@ -264,7 +212,7 @@ void WiFiConfigManager::setupWebServer()
     // 处理 Android 设备的 Captive Portal 检测
     server.on("/generate_204", HTTP_GET, [this]()
               { server.send(200, "text/html", getConfigPage()); });
-    
+
     server.on("/redirect", HTTP_GET, [this]()
               { server.send(200, "text/html", getConfigPage()); });
 
@@ -281,9 +229,69 @@ void WiFiConfigManager::setupWebServer()
     server.on("/success.txt", HTTP_GET, [this]()
               { server.send(200, "text/html", getConfigPage()); });
 
+    // 新增：WiFi扫描接口，返回JSON热点列表
+    server.on("/scan", HTTP_GET, [this]()
+              {
+        int n = WiFi.scanNetworks();
+        DynamicJsonDocument doc(1024);
+        JsonArray arr = doc.to<JsonArray>();
+        for (int i = 0; i < n; ++i) {
+            arr.add(WiFi.SSID(i));
+        }
+        String output;
+        serializeJson(doc, output);
+        server.send(200, "application/json", output); });
+
+    // 新增：重置/打断休眠倒计时接口
+    server.on("/reset_sleep", HTTP_POST, [this]()
+              {
+        powerManager.interruptLowPowerMode();
+        server.send(200, "application/json", "{\"ok\":1}"); });
+
+    // 新增：获取已保存WiFi列表接口
+    server.on("/saved_wifi", HTTP_GET, [this]()
+              {
+        String wifiListStr = preferences.getString("wifi_list", "[]");
+        Serial.printf("[Web] 查询已保存WiFi: %s\n", wifiListStr.c_str());
+        server.send(200, "application/json", wifiListStr); });
+
+    // 新增：删除已保存WiFi接口
+    server.on("/delete_wifi", HTTP_POST, [this]()
+              {
+        String ssid = server.arg("ssid");
+        Serial.printf("[Web] 请求删除WiFi: %s\n", ssid.c_str());
+        String wifiListStr = preferences.getString("wifi_list", "[]");
+        DynamicJsonDocument doc(1024);
+        DeserializationError err = deserializeJson(doc, wifiListStr);
+        if (err) {
+            Serial.printf("[Web] 解析WiFi列表失败: %s\n", err.c_str());
+            server.send(500, "application/json", "{\"error\":\"json parse error\"}");
+            return;
+        }
+        JsonArray arr = doc.as<JsonArray>();
+        bool deleted = false;
+        for (size_t i = 0; i < arr.size(); ++i) {
+            if (arr[i]["ssid"] == ssid) {
+                arr.remove(i);
+                deleted = true;
+                break;
+            }
+        }
+        String output;
+        serializeJson(doc, output);
+        preferences.putString("wifi_list", output);
+        Serial.printf("[Web] 删除结果: %s, 新列表: %s\n", deleted ? "已删除" : "未找到", output.c_str());
+        server.send(200, "application/json", output); });
+
+    // 新增：退出配网模式，切换为STA并尝试连接已保存WiFi
+    server.on("/exit_config", HTTP_POST, [this]() {
+        this->exitConfigMode();
+        server.send(200, "application/json", "{\"ok\":1}");
+    });
+
     // 处理所有未定义的请求
     server.onNotFound([this]()
-                     {
+                      {
         if (!isIp(server.hostHeader()))
         {
             server.sendHeader("Location", String("http://") + WiFi.softAPIP().toString(), true);
@@ -302,16 +310,20 @@ void WiFiConfigManager::handleConfigSubmit()
 {
     String newSSID = server.arg("ssid");
     String newPassword = server.arg("password");
-
     Serial.printf("接收到的SSID: %s\n", newSSID.c_str());
     Serial.printf("接收到的密码: %s\n", newPassword.c_str());
-
     if (newSSID.isEmpty())
     {
         server.send(400, "text/plain", "SSID不能为空");
         return;
     }
-
+    // 先尝试连接该热点
+    if (!tryConnectSingle(newSSID, newPassword))
+    {
+        server.send(401, "text/html", "<div class='error'>WiFi连接失败，请检查密码或信号！</div>" + getConfigPage());
+        return;
+    }
+    // 连接成功才保存
     saveWiFiCredentials(newSSID, newPassword);
     server.send(200, "text/html", getSuccessPage());  // 使用新的成功页面
     delay(3000);  // 延长重启前的时间，让用户看到动画
@@ -320,111 +332,43 @@ void WiFiConfigManager::handleConfigSubmit()
 
 void WiFiConfigManager::handleClient()
 {
-    if (isConfigMode)
-    {
-        dnsServer.processNextRequest();
-        server.handleClient();
-    }
+    dnsServer.processNextRequest();
+    server.handleClient();
 }
 
 String WiFiConfigManager::getConfigPage()
 {
-    String html = R"(
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset='utf-8'>
-            <meta name='viewport' content='width=device-width, initial-scale=1'>
-            <title>MotoBox WiFi配置</title>
-            <style>
-                body { 
-                    font-family: Arial, sans-serif;
-                    padding: 20px;
-                    background-color: #f5f5f5;
-                    max-width: 600px;
-                    margin: 0 auto;
-                }
-                .container {
-                    background: white;
-                    padding: 20px;
-                    border-radius: 10px;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-                }
-                .logo {
-                    text-align: center;
-                    margin-bottom: 20px;
-                }
-                .logo h1 {
-                    color: #333;
-                    font-size: 24px;
-                }
-                .logo span {
-                    color: #666;
-                    font-size: 14px;
-                }
-                input {
-                    width: 100%;
-                    padding: 10px;
-                    margin: 10px 0;
-                    border: 1px solid #ddd;
-                    border-radius: 5px;
-                    box-sizing: border-box;
-                }
-                button {
-                    width: 100%;
-                    padding: 12px;
-                    background-color: #007bff;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 16px;
-                    margin-top: 15px;
-                }
-                button:hover {
-                    background-color: #0056b3;
-                }
-                .footer {
-                    text-align: center;
-                    margin-top: 20px;
-                    color: #666;
-                    font-size: 12px;
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="logo">
-                    <h1>MotoBox</h1>
-                    <span>智能摩托车数据盒子</span>
-                </div>
-                <form method='post' action='/configure'>
-                    <input type='text' name='ssid' placeholder='WiFi名称' required>
-                    <input type='password' name='password' placeholder='WiFi密码'>
-                    <button type='submit'>连接网络</button>
-                </form>
-                <div class="footer">
-                    <p>© 2024 MotoBox. 请连接到您的WiFi网络以继续使用。</p>
-                </div>
-            </div>
-        </body>
-        </html>
-    )";
-    return html;
+    return FPSTR(WIFI_CONFIG_PAGE_HTML);
 }
 
 void WiFiConfigManager::saveWiFiCredentials(const String &ssid, const String &password)
 {
-    if (preferences.clear())
+    // 读取已保存热点
+    String wifiListStr = preferences.getString("wifi_list", "[]");
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, wifiListStr);
+    JsonArray arr = doc.as<JsonArray>();
+    // 检查是否已存在
+    bool found = false;
+    for (JsonObject obj : arr)
     {
-        preferences.putString("ssid", ssid);
-        preferences.putString("password", password);
-        Serial.printf("WiFi凭据保存成功: %s, %s\n", ssid.c_str(), password.c_str());
+        if (obj["ssid"] == ssid)
+        {
+            obj["password"] = password;
+            found = true;
+            break;
+        }
     }
-    else
+    if (!found)
     {
-        Serial.println("WiFi凭据保存失败");
+        JsonObject newObj = arr.createNestedObject();
+        newObj["ssid"] = ssid;
+        newObj["password"] = password;
     }
+    String output;
+    serializeJson(doc, output);
+    preferences.putString("wifi_list", output);
+    Serial.printf("WiFi凭据保存成功: %s, %s\n", ssid.c_str(), password.c_str());
 }
 
 // 检查MQTT服务器连通性（使用config.h配置）
@@ -435,7 +379,8 @@ bool WiFiConfigManager::checkInternetConnection()
     Serial.printf("检测MQTT服务器连通性: %s:%d\n", MQTT_SERVER, MQTT_PORT);
 
     // 尝试连接
-    if (!client.connect(MQTT_SERVER, MQTT_PORT)) {
+    if (!client.connect(MQTT_SERVER, MQTT_PORT))
+    {
         Serial.println("MQTT服务器连接失败！");
         return false;
     }
@@ -445,45 +390,58 @@ bool WiFiConfigManager::checkInternetConnection()
     return true;
 }
 
-
 // 添加新的辅助方法来检查是否是IP地址
 bool WiFiConfigManager::isIp(String str)
 {
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++)
+    {
         int nOctet = 0;
         int nLen = 0;
-        
-        while (nLen < str.length()) {
+
+        while (nLen < str.length())
+        {
             char c = str[nLen];
-            
-            if (c == '.') {
-                if (i < 3) break;
-                else return false;
+
+            if (c == '.')
+            {
+                if (i < 3)
+                    break;
+                else
+                    return false;
             }
-            else if (c >= '0' && c <= '9') {
+            else if (c >= '0' && c <= '9')
+            {
                 nOctet = nOctet * 10 + (c - '0');
-                if (nOctet > 255) return false;
+                if (nOctet > 255)
+                    return false;
             }
-            else {
+            else
+            {
                 return false;
             }
-            
+
             nLen++;
         }
-        
-        if (nOctet > 255 || nLen == 0) return false;
-        if (i < 3 && str[nLen] != '.') return false;
-        
+
+        if (nOctet > 255 || nLen == 0)
+            return false;
+        if (i < 3 && str[nLen] != '.')
+            return false;
+
         str = str.substring(nLen + 1);
     }
-    
+
     return str.length() == 0;
 }
 
 void WiFiConfigManager::reset()
 {
-    Serial.println("重置配置");
+    // 重置WiFi配置并重启设备
+    Serial.println("[BLE] 执行 WiFi 重置...");
+    WiFi.disconnect(true, true);
     preferences.clear();
+    delay(100);
+    ESP.restart();
 }
 
 // 添加一个新函数，用于返回成功页面的HTML
@@ -571,4 +529,40 @@ String WiFiConfigManager::getSuccessPage()
         </html>
     )";
     return html;
+}
+
+// 新增：尝试连接单个热点
+// 特性：用于表单提交时验证密码
+bool WiFiConfigManager::tryConnectSingle(const String &ssid, const String &password)
+{
+    WiFi.disconnect(true);
+    delay(500);
+    WiFi.mode(WIFI_STA);
+    delay(100);
+    WiFi.begin(ssid.c_str(), password.c_str());
+    unsigned long start = millis();
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        if (millis() - start > 10000)
+            return false;
+        delay(300);
+    }
+    return WiFi.status() == WL_CONNECTED;
+}
+
+// 新增：退出配网模式，切换为STA并尝试连接已保存WiFi
+void WiFiConfigManager::exitConfigMode() {
+    if (!isConfigMode) {
+        Serial.println("当前不在配网模式，无需退出");
+        return;
+    }
+    Serial.println("退出配网模式，切换为STA");
+    isConfigMode = false;
+    server.stop();
+    dnsServer.stop();
+    WiFi.disconnect(true, false); // 断开AP
+    delay(100);
+    WiFi.mode(WIFI_STA);
+    delay(100);
+    tryConnectWithSavedCredentials();
 }

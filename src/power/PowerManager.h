@@ -39,8 +39,12 @@ public:
     void printWakeupReason();
     void checkWakeupCause();
 
-private:
+    // ==== 参数集中定义 ====
+    static constexpr unsigned long DEFAULT_IDLE_THRESHOLD = 300000; // 5分钟
+    static constexpr float DEFAULT_MOTION_THRESHOLD = 0.1;         // 加速度变化阈值
     unsigned long lastMotionTime; // 最后一次检测到运动的时间
+
+private:
     unsigned long idleThreshold;  // 进入低功耗模式的空闲时间阈值（毫秒）
     float motionThreshold;        // 运动检测阈值
     PowerState powerState;        // 当前电源状态

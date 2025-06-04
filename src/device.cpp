@@ -393,3 +393,5 @@ void Device::initializeHardware()
     bc.setup();
 #endif
 }
+
+

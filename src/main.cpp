@@ -282,7 +282,7 @@ void setup()
 
 // 创建任务
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-  xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 1, &wifiTaskHandle);
+  xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 2, &wifiTaskHandle);
   xTaskCreatePinnedToCore(taskGps, "TaskGps", 1024 * 10, NULL, 1, &gpsTaskHandle, 1);
 #endif
 

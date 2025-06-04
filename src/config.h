@@ -33,7 +33,8 @@
  */
 
 /* Common Device Configuration */
-#define BLE_NAME            "ESP32-MOTO"
+#define APP_NAME            "DBL-BOX"
+#define BLE_NAME            "DBL-BOX"
 #define SERVICE_UUID        "4FAFC201-1FB5-459E-8FCC-C5C9C331914B"
 #define DEVICE_CHAR_UUID    "BEB5483A-36E1-4688-B7F5-EA07361B26A8"
 #define GPS_CHAR_UUID       "BEB5483E-36E1-4688-B7F5-EA07361B26A8"
