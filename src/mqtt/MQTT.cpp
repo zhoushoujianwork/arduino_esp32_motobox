@@ -90,7 +90,7 @@ void MQTT::loop()
 
 void MQTT::publishGPS(gps_data_t gps_data)
 {
-    if (WiFi.status() == WL_CONNECTED)
+    if (device.get_device_state()->wifiConnected)
     {
        
         if (!mqttClient.publish(mqtt_topic_gps.c_str(), device.gps_data_to_json().c_str()))
@@ -111,7 +111,7 @@ void MQTT::publishGPS(gps_data_t gps_data)
 
 void MQTT::publishIMU(imu_data_t imu_data)
 {
-    if (WiFi.status() == WL_CONNECTED)
+    if (device.get_device_state()->wifiConnected)
     {
         if (!mqttClient.publish(mqtt_topic_imu.c_str(), device.imu_data_to_json().c_str()))
         {
@@ -126,7 +126,7 @@ void MQTT::publishIMU(imu_data_t imu_data)
 
 void MQTT::publishDeviceInfo(device_state_t device_state)
 {
-    if (WiFi.status() == WL_CONNECTED)
+    if (device.get_device_state()->wifiConnected)
     {
         if (!mqttClient.publish(mqtt_topic_device_info.c_str(), device.device_state_to_json().c_str(), true))
         {
