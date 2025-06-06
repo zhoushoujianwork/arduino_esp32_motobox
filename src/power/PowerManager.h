@@ -55,14 +55,11 @@ private:
     
     // 新增：运动检测相关变量
     static const int SAMPLE_COUNT = 5;  // 运动检测采样次数
-    float lastAccelMagnitude;    // 上次加速度幅值
     float accumulatedDelta;      // 累积变化量
-    int sampleIndex;             // 采样索引
     
     void disablePeripherals();    // 关闭外设
     void handleWakeup();          // 处理唤醒事件
     void configurePowerDomains(); // 配置电源域
-    void safeDisableWiFi();      // 安全关闭WiFi
 };
 
 extern PowerManager powerManager;

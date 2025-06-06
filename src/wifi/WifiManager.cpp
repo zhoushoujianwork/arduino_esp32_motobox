@@ -128,6 +128,7 @@ bool WiFiConfigManager::tryConnectWithSavedCredentials()
             Serial.printf("\nWiFi连接成功: %s\n", ssid.c_str());
             return true;
         }
+        Serial.println("连接失败，继续尝试下一个WiFi");
     }
     Serial.println("所有已保存WiFi均连接失败");
     return false;
@@ -593,4 +594,21 @@ bool WiFiConfigManager::isAPModeActive() const {
 
 bool WiFiConfigManager::hasAPClient() const {
     return WiFi.softAPgetStationNum() > 0;
+}
+
+void WiFiConfigManager::safeDisableWiFi() {
+    if (WiFi.getMode() != WIFI_OFF) {
+        Serial.println("[电源管理] 正在断开WiFi...");
+        WiFi.disconnect(true, true); // 断开并忘记配置
+        unsigned long start = millis();
+        // 等待WiFi断开，最多2秒
+        while (WiFi.status() == WL_CONNECTED && millis() - start < 2000) {
+            delay(10);
+        }
+        Serial.println("[电源管理] WiFi已断开，准备关闭WiFi模块...");
+        WiFi.mode(WIFI_OFF);
+        delay(100); // 等待模式切换
+        esp_wifi_deinit();
+        Serial.println("[电源管理] WiFi驱动已释放");
+    }
 }

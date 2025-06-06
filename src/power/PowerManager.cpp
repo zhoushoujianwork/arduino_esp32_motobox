@@ -23,11 +23,6 @@ PowerManager::PowerManager()
     lastMotionTime = 0;
     powerState = POWER_STATE_NORMAL;
     interruptRequested = false;
-
-    // 初始化运动检测相关变量
-    lastAccelMagnitude = 0;
-    accumulatedDelta = 0;
-    sampleIndex = 0;
 }
 
 void PowerManager::begin()
@@ -172,7 +167,7 @@ void PowerManager::disablePeripherals()
     // ===== 1. 通信模块关闭 =====
 
     // WiFi完全关闭
-    safeDisableWiFi();
+    wifiManager.safeDisableWiFi();
 
     // 蓝牙完全关闭
     btStop();
@@ -679,22 +674,5 @@ void PowerManager::checkWakeupCause()
     default:
         Serial.printf("[系统] 唤醒原因: %d\n", wakeup_reason);
         break;
-    }
-}
-
-void PowerManager::safeDisableWiFi() {
-    if (WiFi.getMode() != WIFI_OFF) {
-        Serial.println("[电源管理] 正在断开WiFi...");
-        WiFi.disconnect(true, true); // 断开并忘记配置
-        unsigned long start = millis();
-        // 等待WiFi断开，最多2秒
-        while (WiFi.status() == WL_CONNECTED && millis() - start < 2000) {
-            delay(10);
-        }
-        Serial.println("[电源管理] WiFi已断开，准备关闭WiFi模块...");
-        WiFi.mode(WIFI_OFF);
-        delay(100); // 等待模式切换
-        esp_wifi_deinit();
-        Serial.println("[电源管理] WiFi驱动已释放");
     }
 }

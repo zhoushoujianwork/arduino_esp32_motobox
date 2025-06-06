@@ -61,6 +61,9 @@ public:
      // 新增：AP模式和客户端判断
     bool isAPModeActive() const;
     bool hasAPClient() const;
+
+    void safeDisableWiFi();      // 安全关闭WiFi
+
 };
 
 // 全局实例和接口函数
