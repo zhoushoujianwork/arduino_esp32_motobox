@@ -23,6 +23,9 @@ private:
     String mqtt_topic_command;
     bool reconnect();
 
+    void subscribeCommand(); // 订阅命令
+    void handleCommand(char* topic, byte* payload, unsigned int length); // 处理命令
+
 public:
     MQTT(const char *server, int port, const char *user, const char *password);
     void loop();
@@ -33,9 +36,6 @@ public:
     void publishIMU(imu_data_t imu_data);
     // 发送设备信息
     void publishDeviceInfo(device_state_t device_state);
-
-    void subscribeCommand(); // 订阅命令
-    void handleCommand(char* topic, byte* payload, unsigned int length); // 处理命令
 };
 
 #endif

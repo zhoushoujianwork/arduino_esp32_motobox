@@ -26,7 +26,6 @@ public:
     static void IRAM_ATTR motionISR();
     
     // 低功耗相关方法
-    bool enableMotionDetection(int intPin, float threshold = MOTION_DETECTION_THRESHOLD_DEFAULT);
     void disableMotionDetection();
     bool configureForDeepSleep();
     bool restoreFromDeepSleep();
@@ -43,13 +42,6 @@ public:
      */
     bool detectMotion();
 
-    /**
-     * @brief 设置运动检测参数
-     * @param threshold 运动阈值
-     * @param window    采样窗口
-     */
-    void setMotionDetectionParams(float threshold, int window = MOTION_DETECTION_WINDOW_DEFAULT);
-    
 private:
     int sda;
     int scl;

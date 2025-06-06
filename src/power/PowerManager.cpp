@@ -22,13 +22,11 @@ PowerManager::PowerManager()
     idleThreshold = DEFAULT_IDLE_THRESHOLD; // 默认1分钟无活动进入低功耗模式
     lastMotionTime = 0;
     powerState = POWER_STATE_NORMAL;
-    interruptRequested = false;
 }
 
 void PowerManager::begin()
 {
     powerState = POWER_STATE_NORMAL;
-    interruptRequested = false;
 
     // 处理唤醒事件
     handleWakeup();
@@ -338,18 +336,6 @@ void PowerManager::loop()
     if (now - lastMotionCheck >= 200) {
         lastMotionCheck = now;
 
-        // 如果已请求打断低功耗模式，则在此处理 
-        if (interruptRequested)
-        {
-            if (powerState != POWER_STATE_NORMAL)
-            {
-                Serial.println("[电源管理] 低功耗模式已被打断");
-                powerState = POWER_STATE_NORMAL;
-            }
-            interruptRequested = false;
-            lastMotionTime = millis(); // 重置最后一次运动时间
-            return;
-        }
 
 #if !ENABLE_SLEEP
         // 如果编译时禁用了休眠功能，始终保持在正常状态
@@ -396,27 +382,6 @@ void PowerManager::loop()
 #endif
     }
     // 其他低频逻辑可以继续执行
-}
-
-// 新增：打断低功耗模式进入过程
-void PowerManager::interruptLowPowerMode()
-{
-    // 设置打断请求标志
-    interruptRequested = true;
-
-    // 如果当前正处于倒计时状态，则立即更新状态
-    if (powerState == POWER_STATE_COUNTDOWN || powerState == POWER_STATE_PREPARING_SLEEP)
-    {
-        Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
-        powerState = POWER_STATE_NORMAL;
-        lastMotionTime = millis(); // 重置最后一次运动时间
-
-// 恢复屏幕亮度到最大
-#ifdef MODE_ALLINONE
-        tft_set_brightness(255);
-        Serial.println("[电源管理] 恢复屏幕亮度到最大");
-#endif
-    }
 }
 
 bool PowerManager::isDeviceIdle()
@@ -483,59 +448,31 @@ void PowerManager::enterLowPowerMode()
         while (millis() - countdownStartTime < 1000)
         { // 每秒分为多个小间隔检查
             // 检查是否已请求打断
-            if (interruptRequested)
-            {
-                Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
-                interruptRequested = false;
-                powerState = POWER_STATE_NORMAL;
-
-// 恢复屏幕亮度到最大
-#ifdef MODE_ALLINONE
-                tft_set_brightness(maxBrightness);
-                Serial.println("[电源管理] 恢复屏幕亮度到最大");
-#endif
-
-                return; // 退出函数，不进入低功耗模式
-            }
-
-            // 在倒计时期间检测运动，如果有运动则取消进入低功耗模式
             if (imu.detectMotion())
             {
-                Serial.println("[电源管理] 检测到运动，取消进入低功耗模式");
-                lastMotionTime = millis(); // 更新最后一次运动时间
-                powerState = POWER_STATE_NORMAL;
-
-// 恢复屏幕亮度到最大
-#ifdef MODE_ALLINONE
-                tft_set_brightness(maxBrightness);
-                Serial.println("[电源管理] 恢复屏幕亮度到最大");
-#endif
-
-                return; // 退出函数，不进入低功耗模式
-            }
-
-            delay(500); // 小间隔检查，更快响应
-        }
-    }
-
-    // 设置电源状态为准备睡眠
-    powerState = POWER_STATE_PREPARING_SLEEP;
-
-    // 再次检查是否已请求打断
-    if (interruptRequested)
-    {
-        Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
-        interruptRequested = false;
-        powerState = POWER_STATE_NORMAL;
-
-// 恢复屏幕亮度到最大
+                Serial.println("[电源管理] 收到打断请求，取消进入低功耗模式");
+                interruptLowPowerMode();
+                // 恢复屏幕亮度到最大
 #ifdef MODE_ALLINONE
         tft_set_brightness(maxBrightness);
         Serial.println("[电源管理] 恢复屏幕亮度到最大");
 #endif
 
-        return; // 退出函数，不进入低功耗模式
+// 恢复屏幕亮度到最大
+#ifdef MODE_ALLINONE
+                tft_set_brightness(maxBrightness);
+                Serial.println("[电源管理] 恢复屏幕亮度到最大");
+#endif
+                return; // 退出函数，不进入低功耗模式
+            }
+
+            delay(10); // 小间隔检查，更快响应
+
+        }
     }
+
+    // 设置电源状态为准备睡眠
+    powerState = POWER_STATE_PREPARING_SLEEP;
 
     Serial.println("[电源管理] 倒计时结束，开始关闭外设...");
 
@@ -588,20 +525,12 @@ void PowerManager::enterLowPowerMode()
 #endif
 }
 
-bool PowerManager::setupIMUWakeupSource(int intPin, float threshold)
+void PowerManager::interruptLowPowerMode()
 {
-    if (intPin < 0 || intPin > 21)
-        return false;
-
-    extern IMU imu;
-    if (!imu.enableMotionDetection(intPin, threshold))
-    {
-        Serial.println("[电源管理] IMU运动检测配置失败");
-        return false;
-    }
-
-    Serial.printf("[电源管理] IMU运动检测已配置: GPIO%d, 阈值=%.3fg\n", intPin, threshold);
-    return true;
+    // 重置电源状态
+    powerState = POWER_STATE_NORMAL;
+    // 重置运动检测窗口时间
+    lastMotionTime = millis();
 }
 
 /**

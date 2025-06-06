@@ -88,24 +88,6 @@ void IMU::begin()
     Serial.println("[IMU] 运动检测初始化完成");
 }
 
-bool IMU::enableMotionDetection(int intPin, float threshold) {
-    if (intPin < 0) return false;
-    
-    motionIntPin = intPin;
-    motionThreshold = threshold;
-    
-    // 配置运动检测参数
-    configureMotionDetection(threshold);
-    
-    // 配置中断引脚
-    pinMode(motionIntPin, INPUT_PULLUP);
-    attachInterrupt(motionIntPin, IMU::motionISR, CHANGE);
-    
-    motionDetectionEnabled = true;
-    Serial.printf("[IMU] 运动检测已启用: GPIO%d, 阈值=%.3fg\n", motionIntPin, threshold);
-    
-    return true;
-}
 
 void IMU::configureMotionDetection(float threshold) {
     // 配置三轴任意运动检测

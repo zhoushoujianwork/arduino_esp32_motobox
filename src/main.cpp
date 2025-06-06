@@ -204,7 +204,6 @@ void taskDataProcessing(void *parameter)
     // GPS数据发布 (1Hz)
     if (millis() - lastGpsPublishTime >= 1000)
     {
-      mqtt.publishGPS(*device.get_gps_data());
       // device.printGpsData();
       lastGpsPublishTime = millis();
       // 更新GPS就绪状态
@@ -212,6 +211,7 @@ void taskDataProcessing(void *parameter)
       {
         device.set_gps_ready(true);
         gps.autoAdjustHz(device.get_gps_data()->satellites);
+        mqtt.publishGPS(*device.get_gps_data()); // 节省带宽，有定位数据才发布
       }
       else
       {
@@ -219,8 +219,8 @@ void taskDataProcessing(void *parameter)
       }
     }
 
-    // IMU数据发布 (2Hz)
-    if (millis() - lastImuPublishTime >= 500)
+    // IMU数据发布 (1Hz)
+    if (millis() - lastImuPublishTime >= 1000)
     {
       mqtt.publishIMU(*device.get_imu_data());
       lastImuPublishTime = millis();

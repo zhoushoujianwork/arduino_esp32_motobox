@@ -253,12 +253,6 @@ void WiFiConfigManager::setupWebServer()
         serializeJson(doc, output);
         server.send(200, "application/json", output); });
 
-    // 新增：重置/打断休眠倒计时接口
-    server.on("/reset_sleep", HTTP_POST, [this]()
-              {
-        powerManager.interruptLowPowerMode();
-        server.send(200, "application/json", "{\"ok\":1}"); });
-
     // 新增：获取已保存WiFi列表接口
     server.on("/saved_wifi", HTTP_GET, [this]()
               {

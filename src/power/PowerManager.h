@@ -26,11 +26,8 @@ public:
     bool requestLowPowerMode;
     void enterLowPowerMode();
     bool configureWakeupSources();
-    bool setupIMUWakeupSource(int intPin, float threshold = 0.05);
     bool isDeviceIdle();
     
-    // 新增：打断低功耗模式进入过程
-    void interruptLowPowerMode();
     
     // 新增：获取当前电源状态
     PowerState getPowerState() { return powerState; }
@@ -42,6 +39,9 @@ public:
     void printWakeupReason();
     void checkWakeupCause();
 
+     // 新增：打断低功耗模式进入过程
+    void interruptLowPowerMode();
+
 
     // ==== 参数集中定义 ====
     static constexpr unsigned long DEFAULT_IDLE_THRESHOLD = 30000; // debug 30 秒 ，5分钟
@@ -50,7 +50,6 @@ public:
 private:
     unsigned long idleThreshold;  // 进入低功耗模式的空闲时间阈值（毫秒）
     float motionThreshold;        // 运动检测阈值
-    bool interruptRequested;      // 是否请求打断低功耗模式
     RTC_DATA_ATTR static bool sleepEnabled;  // 是否启用休眠功能（RTC内存，由编译时配置决定）
     
     // 新增：运动检测相关变量
@@ -60,6 +59,8 @@ private:
     void disablePeripherals();    // 关闭外设
     void handleWakeup();          // 处理唤醒事件
     void configurePowerDomains(); // 配置电源域
+
+   
 };
 
 extern PowerManager powerManager;
