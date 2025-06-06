@@ -7,6 +7,7 @@
 #include "qmi8658/IMU.h"
 #include "wifi/WifiManager.h"
 #include "device.h"
+#include "power/PowerManager.h"
 
 class MQTT
 {
@@ -19,6 +20,7 @@ private:
     String mqtt_topic_gps;
     String mqtt_topic_imu;
     String mqtt_topic_device_info;
+    String mqtt_topic_command;
     bool reconnect();
 
 public:
@@ -31,6 +33,9 @@ public:
     void publishIMU(imu_data_t imu_data);
     // 发送设备信息
     void publishDeviceInfo(device_state_t device_state);
+
+    void subscribeCommand(); // 订阅命令
+    void handleCommand(char* topic, byte* payload, unsigned int length); // 处理命令
 };
 
 #endif

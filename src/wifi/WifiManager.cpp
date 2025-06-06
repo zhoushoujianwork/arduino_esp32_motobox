@@ -317,16 +317,35 @@ void WiFiConfigManager::handleConfigSubmit()
         server.send(400, "text/plain", "SSID不能为空");
         return;
     }
-    // 先尝试连接该热点
-    if (!tryConnectSingle(newSSID, newPassword))
-    {
-        server.send(401, "text/html", "<div class='error'>WiFi连接失败，请检查密码或信号！</div>" + getConfigPage());
-        return;
-    }
-    // 连接成功才保存
+    // 直接保存，不做连接校验
     saveWiFiCredentials(newSSID, newPassword);
-    server.send(200, "text/html", getSuccessPage());  // 使用新的成功页面
-    delay(3000);  // 延长重启前的时间，让用户看到动画
+    String html = R"(
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='utf-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1'>
+            <title>WiFi配置成功</title>
+            <style>
+                body { font-family: Arial, sans-serif; background: #f5f5f5; text-align: center; padding: 40px; }
+                .container { background: #fff; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 30px; max-width: 400px; margin: 0 auto; }
+                h1 { color: #007bff; margin-bottom: 20px; }
+                p { color: #333; font-size: 16px; margin-bottom: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <h1>WiFi配置成功！</h1>
+                <p>设备即将重启，并自动尝试连接您填写的WiFi网络。</p>
+                <p>本页面即将失联，请关闭本页面。</p>
+            </div>
+        </body>
+        </html>
+    )";
+    server.send(200, "text/html", html);
+    delay(2000); // 给用户2秒时间看到提示
+    WiFi.softAPdisconnect(true); // 关闭AP
+    delay(500);
     ESP.restart();
 }
 
@@ -565,4 +584,13 @@ void WiFiConfigManager::exitConfigMode() {
     WiFi.mode(WIFI_STA);
     delay(100);
     tryConnectWithSavedCredentials();
+}
+
+bool WiFiConfigManager::isAPModeActive() const {
+    wifi_mode_t mode = WiFi.getMode();
+    return (mode == WIFI_AP || mode == WIFI_AP_STA);
+}
+
+bool WiFiConfigManager::hasAPClient() const {
+    return WiFi.softAPgetStationNum() > 0;
 }

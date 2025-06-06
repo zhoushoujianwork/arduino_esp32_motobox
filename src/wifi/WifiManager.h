@@ -44,6 +44,8 @@ private:
     // 新增：单热点连接测试
     bool tryConnectSingle(const String& ssid, const String& password);
 
+   
+
 public:
     WiFiClientSecure wifiClientSecure;
     WiFiClient wifiClient;
@@ -55,6 +57,10 @@ public:
     void reset();
     bool getConfigMode() const { return isConfigMode; }
     String getSuccessPage();
+
+     // 新增：AP模式和客户端判断
+    bool isAPModeActive() const;
+    bool hasAPClient() const;
 };
 
 // 全局实例和接口函数

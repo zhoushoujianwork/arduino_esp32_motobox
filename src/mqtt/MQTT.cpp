@@ -44,6 +44,7 @@ bool MQTT::reconnect()
         if (device.get_device_state()->wifiConnected && mqttClient.connect(device.get_device_id().c_str(), mqtt_user, mqtt_password))
         {
             Serial.println("MQTT连接成功");
+            subscribeCommand();
             return true;
         }
         
@@ -143,5 +144,49 @@ void MQTT::publishDeviceInfo(device_state_t device_state)
     else
     {
         // Serial.println("设备信息发布失败,WiFi未连接");
+    }
+}
+
+/**
+ * @brief 订阅MQTT命令下发主题
+ */
+void MQTT::subscribeCommand() {
+    // 构建命令topic，例如 device/{device_id}/cmd
+    mqttClient.subscribe(mqtt_topic_command.c_str());
+    Serial.print("已订阅命令主题: ");
+    Serial.println(mqtt_topic_command);
+}
+
+/**
+ * @brief 处理MQTT下发的命令
+ * @param topic 主题
+ * @param payload 消息内容
+ * @param length 消息长度
+ */
+void MQTT::handleCommand(char* topic, byte* payload, unsigned int length) {
+    // 将payload转为字符串
+    String msg;
+    for (unsigned int i = 0; i < length; i++) {
+        msg += (char)payload[i];
+    }
+    Serial.print("收到命令消息: ");
+    Serial.println(msg);
+
+    // 简单解析JSON命令
+    if (msg.indexOf("reset_wifi") > 0) {
+        Serial.println("执行: 重置WiFi");
+        wifiManager.reset();
+    } else if (msg.indexOf("enter_config") > 0) {
+        Serial.println("执行: 进入配网模式");
+        wifiManager.enterConfigMode();
+    } else if (msg.indexOf("exit_config") > 0) {
+        Serial.println("执行: 退出配网模式");
+        wifiManager.exitConfigMode();
+    } else if (msg.indexOf("enter_sleep") > 0) {
+        Serial.println("执行: 进入睡眠模式");
+        // powerManager.requestLowPowerMode = true;
+        // powerManager.enterLowPowerMode();
+    } else {
+        Serial.println("未知命令");
     }
 }

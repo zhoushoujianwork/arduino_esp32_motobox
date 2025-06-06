@@ -7,6 +7,7 @@
 #include "gps/GPS.h"
 #include "qmi8658/IMU.h"
 #include "wifi/WifiManager.h"
+#include "power/PowerManager.h"
 
 // 胎压数据结构
 struct TirePressureData {

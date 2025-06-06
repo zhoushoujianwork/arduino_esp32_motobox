@@ -8,6 +8,7 @@
 #include "device.h"
 #include "qmi8658/IMU.h"
 #include "gps/GPS.h"
+#include "wifi/WifiManager.h"
 
 // 低功耗模式状态枚举
 enum PowerState {
@@ -21,8 +22,9 @@ public:
     PowerManager();
     void begin();
     void loop();
+    bool requestLowPowerMode;
     void enterLowPowerMode();
-    void configureWakeupSources();
+    bool configureWakeupSources();
     bool setupIMUWakeupSource(int intPin, float threshold = 0.05);
     bool isDeviceIdle();
     
@@ -41,7 +43,7 @@ public:
 
 
     // ==== 参数集中定义 ====
-    static constexpr unsigned long DEFAULT_IDLE_THRESHOLD = 300000; // 5分钟
+    static constexpr unsigned long DEFAULT_IDLE_THRESHOLD = 30000; // debug 30 秒 ，5分钟
     static constexpr float DEFAULT_MOTION_THRESHOLD = 0.1;         // 加速度变化阈值
     unsigned long lastMotionTime; // 最后一次检测到运动的时间
 

@@ -33,8 +33,8 @@
  */
 
 /* Common Device Configuration */
-#define APP_NAME            "DBL-BOX"
-#define BLE_NAME            "DBL-BOX"
+#define APP_NAME            "DBLBOX"
+#define BLE_NAME            "DBLBOX"
 #define SERVICE_UUID        "4FAFC201-1FB5-459E-8FCC-C5C9C331914B"
 #define DEVICE_CHAR_UUID    "BEB5483A-36E1-4688-B7F5-EA07361B26A8"
 #define GPS_CHAR_UUID       "BEB5483E-36E1-4688-B7F5-EA07361B26A8"
@@ -63,6 +63,7 @@
 #define MQTT_TOPIC_DEVICE_INFO  String("vehicle/v1/") + device.get_device_id() + "/device/info"
 #define MQTT_TOPIC_GPS         String("vehicle/v1/") + device.get_device_id() + "/gps/position"
 #define MQTT_TOPIC_IMU         String("vehicle/v1/") + device.get_device_id() + "/imu/gyro"
+#define MQTT_TOPIC_COMMAND     String("vehicle/v1/") + device.get_device_id() + "/command"
 
 /* MQTT Intervals (in milliseconds) */
 #ifndef MQTT_DEVICE_INFO_INTERVAL

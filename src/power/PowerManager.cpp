@@ -99,7 +99,7 @@ void PowerManager::configurePowerDomains()
     esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL, ESP_PD_OPTION_OFF);         // 关闭XTAL
 }
 
-void PowerManager::configureWakeupSources()
+bool PowerManager::configureWakeupSources()
 {
     Serial.println("[电源管理] 🔧 开始配置唤醒源...");
 
@@ -113,7 +113,7 @@ void PowerManager::configureWakeupSources()
         if (ret != ESP_OK)
         {
             Serial.printf("[电源管理] ❌ RTC GPIO初始化失败: %s\n", esp_err_to_name(ret));
-            return;
+            return false;
         }
         Serial.println("[电源管理] ✅ RTC GPIO初始化成功");
 
@@ -128,7 +128,7 @@ void PowerManager::configureWakeupSources()
         if (ret != ESP_OK)
         {
             Serial.printf("[电源管理] ❌ EXT0唤醒配置失败: %s\n", esp_err_to_name(ret));
-            return;
+            return false;
         }
         Serial.printf("[电源管理] ✅ EXT0唤醒配置成功 (GPIO%d, 低电平触发)\n", IMU_INT_PIN);
 
@@ -139,7 +139,7 @@ void PowerManager::configureWakeupSources()
         if (!imuConfigured)
         {
             Serial.println("[电源管理] ❌ IMU深度睡眠配置失败");
-            return;
+            return false;
         }
         Serial.println("[电源管理] ✅ IMU深度睡眠配置成功");
 
@@ -151,6 +151,7 @@ void PowerManager::configureWakeupSources()
     else
     {
         Serial.printf("[电源管理] ❌ 无效的IMU中断引脚: %d\n", IMU_INT_PIN);
+        return false;
     }
 
     // 配置定时器唤醒作为备份
@@ -160,9 +161,10 @@ void PowerManager::configureWakeupSources()
     if (ret != ESP_OK)
     {
         Serial.printf("[电源管理] ❌ 定时器唤醒配置失败: %s\n", esp_err_to_name(ret));
-        return;
+        return false;
     }
     Serial.println("[电源管理] ✅ 定时器唤醒源配置完成");
+    return true; // 全部配置成功
 }
 
 void PowerManager::disablePeripherals()
@@ -442,6 +444,7 @@ void PowerManager::loop()
                     Serial.printf("[电源管理] 电池状态: %d%%, 电压: %dmV\n",
                                   device.get_device_state()->battery_percentage,
                                   device.get_device_state()->battery_voltage);
+                    
                     enterLowPowerMode();
                 }
             }
@@ -474,6 +477,11 @@ void PowerManager::interruptLowPowerMode()
 
 bool PowerManager::isDeviceIdle()
 {
+    // 新增：AP模式下有客户端连接时不判定为空闲
+    if (wifiManager.isAPModeActive() && wifiManager.hasAPClient()) {
+        Serial.println("[电源管理] AP模式下有客户端连接，禁止休眠");
+        return false;
+    }
     // 检查设备是否空闲足够长的时间
     return (millis() - lastMotionTime) > idleThreshold;
 }
@@ -603,7 +611,15 @@ void PowerManager::enterLowPowerMode()
 
     Serial.println("[电源管理] ⏸️  开始配置唤醒源...");
     // 配置唤醒源
-    configureWakeupSources();
+    if (!configureWakeupSources()) {
+        Serial.println("[电源管理] ❌ 唤醒源配置失败，终止休眠流程，恢复正常模式");
+        powerState = POWER_STATE_NORMAL;
+#ifdef MODE_ALLINONE
+        tft_set_brightness(255);
+        Serial.println("[电源管理] 恢复屏幕亮度到最大");
+#endif
+        return;
+    }
     Serial.println("[电源管理] ✅ 唤醒源配置完成");
 
     // 打印设备信息和统计数据

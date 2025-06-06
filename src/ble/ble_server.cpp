@@ -47,16 +47,31 @@ class DeviceCharacteristicCallbacks : public NimBLECharacteristicCallbacks
 {
     void onWrite(NimBLECharacteristic *pCharacteristic)
     {
+        // 处理 BLE 写入命令
         std::string value = pCharacteristic->getValue();
-        if (!value.empty() && value[0] == 0x01) {
-            Serial.println("收到 BLE 重置 WiFi 命令");
-            wifiManager.reset();
-        }else if (!value.empty() && value[0] == 0x02) {
-            Serial.println("收到 BLE 进入配网模式命令");
-            wifiManager.enterConfigMode();
-        } else if (!value.empty() && value[0] == 0x03) {
-            Serial.println("收到 BLE 退出配网模式命令");
-            wifiManager.exitConfigMode();
+        if (!value.empty()) {
+            switch (value[0]) {
+                case 0x01:
+                    Serial.println("收到 BLE 重置 WiFi 命令");
+                    wifiManager.reset();
+                    break;
+                case 0x02:
+                    Serial.println("收到 BLE 进入配网模式命令");
+                    wifiManager.enterConfigMode();
+                    break;
+                case 0x03:
+                    Serial.println("收到 BLE 退出配网模式命令");
+                    wifiManager.exitConfigMode();
+                    break;
+                // case 0x04:
+                //     Serial.println("收到 BLE 进入睡眠模式");
+                //     powerManager.requestLowPowerMode = true;
+                //     powerManager.enterLowPowerMode();
+                //     break;
+                default:
+                    Serial.printf("收到未知 BLE 命令: 0x%02X\n", value[0]);
+                    break;
+            }
         }
     }
 };
