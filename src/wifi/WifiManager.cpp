@@ -8,20 +8,30 @@ bool needCheckInternet = false;
 
 void WiFiEvent(WiFiEvent_t event)
 {
+    // 电源倒计时的时候不处理
+    if (powerManager.powerState == POWER_STATE_COUNTDOWN) {
+        return;
+    }
     switch (event)
     {
+    case SYSTEM_EVENT_STA_START:
+        Serial.println("STA WiFi已开始连接");
+        break;
+    case SYSTEM_EVENT_STA_STOP:
+        Serial.println("STA WiFi已停止连接");
+        break;
     case SYSTEM_EVENT_STA_CONNECTED:
-        Serial.println("WiFi已连接");
+        Serial.println("STA WiFi已连接");
         device.set_wifi_connected(true);
         wifiConnectedTime = millis();
         needCheckInternet = true;
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
-        Serial.println("WiFi已断开");
+        Serial.println("STA WiFi已断开");
         device.set_wifi_connected(false);
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
-        Serial.printf("获取到IP地址: %s\n", WiFi.localIP().toString().c_str());
+        Serial.printf("STA 获取到IP地址: %s\n", WiFi.localIP().toString().c_str());
         break;
     case SYSTEM_EVENT_AP_START:
         Serial.println("AP模式已启动");

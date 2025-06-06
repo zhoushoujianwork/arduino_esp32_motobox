@@ -18,6 +18,11 @@ MQTT::MQTT(const char *server, int port, const char *user, const char *password)
     mqtt_topic_gps = MQTT_TOPIC_GPS;
     mqtt_topic_imu = MQTT_TOPIC_IMU;
     mqtt_topic_device_info = MQTT_TOPIC_DEVICE_INFO;
+    mqtt_topic_command = MQTT_TOPIC_COMMAND;
+
+    mqttClient.setCallback([this](char* topic, byte* payload, unsigned int length) {
+        this->handleCommand(topic, payload, length);
+    });
 }
 
 bool MQTT::reconnect()
@@ -43,8 +48,9 @@ bool MQTT::reconnect()
     while (attempts < MAX_ATTEMPTS) {
         if (device.get_device_state()->wifiConnected && mqttClient.connect(device.get_device_id().c_str(), mqtt_user, mqtt_password))
         {
-            Serial.println("MQTT连接成功");
+            Serial.println("重试 MQTT连接成功");
             subscribeCommand();
+
             return true;
         }
         
@@ -62,13 +68,18 @@ bool MQTT::reconnect()
 
 void MQTT::loop()
 {
+    // 如果WiFi未连接，直接返回，不做任何MQTT操作
     if (!device.get_device_state()->wifiConnected)
     {
-        // set mqttClient to disconnected
-        mqttClient.disconnect();
+        // 只在第一次WiFi断开时断开MQTT，避免反复调用
+        if (mqttClient.connected()) {
+            mqttClient.disconnect();
+            Serial.println("WiFi断开，已断开MQTT连接");
+        }
         return;
     }
 
+    // 只有WiFi连接时才处理MQTT连接和循环
     if (!mqttClient.connected())
     {
         Serial.println("MQTT连接断开，尝试重新连接");
@@ -76,10 +87,6 @@ void MQTT::loop()
         {
             Serial.println("MQTT连接失败");
             return;
-        }
-        else
-        {
-            Serial.println("MQTT连接成功");
         }
     }
 

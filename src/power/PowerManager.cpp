@@ -423,7 +423,7 @@ bool PowerManager::isDeviceIdle()
 {
     // 新增：AP模式下有客户端连接时不判定为空闲
     if (wifiManager.isAPModeActive() && wifiManager.hasAPClient()) {
-        Serial.println("[电源管理] AP模式下有客户端连接，禁止休眠");
+        // Serial.println("[电源管理] AP模式下有客户端连接，禁止休眠");
         return false;
     }
     // 检查设备是否空闲足够长的时间

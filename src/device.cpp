@@ -53,6 +53,10 @@ void Device::init()
 
 void Device::print_device_info()
 {
+    // 如果休眠倒计时的时候不打印
+    if (powerManager.powerState == POWER_STATE_COUNTDOWN) {
+        return;
+    }
     Serial.print("Device Info:");
     Serial.printf("WiFi Connected: %d\t", device_state.wifiConnected);
     Serial.printf("BLE Connected: %d\t", device_state.bleConnected);

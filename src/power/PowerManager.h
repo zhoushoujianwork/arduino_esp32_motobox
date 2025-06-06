@@ -20,6 +20,7 @@ enum PowerState {
 class PowerManager {
 public:
     PowerManager();
+    PowerState powerState;        // 当前电源状态
     void begin();
     void loop();
     bool requestLowPowerMode;
@@ -49,7 +50,6 @@ public:
 private:
     unsigned long idleThreshold;  // 进入低功耗模式的空闲时间阈值（毫秒）
     float motionThreshold;        // 运动检测阈值
-    PowerState powerState;        // 当前电源状态
     bool interruptRequested;      // 是否请求打断低功耗模式
     RTC_DATA_ATTR static bool sleepEnabled;  // 是否启用休眠功能（RTC内存，由编译时配置决定）
     
