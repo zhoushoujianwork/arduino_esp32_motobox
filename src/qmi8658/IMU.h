@@ -10,8 +10,7 @@
 #define dt 0.01    // 时间间隔，单位是秒（假设采样率为100Hz）
 
 // 运动检测相关参数
-// 运动检测相关参数
-#define MOTION_DETECTION_THRESHOLD_DEFAULT 0.1   // 增加到 0.1g
+#define MOTION_DETECTION_THRESHOLD_DEFAULT 0.05   
 #define MOTION_DETECTION_WINDOW_DEFAULT 32       // 增加窗口大小到32
 #define MOTION_DETECTION_DEBOUNCE_MS 200        // 增加去抖时间到200ms
 
@@ -37,6 +36,19 @@ public:
     // 电源管理方法
     void setAccelPowerMode(uint8_t mode);  // 0=低功耗，1=正常，2=高性能
     void setGyroEnabled(bool enabled);
+
+    /**
+     * @brief 检测是否有运动
+     * @return true: 检测到运动, false: 未检测到
+     */
+    bool detectMotion();
+
+    /**
+     * @brief 设置运动检测参数
+     * @param threshold 运动阈值
+     * @param window    采样窗口
+     */
+    void setMotionDetectionParams(float threshold, int window = MOTION_DETECTION_WINDOW_DEFAULT);
     
 private:
     int sda;
@@ -48,6 +60,12 @@ private:
     
     // 配置运动检测参数
     void configureMotionDetection(float threshold);
+
+    // 运动检测相关变量
+    float lastAccelMagnitude = 0;
+    float accumulatedDelta = 0;
+    int sampleIndex = 0;
+    int sampleWindow = MOTION_DETECTION_WINDOW_DEFAULT;
 };
 
 extern IMU imu;

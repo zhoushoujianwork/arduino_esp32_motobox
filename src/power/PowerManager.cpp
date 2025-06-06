@@ -20,7 +20,6 @@ PowerManager::PowerManager()
 {
     // 设置默认值
     idleThreshold = DEFAULT_IDLE_THRESHOLD; // 默认1分钟无活动进入低功耗模式
-    motionThreshold = DEFAULT_MOTION_THRESHOLD; // 加速度变化阈值
     lastMotionTime = 0;
     powerState = POWER_STATE_NORMAL;
     interruptRequested = false;
@@ -33,7 +32,6 @@ PowerManager::PowerManager()
 
 void PowerManager::begin()
 {
-    lastMotionTime = millis();
     powerState = POWER_STATE_NORMAL;
     interruptRequested = false;
 
@@ -336,55 +334,6 @@ void PowerManager::disablePeripherals()
 #endif
 }
 
-bool PowerManager::detectMotion()
-{
-    extern IMU imu;
-    imu_data_t *imuData = device.get_imu_data();
-
-    // 计算当前加速度幅值
-    float accelMagnitude = sqrt(
-        imuData->accel_x * imuData->accel_x +
-        imuData->accel_y * imuData->accel_y +
-        imuData->accel_z * imuData->accel_z);
-
-    // 计算变化量
-    float delta = abs(accelMagnitude - lastAccelMagnitude);
-    lastAccelMagnitude = accelMagnitude;
-
-    // 累积变化量
-    accumulatedDelta += delta;
-    sampleIndex++;
-
-    // 每收集SAMPLE_COUNT个样本进行一次判断
-    if (sampleIndex >= SAMPLE_COUNT)
-    {
-        float averageDelta = accumulatedDelta / SAMPLE_COUNT;
-        bool motionDetected = averageDelta > (motionThreshold * 0.8);
-
-        // 重置累积值
-        accumulatedDelta = 0;
-        sampleIndex = 0;
-
-        // 调试输出
-        if (powerState != POWER_STATE_NORMAL)
-        {
-            Serial.printf("[电源管理] 运动检测: 平均变化=%.4f, 阈值=%.4f\n",
-                          averageDelta, motionThreshold * 0.8);
-        }
-
-        // 如果检测到运动且当前处于非正常工作状态，则自动打断低功耗进入过程
-        if (motionDetected && powerState != POWER_STATE_NORMAL)
-        {
-            Serial.printf("[电源管理] 检测到运动 (平均变化=%.4f), 打断低功耗模式\n", averageDelta);
-            interruptLowPowerMode();
-        }
-
-        return motionDetected;
-    }
-
-    return false;
-}
-
 void PowerManager::loop()
 {
     static unsigned long lastMotionCheck = 0;
@@ -430,7 +379,7 @@ void PowerManager::loop()
         if (powerState == POWER_STATE_NORMAL)
         {
             // 检测设备是否有运动
-            if (detectMotion())
+            if (imu.detectMotion())
             {
                 // 如果有运动，更新最后一次运动时间
                 lastMotionTime = millis();
@@ -555,7 +504,7 @@ void PowerManager::enterLowPowerMode()
             }
 
             // 在倒计时期间检测运动，如果有运动则取消进入低功耗模式
-            if (detectMotion())
+            if (imu.detectMotion())
             {
                 Serial.println("[电源管理] 检测到运动，取消进入低功耗模式");
                 lastMotionTime = millis(); // 更新最后一次运动时间

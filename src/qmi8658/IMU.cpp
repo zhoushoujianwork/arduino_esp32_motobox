@@ -1,4 +1,5 @@
 #include "IMU.h"
+#include <math.h>
 
 #define USE_WIRE
 
@@ -14,6 +15,7 @@ IMU::IMU(int sda, int scl, int motionIntPin)
     this->motionIntPin = motionIntPin;
     this->motionThreshold = MOTION_DETECTION_THRESHOLD_DEFAULT;
     this->motionDetectionEnabled = false;
+    this->sampleWindow = MOTION_DETECTION_WINDOW_DEFAULT;
 }
 
 void IMU::begin()
@@ -286,4 +288,30 @@ void IMU::loop()
             }
         }
     }
+}
+
+/**
+ * @brief 检测是否有运动
+ * @return true: 检测到运动, false: 未检测到
+ */
+bool IMU::detectMotion()
+{
+    imu_data_t *imuData = device.get_imu_data();
+    float accelMagnitude = sqrt(
+        imuData->accel_x * imuData->accel_x +
+        imuData->accel_y * imuData->accel_y +
+        imuData->accel_z * imuData->accel_z);
+    float delta = fabs(accelMagnitude - lastAccelMagnitude);
+    lastAccelMagnitude = accelMagnitude;
+    accumulatedDelta += delta;
+    sampleIndex++;
+    if (sampleIndex >= sampleWindow)
+    {
+        float averageDelta = accumulatedDelta / sampleWindow;
+        bool motionDetected = averageDelta > (motionThreshold * 0.8);
+        accumulatedDelta = 0;
+        sampleIndex = 0;
+        return motionDetected;
+    }
+    return false;
 }

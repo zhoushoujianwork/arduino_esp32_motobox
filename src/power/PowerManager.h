@@ -44,7 +44,6 @@ public:
 
     // ==== 参数集中定义 ====
     static constexpr unsigned long DEFAULT_IDLE_THRESHOLD = 30000; // debug 30 秒 ，5分钟
-    static constexpr float DEFAULT_MOTION_THRESHOLD = 0.1;         // 加速度变化阈值
     unsigned long lastMotionTime; // 最后一次检测到运动的时间
 
 private:
@@ -60,7 +59,6 @@ private:
     float accumulatedDelta;      // 累积变化量
     int sampleIndex;             // 采样索引
     
-    bool detectMotion();          // 检测设备是否在运动
     void disablePeripherals();    // 关闭外设
     void handleWakeup();          // 处理唤醒事件
     void configurePowerDomains(); // 配置电源域
