@@ -37,8 +37,11 @@ Device::Device()
 
 void Device::init()
 {
-    device_state.device_firmware_version = FIRMWARE_VERSION;
-    device_state.device_hardware_version = HARDWARE_VERSION;
+    // 从getVersionInfo()获取版本信息
+    const VersionInfo& versionInfo = getVersionInfo();
+    device_state.device_firmware_version = versionInfo.firmware_version;
+    device_state.device_hardware_version = versionInfo.hardware_version;
+    
     device_state.sleep_time = 300; // 默认5分钟无活动进入低功耗模式
     device_state.wifiConnected = false;
 #ifdef MODE_CLIENT

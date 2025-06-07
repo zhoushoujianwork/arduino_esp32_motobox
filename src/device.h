@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 #include "compass/Compass.h"
 #include "config.h"
+#include "version.h"  // 包含版本信息头文件
 
 typedef struct
 {
@@ -92,42 +93,40 @@ public:
     void set_gps_ready(bool ready);
     void set_imu_ready(bool ready);
     void print_device_info();
-    void set_device_state(device_state_t *state);
     String get_device_id();
-    String device_state_to_json();
-    
     device_state_t *get_device_state();
+    void set_device_state(device_state_t *state);
+    String device_state_to_json();
 
-    // gps
+    // GPS相关
     gps_data_t *get_gps_data();
     void set_gps_data(gps_data_t *data);
-    float getTotalDistanceKm();
     String gps_data_to_json();
     void printGpsData();
+    float getTotalDistanceKm();
 
-    // imu
+    // IMU相关
     imu_data_t *get_imu_data();
     void set_imu_data(imu_data_t *data);
     String imu_data_to_json();
     void printImuData();
 
-    // 罗盘相关方法
+    // 罗盘相关
     compass_data_t *get_compass_data();
     void set_compass_data(compass_data_t *data);
     String compass_data_to_json();
     void printCompassData();
 
-    // 新增：硬件初始化
+    // 硬件初始化
     void initializeHardware();
-
 
 private:
     device_state_t device_state;
     gps_data_t gps_data;
     imu_data_t imu_data;
-    compass_data_t compass_data;  // 添加罗盘数据成员
-    float totalDistanceKm;
-    long lastDistanceTime;
+    compass_data_t compass_data;
+    unsigned long lastDistanceTime = 0;
+    float totalDistanceKm = 0;
 };
 
 extern Device device;
