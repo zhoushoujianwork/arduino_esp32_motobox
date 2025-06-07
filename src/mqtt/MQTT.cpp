@@ -213,8 +213,8 @@ void MQTT::handleCommand(char* topic, byte* payload, unsigned int length) {
     } else if (strcmp(cmd, "set_sleep_time") == 0) {
         // 获取sleep_time字段
         int sleepTime = doc["sleep_time"] | 0; // 默认0
-        device.get_device_state()->sleep_time = sleepTime;
-        Serial.printf("设置睡眠时间: %d 秒\n", sleepTime);
+        powerManager.setSleepTime(sleepTime); // 通过powerManager统一设置和保存
+        Serial.printf("设置休眠时间: %d 秒\n", sleepTime);
     } else {
         Serial.println("未知命令");
     }

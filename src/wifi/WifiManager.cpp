@@ -1,6 +1,7 @@
 #include "WifiManager.h"
 #include "power/PowerManager.h"
 #include "wifi/wifi_config_page.h"
+#include "utils/PreferencesUtils.h"
 
 // WiFi事件回调函数
 unsigned long wifiConnectedTime = 0;
@@ -112,7 +113,7 @@ void WiFiConfigManager::loop()
 // 特性：如果没有已保存的WiFi，返回false，通知外部进入配网模式
 bool WiFiConfigManager::tryConnectWithSavedCredentials()
 {
-    String wifiListStr = preferences.getString("wifi_list", "[]");
+    String wifiListStr = PreferencesUtils::loadString(PreferencesUtils::NS_WIFI, PreferencesUtils::KEY_WIFI_LIST, "[]");
     DynamicJsonDocument doc(1024);
     deserializeJson(doc, wifiListStr);
     JsonArray arr = doc.as<JsonArray>();
@@ -256,7 +257,7 @@ void WiFiConfigManager::setupWebServer()
     // 新增：获取已保存WiFi列表接口
     server.on("/saved_wifi", HTTP_GET, [this]()
               {
-        String wifiListStr = preferences.getString("wifi_list", "[]");
+        String wifiListStr = PreferencesUtils::loadString(PreferencesUtils::NS_WIFI, PreferencesUtils::KEY_WIFI_LIST, "[]");
         Serial.printf("[Web] 查询已保存WiFi: %s\n", wifiListStr.c_str());
         server.send(200, "application/json", wifiListStr); });
 
@@ -265,7 +266,7 @@ void WiFiConfigManager::setupWebServer()
               {
         String ssid = server.arg("ssid");
         Serial.printf("[Web] 请求删除WiFi: %s\n", ssid.c_str());
-        String wifiListStr = preferences.getString("wifi_list", "[]");
+        String wifiListStr = PreferencesUtils::loadString(PreferencesUtils::NS_WIFI, PreferencesUtils::KEY_WIFI_LIST, "[]");
         DynamicJsonDocument doc(1024);
         DeserializationError err = deserializeJson(doc, wifiListStr);
         if (err) {
@@ -284,7 +285,7 @@ void WiFiConfigManager::setupWebServer()
         }
         String output;
         serializeJson(doc, output);
-        preferences.putString("wifi_list", output);
+        PreferencesUtils::saveString(PreferencesUtils::NS_WIFI, PreferencesUtils::KEY_WIFI_LIST, output);
         Serial.printf("[Web] 删除结果: %s, 新列表: %s\n", deleted ? "已删除" : "未找到", output.c_str());
         server.send(200, "application/json", output); });
 
@@ -368,7 +369,7 @@ String WiFiConfigManager::getConfigPage()
 void WiFiConfigManager::saveWiFiCredentials(const String &ssid, const String &password)
 {
     // 读取已保存热点
-    String wifiListStr = preferences.getString("wifi_list", "[]");
+    String wifiListStr = PreferencesUtils::loadString(PreferencesUtils::NS_WIFI, PreferencesUtils::KEY_WIFI_LIST, "[]");
     DynamicJsonDocument doc(1024);
     deserializeJson(doc, wifiListStr);
     JsonArray arr = doc.as<JsonArray>();
@@ -391,7 +392,7 @@ void WiFiConfigManager::saveWiFiCredentials(const String &ssid, const String &pa
     }
     String output;
     serializeJson(doc, output);
-    preferences.putString("wifi_list", output);
+    PreferencesUtils::saveString(PreferencesUtils::NS_WIFI, PreferencesUtils::KEY_WIFI_LIST, output);
     Serial.printf("WiFi凭据保存成功: %s, %s\n", ssid.c_str(), password.c_str());
 }
 

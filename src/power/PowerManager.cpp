@@ -9,6 +9,7 @@
 #include "soc/periph_defs.h"
 #include "led/PWMLED.h"
 #include "device.h"
+#include "utils/PreferencesUtils.h"
 
 // 初始化静态变量
 #if ENABLE_SLEEP
@@ -22,19 +23,22 @@ PowerManager::PowerManager()
     // 设置默认值
     lastMotionTime = 0;
     powerState = POWER_STATE_NORMAL;
+    sleepTimeSec = device.get_device_state()->sleep_time;
 }
 
 void PowerManager::begin()
 {
     powerState = POWER_STATE_NORMAL;
 
-    // 支持 配置 idleThreshold ，单位：毫秒
-    idleThreshold = device.get_device_state()->sleep_time * 1000;
+    // 启动时从存储读取休眠时间（秒），如无则用默认值
+    sleepTimeSec = PreferencesUtils::loadULong(PreferencesUtils::NS_POWER, PreferencesUtils::KEY_SLEEP_TIME, device.get_device_state()->sleep_time);
+    idleThreshold = sleepTimeSec * 1000;
 
     // 处理唤醒事件
     handleWakeup();
 
     Serial.println("[电源管理] 休眠功能已启用 (编译时配置)");
+    Serial.printf("[电源管理] 当前休眠时间: %lu 秒\n", sleepTimeSec);
 }
 
 void PowerManager::handleWakeup()
@@ -373,7 +377,7 @@ void PowerManager::loop()
                 // 检查设备是否空闲足够长的时间
                 if (isDeviceIdle())
                 {
-                    Serial.println("[电源管理] 设备已静止超过1分钟，准备进入低功耗模式...");
+                    Serial.printf("[电源管理] 设备已静止超过%lu秒，准备进入低功耗模式...\n", sleepTimeSec);
                     Serial.printf("[电源管理] 电池状态: %d%%, 电压: %dmV\n",
                                   device.get_device_state()->battery_percentage,
                                   device.get_device_state()->battery_voltage);
@@ -607,4 +611,22 @@ void PowerManager::checkWakeupCause()
         Serial.printf("[系统] 唤醒原因: %d\n", wakeup_reason);
         break;
     }
+}
+
+// 新增：设置休眠时间（秒），并保存到存储，同时更新设备状态，重新计时休眠
+void PowerManager::setSleepTime(unsigned long seconds) {
+    device.get_device_state()->sleep_time = seconds; // 更新设备状态
+    sleepTimeSec = seconds;
+    idleThreshold = sleepTimeSec * 1000;
+    lastMotionTime = millis(); // 新增：重置空闲计时
+    PreferencesUtils::saveULong(PreferencesUtils::NS_POWER, PreferencesUtils::KEY_SLEEP_TIME, sleepTimeSec);
+    Serial.printf("[电源管理] 休眠时间已更新并保存: %lu 秒\n", sleepTimeSec);
+}
+
+// 新增：获取休眠时间（秒）
+unsigned long PowerManager::getSleepTime() const {
+    if (device.get_device_state()->sleep_time != sleepTimeSec) {
+        Serial.printf("[电源管理] 出现问题：休眠时间不一致 %lu 秒，device: %lu 秒\n", sleepTimeSec, device.get_device_state()->sleep_time);
+    }
+    return sleepTimeSec;
 }

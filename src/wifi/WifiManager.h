@@ -9,6 +9,7 @@
 #include "device.h"
 #include "config.h"
 #include "esp_wifi.h"
+#include "utils/PreferencesUtils.h"
 
 class WiFiConfigManager
 {

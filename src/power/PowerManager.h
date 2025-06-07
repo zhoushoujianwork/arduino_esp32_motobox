@@ -28,6 +28,9 @@ public:
     bool configureWakeupSources();
     bool isDeviceIdle();
     
+    // 新增：获取/设置休眠时间（秒）
+    void setSleepTime(unsigned long seconds);
+    unsigned long getSleepTime() const;
     
     // 新增：获取当前电源状态
     PowerState getPowerState() { return powerState; }
@@ -58,6 +61,7 @@ private:
     void configurePowerDomains(); // 配置电源域
 
     unsigned long lastMotionTime; // 最后一次检测到运动的时间
+    unsigned long sleepTimeSec;   // 休眠时间（秒）
    
 };
 
