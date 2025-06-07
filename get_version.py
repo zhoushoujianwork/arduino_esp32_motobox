@@ -2,7 +2,7 @@ import subprocess
 import os
 
 FILENAME_BUILDNO = 'versioning'
-FILENAME_VERSION_H = 'include/version.h'
+FILENAME_VERSION_H = 'src/version.h'  # Changed to src/version.h to match project structure
 
 def get_latest_tag():
     try:
@@ -44,29 +44,33 @@ def write_version_h(tag, build_no):
         f.write(hf)
     print(f"写入 {FILENAME_VERSION_H} 完成: {version_full}")
 
-def main():
+# Standalone execution function
+def run_standalone():
     tag = get_latest_tag()
     build_no = get_and_update_buildno()
     write_version_h(tag, build_no)
 
 if __name__ == "__main__":
-    main()
+    run_standalone()
 
-def main(env, *args, **kwargs):
+# PlatformIO integration function
+def env_inject_version(env):
     version = get_latest_tag()
     hardware = env["PIOENV"]  # 获取当前环境名
     print("Injecting FIRMWARE_VERSION:", version)
     print("Injecting HARDWARE_VERSION:", hardware)
 
-    if version == "unknown" or hardware == "unknown":
-        env.Exit(1)
-        return -1
-
+    # Add version definitions directly to build flags
     env.Append(CPPDEFINES=[
-        ("FIRMWARE_VERSION", '"%s"' % version),
-        ("HARDWARE_VERSION", '"%s"' % hardware)
+        ("FIRMWARE_VERSION", '\\"%s\\"' % version),
+        ("HARDWARE_VERSION", '\\"%s\\"' % hardware)
     ])
+    
+    # Also generate version.h file
+    build_no = get_and_update_buildno()
+    write_version_h(version, build_no)
     return 0
 
+# This is the function that PlatformIO calls
 def before_build(env, platform):
-    main(env)
+    return env_inject_version(env)
