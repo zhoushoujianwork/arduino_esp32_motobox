@@ -1,21 +1,65 @@
-# ESP32-S3 MotoBox IMU唤醒功能实现指南
+# ESP32-S3 MotoBox 项目知识库
 
-## 功能概述
+## 开发规则
+dev分支开发，最终merge合并到 main分支，并附带标准 tag；
 
-本文档详细说明了如何使用IMU(惯性测量单元)的中断功能来实现ESP32-S3在静止一段时间后的自动唤醒功能。该功能允许设备在检测到运动时从深度睡眠状态中唤醒，从而实现低功耗与及时响应的平衡。
+## 项目概述
+ESP32-S3 MotoBox是一个基于ESP32-S3的摩托车数据采集与显示系统，专注于嵌入式系统开发和低功耗设计。该项目结合了多种传感器数据采集、无线通信和电源管理功能，为摩托车提供智能化解决方案。
 
-## 实现原理
+## 核心功能
 
-1. **IMU运动检测**：利用QMI8658传感器的运动检测功能，当检测到加速度变化超过预设阈值时触发中断
-2. **RTC GPIO唤醒**：将IMU中断引脚连接到ESP32-S3的RTC GPIO，配置为外部唤醒源
-3. **低功耗模式**：在深度睡眠期间，仅保持IMU的加速度计在低功耗模式下工作，其他外设关闭
+### 1. 低功耗管理系统
+- **IMU唤醒功能**：利用QMI8658传感器的运动检测功能实现设备自动唤醒
+- **深度睡眠机制**：静止一段时间后自动进入深度睡眠状态，大幅降低功耗
+- **硬件唤醒实现**：通过IMU中断引脚连接到ESP32-S3的RTC GPIO实现唤醒
+- **运动检测参数**：可配置的运动检测阈值和检测窗口
 
-## 关键组件
+### 2. 网络连接功能
+- **WiFi管理**：支持STA和AP两种模式，具备自动重连和配网功能
+- **MQTT通信**：支持远程命令控制和数据上报
+- **连接状态处理**：当WiFi断开时，MQTT不再进行请求，避免资源浪费
+- **配网模式**：支持通过BLE指令或MQTT订阅指令进入配网模式
 
-### 1. IMU类增强功能
+### 3. 电源管理策略
+- **运动检测控制**：无运动达到阈值时开启休眠倒计时
+- **AP模式特殊处理**：AP模式下有客户端连接时不进入休眠，保持服务
+- **休眠安全机制**：休眠模式配置失败时会重试，防止设备无法唤醒
+- **可配置休眠时间**：支持通过MQTT远程设置休眠时间参数
 
-IMU类已增强以支持以下功能：
+### 4. 状态指示系统
+- **PWM灯光设计**：绿色5%常亮表示WiFi连接成功，具备联网能力
+- **亮度优化**：优化PWM灯光亮度，防止出现闪光问题和解决常亮问题
 
+### 5. 配置方式
+- **BLE配置**：支持通过蓝牙低功耗进行设备配置
+- **MQTT远程配置**：支持通过MQTT订阅指令进行远程配置
+- **WiFi配置界面**：
+  - 支持列表选择热点名称或用户手动输入
+  - 用户输入密码
+  - 配置完成后直接重启设备，无需校验
+  - 重启后自动尝试使用已保存的WiFi配置连接网络
+
+## 版本历史
+
+### v2.2.2 (2025-06-07)
+- 优化振动监测阈值
+- 设置PWM灯光亮度，防止闪光和常亮问题
+- 增强电源管理功能
+- 支持休眠时间设置与获取
+
+### v2.2.1 (2025-06-07)
+- 支持MQTT下发休眠时间配置
+
+### v2.2.0 (2025-06-06)
+- 支持MQTT配置
+
+### v2.1.0 (2025-06-02)
+- 支持低功耗模式
+- 支持BLE配置设备进入组网模式
+
+## 技术实现细节
+
+### IMU唤醒功能实现
 ```cpp
 // 运动检测相关方法
 bool enableMotionDetection(int intPin, float threshold = MOTION_DETECTION_THRESHOLD_DEFAULT);
@@ -31,10 +75,7 @@ bool restoreFromDeepSleep();
 bool isMotionDetected();
 ```
 
-### 2. PowerManager类集成
-
-PowerManager类已更新以利用IMU的运动检测功能：
-
+### PowerManager类集成
 ```cpp
 // 配置IMU作为唤醒源
 bool setupIMUWakeupSource(int intPin, float threshold = 0.05);
@@ -43,89 +84,21 @@ bool setupIMUWakeupSource(int intPin, float threshold = 0.05);
 void configureWakeupSources();
 ```
 
-## 配置参数
-
-### IMU运动检测参数
-
-```cpp
-// 运动检测配置
-#define MOTION_DETECTION_THRESHOLD_DEFAULT 0.05  // 默认运动检测阈值 (g)
-#define MOTION_DETECTION_WINDOW_DEFAULT 5        // 默认运动检测窗口大小
-#define MOTION_DETECTION_DEBOUNCE_MS 100         // 运动检测去抖时间 (ms)
-```
-
-### IMU中断引脚定义
-
-```cpp
-// 在device.h中定义
-#ifndef IMU_INT_PIN
-#define IMU_INT_PIN 4  // 默认使用GPIO4作为IMU中断引脚，请根据实际硬件修改
-#endif
-```
-
-## 唤醒流程
-
+### 唤醒流程
 1. 设备进入深度睡眠前，配置IMU为低功耗模式并启用运动检测
 2. 将IMU中断引脚配置为RTC GPIO唤醒源
 3. 当检测到运动时，IMU中断引脚触发，唤醒ESP32-S3
 4. 系统启动后检查唤醒原因，并根据唤醒源执行相应操作
 
-## 唤醒源处理
-
-```cpp
-void checkWakeupCause() {
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  
-  switch(wakeup_reason) {
-    case ESP_SLEEP_WAKEUP_EXT0:
-      Serial.println("[系统] 通过外部中断唤醒 (EXT0)");
-      // 检查是否是IMU中断引脚唤醒
-      if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21) {
-        if (digitalRead(IMU_INT_PIN) == LOW) {
-          Serial.println("[系统] 检测到IMU运动唤醒");
-          // 这里可以添加特定的运动唤醒处理逻辑
-        } else {
-          Serial.println("[系统] 检测到按钮唤醒");
-          // 这里可以添加特定的按钮唤醒处理逻辑
-        }
-      }
-      break;
-    case ESP_SLEEP_WAKEUP_TIMER:
-      Serial.println("[系统] 通过定时器唤醒");
-      break;
-    default:
-      Serial.printf("[系统] 唤醒原因: %d\n", wakeup_reason);
-      break;
-  }
-}
-```
-
-## 注意事项
+## 注意事项与最佳实践
 
 1. **RTC GPIO限制**：ESP32-S3只有GPIO0-GPIO21可用作RTC GPIO，请确保IMU中断引脚连接到这些引脚之一
 2. **中断引脚状态**：确保中断引脚在配置为唤醒源时不处于触发状态，否则设备将立即唤醒
 3. **电源管理**：在深度睡眠前关闭所有不必要的外设，以最大化电池寿命
 4. **去抖处理**：添加适当的去抖逻辑，避免误触发
+5. **WiFi与休眠**：当设备处于WiFi AP配网模式且有客户端连接时，不应进入休眠状态
+6. **休眠失败处理**：当休眠模式配置失败时，应重新尝试进入休眠模式，防止设备无法唤醒
 
-## 调试技巧
+## 许可证信息
 
-1. 使用串口监视器观察IMU中断状态和唤醒原因
-2. 调整运动检测阈值以平衡灵敏度和功耗
-3. 测试不同的运动模式，确保唤醒功能在各种场景下可靠工作
-
-## 硬件连接
-
-确保IMU中断引脚正确连接到ESP32-S3的RTC GPIO引脚，并根据实际硬件修改`IMU_INT_PIN`定义。
-
-## 功能测试
-
-1. 编译并上传代码到设备
-2. 观察设备进入深度睡眠状态
-3. 轻轻移动或摇晃设备，观察是否唤醒
-4. 检查串口输出，确认唤醒原因是IMU中断
-
-## 进一步优化
-
-1. 根据不同的使用场景动态调整运动检测阈值
-2. 实现自适应功耗管理，根据电池电量调整唤醒灵敏度
-3. 添加运动模式识别，区分不同类型的运动并执行相应操作
+本项目采用GNU General Public License v3.0 (GPL-3.0)开源许可证，并附加Commons Clause限制条款，禁止商业使用。未经授权，不得将本项目用于商业目的。

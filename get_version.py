@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import subprocess
 import os
 
@@ -8,7 +9,7 @@ def get_latest_tag():
     try:
         tag = subprocess.check_output(['git', 'describe', '--tags', '--abbrev=0']).decode().strip()
     except Exception as e:
-        print("获取 git tag 失败: %s" % e)
+        print("Failed to get git tag: %s" % e)
         tag = "v0.0.0"
     return tag
 
@@ -19,7 +20,7 @@ def get_and_update_buildno():
             with open(FILENAME_BUILDNO) as f:
                 build_no = int(f.readline().strip()) + 1
         except Exception as e:
-            print('读取 build 号失败，重置为 1:', e)
+            print('Failed to read build number, reset to 1:', e)
             build_no = 1
     with open(FILENAME_BUILDNO, 'w+') as f:
         f.write(str(build_no))
@@ -27,22 +28,27 @@ def get_and_update_buildno():
     return build_no
 
 def write_version_h(tag, build_no):
-    version_full = f"{tag}+{build_no}"
-    hf = f"""
+    version_full = "{0}+{1}".format(tag, build_no)
+    hf = """
 #ifndef BUILD_NUMBER
-  #define BUILD_NUMBER "{build_no}"
+  #define BUILD_NUMBER "{0}"
 #endif
 #ifndef VERSION
-  #define VERSION "{version_full}"
+  #define VERSION "{1}"
 #endif
 #ifndef VERSION_SHORT
-  #define VERSION_SHORT "{version_full}"
+  #define VERSION_SHORT "{1}"
 #endif
-"""
-    os.makedirs(os.path.dirname(FILENAME_VERSION_H), exist_ok=True)
+""".format(build_no, version_full)
+    
+    # Create directory if it doesn't exist
+    dir_path = os.path.dirname(FILENAME_VERSION_H)
+    if dir_path and not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+        
     with open(FILENAME_VERSION_H, 'w+') as f:
         f.write(hf)
-    print(f"写入 {FILENAME_VERSION_H} 完成: {version_full}")
+    print("Writing {0} completed: {1}".format(FILENAME_VERSION_H, version_full))
 
 # Standalone execution function
 def run_standalone():
@@ -56,7 +62,7 @@ if __name__ == "__main__":
 # PlatformIO integration function
 def env_inject_version(env):
     version = get_latest_tag()
-    hardware = env["PIOENV"]  # 获取当前环境名
+    hardware = env["PIOENV"]  # Get current environment name
     print("Injecting FIRMWARE_VERSION:", version)
     print("Injecting HARDWARE_VERSION:", hardware)
 
