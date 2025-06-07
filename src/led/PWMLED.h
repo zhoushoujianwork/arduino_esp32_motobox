@@ -20,7 +20,7 @@ public:
     };
 
     static const uint8_t MAX_BRIGHTNESS = 255;  // 最大亮度值
-    static const uint8_t DEFAULT_BRIGHTNESS = 128;  // 默认亮度为 50%
+    static const uint8_t DEFAULT_BRIGHTNESS = 25;  // 默认亮度为 10%
 
     PWMLED(uint8_t pin);
     void begin();

@@ -234,8 +234,14 @@ void PowerManager::disablePeripherals()
 #ifdef PWM_LED_PIN
     extern PWMLED pwmLed;
     pwmLed.setMode(PWMLED::OFF);
-    ledcDetachPin(PWM_LED_PIN);
-    pinMode(PWM_LED_PIN, INPUT);
+    FastLED.show();
+    delay(20); // 确保数据已发出
+    FastLED.show();
+    delay(20); // 确保数据已发出
+    FastLED.show();
+    digitalWrite(PWM_LED_PIN, LOW); // 强制拉低
+    delay(5);
+    pinMode(PWM_LED_PIN, INPUT); // 再切换为高阻
     Serial.println("[电源管理] PWM LED已关闭");
 #endif
 

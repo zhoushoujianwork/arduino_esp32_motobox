@@ -5,7 +5,7 @@ PWMLED::PWMLED(uint8_t pin)
     , _mode(OFF)
     , _lastMode(OFF)
     , _lastUpdate(0)
-    , _brightness(0)
+    , _brightness(DEFAULT_BRIGHTNESS)
     , _increasing(true)
     , _hue(0)
 {

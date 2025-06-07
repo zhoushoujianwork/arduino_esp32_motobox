@@ -290,6 +290,7 @@ bool IMU::detectMotion()
     if (sampleIndex >= sampleWindow)
     {
         float averageDelta = accumulatedDelta / sampleWindow;
+        Serial.printf("[IMU] 运动检测阈值: %f, 平均加速度变化: %f\n", motionThreshold, averageDelta);
         bool motionDetected = averageDelta > (motionThreshold * 0.8);
         accumulatedDelta = 0;
         sampleIndex = 0;

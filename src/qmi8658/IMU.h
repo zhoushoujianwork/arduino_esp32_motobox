@@ -10,7 +10,7 @@
 #define dt 0.01    // 时间间隔，单位是秒（假设采样率为100Hz）
 
 // 运动检测相关参数
-#define MOTION_DETECTION_THRESHOLD_DEFAULT 0.05   
+#define MOTION_DETECTION_THRESHOLD_DEFAULT 0.0035   // 0.05 适合震动检测，, 静止的量级0.001~0.003
 #define MOTION_DETECTION_WINDOW_DEFAULT 32       // 增加窗口大小到32
 #define MOTION_DETECTION_DEBOUNCE_MS 200        // 增加去抖时间到200ms
 
