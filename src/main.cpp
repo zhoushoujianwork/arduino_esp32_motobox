@@ -66,7 +66,9 @@ BTN button(BTN_PIN);
 BLEC bc;
 #endif
 
-BAT bat(BAT_PIN, BAT_MIN_VOLTAGE, BAT_MAX_VOLTAGE);
+#ifdef BAT_PIN
+  BAT bat(BAT_PIN);
+#endif
 
 #ifdef PWM_LED_PIN
 PWMLED pwmLed(PWM_LED_PIN);

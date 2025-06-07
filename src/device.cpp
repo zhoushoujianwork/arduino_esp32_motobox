@@ -58,13 +58,20 @@ void Device::print_device_info()
     if (powerManager.powerState == POWER_STATE_COUNTDOWN) {
         return;
     }
-    Serial.print("Device Info:");
-    Serial.printf("WiFi Connected: %d\t", device_state.wifiConnected);
-    Serial.printf("BLE Connected: %d\t", device_state.bleConnected);
-    Serial.printf("Battery Voltage: %d\t", device_state.battery_voltage);
-    Serial.printf("Battery Percentage: %d\t", device_state.battery_percentage);
-    Serial.printf("GPS Ready: %d\t", device_state.gpsReady);
+    Serial.println("Device Info:");
+    Serial.printf("Device ID: %s\n", get_device_id().c_str());
+    Serial.printf("Sleep Time: %d\n", device_state.sleep_time);
+    Serial.printf("Firmware Version: %s\n", device_state.device_firmware_version);
+    Serial.printf("Hardware Version: %s\n", device_state.device_hardware_version);
+    Serial.printf("WiFi Connected: %d\n", device_state.wifiConnected);
+    Serial.printf("BLE Connected: %d\n", device_state.bleConnected);
+    Serial.printf("Battery Voltage: %d\n", device_state.battery_voltage);
+    Serial.printf("Battery Percentage: %d\n", device_state.battery_percentage);
+    Serial.printf("GPS Ready: %d\n", device_state.gpsReady);
     Serial.printf("IMU Ready: %d\n", device_state.imuReady);
+    Serial.printf("Compass Ready: %d\n", device_state.compassReady);
+    Serial.println("--------------------------------");
+    
 }
 
 String Device::get_device_id()

@@ -12,7 +12,7 @@
 class BAT
 {
 public:
-    BAT(int pin, int min_voltage, int max_voltage);
+    BAT(int pin);
     void loop();
     void print_voltage();
 

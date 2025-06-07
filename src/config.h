@@ -19,7 +19,7 @@
 #endif
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "2.1.0"
+#define FIRMWARE_VERSION "unknown"
 #endif
 
 #ifndef HARDWARE_VERSION
@@ -39,10 +39,6 @@
 #define DEVICE_CHAR_UUID    "BEB5483A-36E1-4688-B7F5-EA07361B26A8"
 #define GPS_CHAR_UUID       "BEB5483E-36E1-4688-B7F5-EA07361B26A8"
 #define IMU_CHAR_UUID       "BEB5483F-36E1-4688-B7F5-EA07361B26A8"
-
-/* Battery Configuration */
-#define BAT_MIN_VOLTAGE     2900
-#define BAT_MAX_VOLTAGE     3250
 
 /* LED Configuration */
 #define LED_BLINK_INTERVAL 100
@@ -64,19 +60,10 @@
 #define MQTT_TOPIC_GPS         String("vehicle/v1/") + device.get_device_id() + "/gps/position"
 #define MQTT_TOPIC_IMU         String("vehicle/v1/") + device.get_device_id() + "/imu/gyro"
 #define MQTT_TOPIC_COMMAND     String("vehicle/v1/") + device.get_device_id() + "/command"
-
 /* MQTT Intervals (in milliseconds) */
-#ifndef MQTT_DEVICE_INFO_INTERVAL
 #define MQTT_DEVICE_INFO_INTERVAL  5000
-#endif
-
-#ifndef MQTT_IMU_PUBLISH_INTERVAL
 #define MQTT_IMU_PUBLISH_INTERVAL   200
-#endif
-
-#ifndef MQTT_BAT_PRINT_INTERVAL
 #define MQTT_BAT_PRINT_INTERVAL   10000
-#endif
 
 /* 
 TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
