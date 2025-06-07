@@ -39,6 +39,7 @@ void Device::init()
 {
     device_state.device_firmware_version = FIRMWARE_VERSION;
     device_state.device_hardware_version = HARDWARE_VERSION;
+    device_state.sleep_time = 300; // 默认5分钟无活动进入低功耗模式
     device_state.wifiConnected = false;
 #ifdef MODE_CLIENT
     device_state.bleConnected = false;

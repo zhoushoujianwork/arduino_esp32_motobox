@@ -8,6 +8,7 @@
 #include "driver/periph_ctrl.h"
 #include "soc/periph_defs.h"
 #include "led/PWMLED.h"
+#include "device.h"
 
 // 初始化静态变量
 #if ENABLE_SLEEP
@@ -19,7 +20,6 @@ RTC_DATA_ATTR bool PowerManager::sleepEnabled = false; // 默认禁用休眠功�
 PowerManager::PowerManager()
 {
     // 设置默认值
-    idleThreshold = DEFAULT_IDLE_THRESHOLD; // 默认1分钟无活动进入低功耗模式
     lastMotionTime = 0;
     powerState = POWER_STATE_NORMAL;
 }
@@ -27,6 +27,9 @@ PowerManager::PowerManager()
 void PowerManager::begin()
 {
     powerState = POWER_STATE_NORMAL;
+
+    // 支持 配置 idleThreshold ，单位：毫秒
+    idleThreshold = device.get_device_state()->sleep_time * 1000;
 
     // 处理唤醒事件
     handleWakeup();

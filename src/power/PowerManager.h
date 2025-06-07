@@ -43,9 +43,6 @@ public:
     void interruptLowPowerMode();
 
 
-    // ==== 参数集中定义 ====
-    static constexpr unsigned long DEFAULT_IDLE_THRESHOLD = 30000; // debug 30 秒 ，5分钟
-    unsigned long lastMotionTime; // 最后一次检测到运动的时间
 
 private:
     unsigned long idleThreshold;  // 进入低功耗模式的空闲时间阈值（毫秒）
@@ -60,6 +57,7 @@ private:
     void handleWakeup();          // 处理唤醒事件
     void configurePowerDomains(); // 配置电源域
 
+    unsigned long lastMotionTime; // 最后一次检测到运动的时间
    
 };
 

@@ -70,6 +70,7 @@ typedef struct
     String device_id; // 设备ID
     String device_firmware_version; // 固件版本
     String device_hardware_version; // 硬件版本
+    int sleep_time; // 休眠时间 单位：秒
     int battery_voltage;
     int battery_percentage;
     bool wifiConnected;
@@ -119,8 +120,6 @@ public:
     // 新增：硬件初始化
     void initializeHardware();
 
-    // 新增：重置WiFi配置并重启设备
-    void reset_wifi();
 
 private:
     device_state_t device_state;

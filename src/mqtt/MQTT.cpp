@@ -3,6 +3,7 @@
 #include "MQTT.h"
 #include "config.h"
 #include "wifi/WifiManager.h"
+#include <ArduinoJson.h>
 
 MQTT::MQTT(const char *server, int port, const char *user, const char *password)
     : mqtt_server(server), mqtt_port(port), mqtt_user(user), mqtt_password(password)
@@ -165,7 +166,7 @@ void MQTT::subscribeCommand() {
 }
 
 /**
- * @brief 处理MQTT下发的命令
+ * @brief 处理MQTT下发的命令（JSON格式）
  * @param topic 主题
  * @param payload 消息内容
  * @param length 消息长度
@@ -179,20 +180,41 @@ void MQTT::handleCommand(char* topic, byte* payload, unsigned int length) {
     Serial.print("收到命令消息: ");
     Serial.println(msg);
 
-    // 简单解析JSON命令
-    if (msg.indexOf("reset_wifi") > 0) {
+    // 使用 ArduinoJson 解析JSON命令
+    StaticJsonDocument<256> doc;
+    DeserializationError error = deserializeJson(doc, msg);
+    if (error) {
+        Serial.print("JSON解析失败: ");
+        Serial.println(error.c_str());
+        return;
+    }
+
+    // 获取cmd字段
+    const char* cmd = doc["cmd"];
+    if (!cmd) {
+        Serial.println("未找到cmd字段");
+        return;
+    }
+
+    // 匹配命令
+    if (strcmp(cmd, "reset_wifi") == 0) {
         Serial.println("执行: 重置WiFi");
         wifiManager.reset();
-    } else if (msg.indexOf("enter_config") > 0) {
+    } else if (strcmp(cmd, "enter_config") == 0) {
         Serial.println("执行: 进入配网模式");
         wifiManager.enterConfigMode();
-    } else if (msg.indexOf("exit_config") > 0) {
+    } else if (strcmp(cmd, "exit_config") == 0) {
         Serial.println("执行: 退出配网模式");
         wifiManager.exitConfigMode();
-    } else if (msg.indexOf("enter_sleep") > 0) {
+    } else if (strcmp(cmd, "enter_sleep") == 0) {
         Serial.println("执行: 进入睡眠模式");
         // powerManager.requestLowPowerMode = true;
         // powerManager.enterLowPowerMode();
+    } else if (strcmp(cmd, "set_sleep_time") == 0) {
+        // 获取sleep_time字段
+        int sleepTime = doc["sleep_time"] | 0; // 默认0
+        device.get_device_state()->sleep_time = sleepTime;
+        Serial.printf("设置睡眠时间: %d 秒\n", sleepTime);
     } else {
         Serial.println("未知命令");
     }
