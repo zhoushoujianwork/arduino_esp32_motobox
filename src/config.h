@@ -51,6 +51,7 @@
 
 /* MQTT Configuration */
 #define MQTT_SERVER        "mq-hub.daboluo.cc"
+// #define MQTT_SERVER        "222.186.32.152"
 #define MQTT_PORT         32571
 #define MQTT_USER         ""
 #define MQTT_PASSWORD     ""

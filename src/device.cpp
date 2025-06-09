@@ -1,4 +1,5 @@
 #include "device.h"
+#include "net/NetManager.h"
 #include "led/PWMLED.h"
 #include "led/LED.h"
 #include "wifi/WifiManager.h"
@@ -20,7 +21,6 @@ extern bool isConnected;
 extern Compass compass;
 #endif
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-extern WiFiConfigManager wifiManager;
 extern BLES bs;
 extern IMU imu;
 #endif
@@ -28,7 +28,7 @@ extern IMU imu;
 extern BLEC bc;
 #endif
 extern PowerManager powerManager;
-
+extern NetManager netManager;
 extern const VersionInfo &getVersionInfo();
 
 Device::Device()
@@ -357,10 +357,8 @@ void Device::initializeHardware()
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     delay(200);
-    // WiFi初始化
-    Serial.println("[系统] 初始化WiFi连接...");
-    wifiManager.begin();
-
+    netManager.begin();
+    
     // 蓝牙服务器初始化
     bs.setup();
 

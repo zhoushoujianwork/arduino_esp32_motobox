@@ -10,6 +10,7 @@
 #include "led/PWMLED.h"
 #include "device.h"
 #include "utils/PreferencesUtils.h"
+#include "mqtt/MQTT.h"
 
 // 初始化静态变量
 #if ENABLE_SLEEP
@@ -17,6 +18,11 @@ RTC_DATA_ATTR bool PowerManager::sleepEnabled = true; // 默认启用休眠功�
 #else
 RTC_DATA_ATTR bool PowerManager::sleepEnabled = false; // 默认禁用休眠功能
 #endif
+
+extern MQTT mqtt;
+
+PowerManager powerManager;
+
 
 PowerManager::PowerManager()
 {
@@ -168,6 +174,9 @@ bool PowerManager::configureWakeupSources()
 void PowerManager::disablePeripherals()
 {
     Serial.println("[电源管理] 正在关闭所有外设电路...");
+
+    // ===== 0. 断开MQTT连接 =====
+    mqtt.disconnect();
 
     // ===== 1. 通信模块关闭 =====
 

@@ -131,9 +131,10 @@ void BTN::handleButtonEvents() {
     {
     case BTN::SINGLE_CLICK:
     {
-        Serial.println("[按钮] 单击");
+        Serial.println("[按钮] 单击 重启");
         int hz = gps.changeHz();
         Serial.printf("[GPS] 当前频率: %dHz\n", hz);
+        esp_restart();
         break;
     }
 

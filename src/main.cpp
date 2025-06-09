@@ -24,8 +24,10 @@
 #include "power/PowerManager.h"
 #include "qmi8658/IMU.h"
 #include "wifi/WifiManager.h"
+#include "net/NetManager.h"
 #include "esp_wifi.h"
 #include "version.h"
+#include "gsm/GsmManager.h"
 
 // 仅在未定义DISABLE_TFT时包含TFT相关头文件
 #ifndef DISABLE_TFT
@@ -67,18 +69,18 @@ BLEC bc;
 #endif
 
 #ifdef BAT_PIN
-  BAT bat(BAT_PIN);
+BAT bat(BAT_PIN);
 #endif
 
 #ifdef PWM_LED_PIN
 PWMLED pwmLed(PWM_LED_PIN);
 #endif
 #ifdef LED_PIN
-    led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
+led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
 #endif
 
-PowerManager powerManager;
-
+extern PowerManager powerManager;
+extern NetManager netManager;
 #if defined(GPS_COMPASS_SDA) && defined(GPS_COMPASS_SCL)
 #include "compass/Compass.h"
 Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
@@ -97,7 +99,7 @@ void taskWifi(void *parameter)
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   while (true)
   {
-    wifiManager.loop();
+    netManager.loop();
     delay(5);
   }
 #endif
@@ -154,12 +156,15 @@ void taskSystem(void *parameter)
 // - MQTT连接时显示蓝色
 // - 无连接时显示红色
 #ifdef PWM_LED_PIN
-    if (device.get_device_state()->wifiConnected) {
-        pwmLed.setMode(PWMLED::GREEN,5);
-    // } else if (device.get_device_state()->bleConnected) {
-    //     pwmLed.setMode(PWMLED::GREEN);
-    } else {
-        pwmLed.setMode(PWMLED::RED,10);
+    if (device.get_device_state()->wifiConnected)
+    {
+      pwmLed.setMode(PWMLED::GREEN, 5);
+      // } else if (device.get_device_state()->bleConnected) {
+      //     pwmLed.setMode(PWMLED::GREEN);
+    }
+    else
+    {
+      pwmLed.setMode(PWMLED::RED, 10);
     }
 #endif
 
@@ -281,7 +286,6 @@ void setup()
   device.initializeHardware();
 
 
-
 // 创建任务
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 2, &wifiTaskHandle);
@@ -290,6 +294,7 @@ void setup()
 
   xTaskCreate(taskSystem, "TaskSystem", 1024 * 10, NULL, 2, NULL);
   xTaskCreate(taskDataProcessing, "TaskData", 1024 * 10, NULL, 1, NULL);
+
   Serial.println("[系统] 初始化完成");
 }
 

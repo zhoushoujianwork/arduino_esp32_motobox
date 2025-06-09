@@ -21,6 +21,7 @@ private:
     String mqtt_topic_imu;
     String mqtt_topic_device_info;
     String mqtt_topic_command;
+    Client* networkClient = nullptr; // 新增，当前底层 Client
     bool reconnect();
 
     void subscribeCommand(); // 订阅命令
@@ -28,7 +29,9 @@ private:
 
 public:
     MQTT(const char *server, int port, const char *user, const char *password);
+    void setClient(Client* client); // 新增，动态切换底层 Client
     void loop();
+    void disconnect(); // 新增，断开MQTT连接，适配低功耗
 
     // 发送GPS数据
     void publishGPS(gps_data_t gps_data);
