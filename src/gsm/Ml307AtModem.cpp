@@ -1,12 +1,8 @@
 #include "Ml307AtModem.h"
 
-#if defined(GSM_RX_PIN) && defined(GSM_TX_PIN)
+#ifdef GSM_ENABLED
 // 构造全局对象 ml370，默认使用 Serial2，波特率 115200，RX=17，TX=18
 Ml307AtModem ml370(Serial2, 115200, GSM_RX_PIN, GSM_TX_PIN);
-#else
-// 为null
-Ml307AtModem ml370(Serial2, 115200, -1, -1);
-#endif
 
 // 修改构造函数实现，添加resetPin参数
 Ml307AtModem::Ml307AtModem(HardwareSerial& serial, uint32_t baudrate, int8_t rxPin, int8_t txPin, int8_t resetPin)
@@ -571,6 +567,11 @@ void Ml307AtModem::processRxData() {
     }
 }
 
+// isReady
+bool Ml307AtModem::isReady() {
+    return _connected;
+}
+
 // 修改connect函数，添加MQTT数据发送日志
 int Ml307AtModem::connect(const char *host, uint16_t port) {
     // 确保关闭之前的连接
@@ -673,3 +674,4 @@ bool Ml307AtModem::autoBaudrate() {
     Serial.println("[GSM] 未能找到正确波特率");
     return false;
 }
+#endif

@@ -91,7 +91,7 @@ void MQTT::loop()
 {
     // 优先判断网络状态
     if (!netManager.isConnected()) {
-        Serial.println("[MQTT] 当前无可用网络连接");
+        // Serial.println("[MQTT] 当前无可用网络连接");
         disconnect();
         return;
     }
@@ -101,21 +101,21 @@ void MQTT::loop()
     NetManager::NetType currentNetType = netManager.getCurrentType();
     
     // 输出当前网络状态
-    Serial.print("[MQTT] 当前网络类型: ");
-    switch(currentNetType) {
-        case NetManager::NET_WIFI:
-            Serial.printf("WiFi (SSID: %s, 信号强度: %d)\n", 
-                WiFi.SSID().c_str(), 
-                WiFi.RSSI());
-            break;
-        case NetManager::NET_GSM:
-            Serial.println("4G/GSM");
-            // 如果有信号强度检测函数，可以加入
-            // Serial.printf("(信号强度: %d)\n", ml370.getSignalStrength());
-            break;
-        default:
-            Serial.println("未知");
-    }
+    // Serial.print("[MQTT] 当前网络类型: ");
+    // switch(currentNetType) {
+    //     case NetManager::NET_WIFI:
+    //         Serial.printf("WiFi (SSID: %s, 信号强度: %d)\n", 
+    //             WiFi.SSID().c_str(), 
+    //             WiFi.RSSI());
+    //         break;
+    //     case NetManager::NET_GSM:
+    //         Serial.println("4G/GSM");
+    //         // 如果有信号强度检测函数，可以加入
+    //         // Serial.printf("(信号强度: %d)\n", ml370.getSignalStrength());
+    //         break;
+    //     default:
+    //         Serial.println("未知");
+    // }
 
     // Client 发生变化时的详细日志
     if (activeClient != networkClient) {

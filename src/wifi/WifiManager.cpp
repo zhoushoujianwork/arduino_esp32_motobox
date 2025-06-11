@@ -80,6 +80,11 @@ void WiFiConfigManager::begin()
 // 阻塞的
 void WiFiConfigManager::loop()
 {
+    // 如果在进入倒计时休眠状态直接条幅
+    if (powerManager.powerState == POWER_STATE_COUNTDOWN) {
+        return;
+    }
+    
     if (isConfigMode)
     {
         handleClient();

@@ -74,12 +74,12 @@ typedef struct
     int sleep_time; // 休眠时间 单位：秒
     int battery_voltage;
     int battery_percentage;
-    bool wifiConnected;
-    bool bleConnected;
-    bool gpsReady;
-    bool imuReady;
-
-    bool compassReady;  // 添加罗盘状态
+    bool wifiConnected; // WiFi连接状态
+    bool bleConnected; // BLE连接状态
+    bool gpsReady; // GPS准备状态
+    bool imuReady; // IMU准备状态
+    bool compassReady;  // 罗盘准备状态
+    bool gsmReady; // GSM准备状态
 } device_state_t;
 
 

@@ -50,6 +50,10 @@ void PowerManager::begin()
 void PowerManager::handleWakeup()
 {
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    Serial.printf("[电源管理] 唤醒原因: %d\n", wakeup_reason);
+
+    // 解除所有GPIO保持
+    gpio_deep_sleep_hold_dis();
 
     switch (wakeup_reason)
     {
@@ -58,40 +62,36 @@ void PowerManager::handleWakeup()
         if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21)
         {
             // 等待引脚状态稳定
-            delay(50);
+            delay(100);
             int pinState = digitalRead(IMU_INT_PIN);
             Serial.printf("[电源管理] IMU引脚状态: %d\n", pinState);
 
-            // 验证是否为真实的WakeOnMotion事件
+            // 恢复IMU
             extern IMU imu;
-            Serial.println("[电源管理] IMU运动唤醒检测到，记录运动事件");
-
-            // 从WakeOnMotion模式恢复到正常模式
+            Serial.println("[电源管理] 从IMU运动唤醒，恢复IMU状态");
             imu.restoreFromDeepSleep();
 
-            // 检查是否为WakeOnMotion事件
             if (imu.checkWakeOnMotionEvent())
             {
-                Serial.println("[电源管理] 确认为WakeOnMotion事件唤醒");
+                Serial.println("[电源管理] ✅ 确认为运动唤醒事件");
             }
             else
             {
-                Serial.println("[电源管理] 可能为其他原因唤醒");
+                Serial.println("[电源管理] ⚠️ 未检测到运动事件，可能为其他原因唤醒");
             }
         }
         break;
     }
     case ESP_SLEEP_WAKEUP_TIMER:
-        Serial.println("[电源管理] 定时器唤醒");
-        // 这里可以添加定时唤醒后的特殊处理
+        Serial.println("[电源管理] ⏰ 定时器唤醒");
         break;
     default:
-        if (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED)
-        {
-            Serial.printf("[电源管理] 其他唤醒原因: %d\n", wakeup_reason);
-        }
+        Serial.println("[电源管理] 🔄 首次启动或重置");
         break;
     }
+
+    // 重置运动检测时间
+    lastMotionTime = millis();
 }
 
 void PowerManager::configurePowerDomains()
@@ -107,120 +107,125 @@ bool PowerManager::configureWakeupSources()
 {
     Serial.println("[电源管理] 🔧 开始配置唤醒源...");
 
-    // 配置IMU运动唤醒
-    if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21)
-    { // 确保是有效的RTC GPIO
-        Serial.printf("[电源管理] 配置IMU唤醒引脚 GPIO%d...\n", IMU_INT_PIN);
+    // 1. 先禁用所有唤醒源
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
 
+    // 2. 配置IMU运动唤醒
+    if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21)
+    {
+        // 检查是否为有效的RTC GPIO
+        if(!rtc_gpio_is_valid_gpio((gpio_num_t)IMU_INT_PIN)) {
+            Serial.printf("[电源管理] ❌ GPIO%d 不是有效的RTC GPIO\n", IMU_INT_PIN);
+            return false;
+        }
+
+        // 解除GPIO保持状态
+        rtc_gpio_hold_dis((gpio_num_t)IMU_INT_PIN);
+        
         // 初始化RTC GPIO
         esp_err_t ret = rtc_gpio_init((gpio_num_t)IMU_INT_PIN);
-        if (ret != ESP_OK)
-        {
+        if (ret != ESP_OK) {
             Serial.printf("[电源管理] ❌ RTC GPIO初始化失败: %s\n", esp_err_to_name(ret));
             return false;
         }
-        Serial.println("[电源管理] ✅ RTC GPIO初始化成功");
 
+        // 配置GPIO方向和上拉
         rtc_gpio_set_direction((gpio_num_t)IMU_INT_PIN, RTC_GPIO_MODE_INPUT_ONLY);
-        rtc_gpio_pullup_en((gpio_num_t)IMU_INT_PIN);    // 使用上拉电阻
-        rtc_gpio_pulldown_dis((gpio_num_t)IMU_INT_PIN); // 禁用下拉
-        Serial.println("[电源管理] ✅ RTC GPIO方向和上拉配置完成");
+        rtc_gpio_pullup_en((gpio_num_t)IMU_INT_PIN);
+        rtc_gpio_pulldown_dis((gpio_num_t)IMU_INT_PIN);
 
-        // WakeOnMotion模式中，官方例子建议检查默认引脚值来确定触发方式
-        // 由于我们在configWakeOnMotion中设置defaultPinValue=1，所以检测低电平触发
-        ret = esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT_PIN, 0); // 低电平触发
-        if (ret != ESP_OK)
-        {
+        // 配置EXT0唤醒
+        ret = esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT_PIN, 0);
+        if (ret != ESP_OK) {
             Serial.printf("[电源管理] ❌ EXT0唤醒配置失败: %s\n", esp_err_to_name(ret));
             return false;
         }
-        Serial.printf("[电源管理] ✅ EXT0唤醒配置成功 (GPIO%d, 低电平触发)\n", IMU_INT_PIN);
 
-        // 配置IMU的运动检测中断
+        Serial.printf("[电源管理] ✅ IMU唤醒配置成功 (GPIO%d)\n", IMU_INT_PIN);
+
+        // 配置IMU
         extern IMU imu;
-        Serial.println("[电源管理] 配置IMU为深度睡眠模式...");
-        bool imuConfigured = imu.configureForDeepSleep(); // 使用新的WakeOnMotion配置
-        if (!imuConfigured)
-        {
+        if (!imu.configureForDeepSleep()) {
             Serial.println("[电源管理] ❌ IMU深度睡眠配置失败");
             return false;
         }
-        Serial.println("[电源管理] ✅ IMU深度睡眠配置成功");
-
-        // 添加延迟确保IMU配置稳定
-        delay(100);
-
-        Serial.printf("[电源管理] IMU WakeOnMotion唤醒源配置完成 (GPIO%d, 低电平触发)\n", IMU_INT_PIN);
-    }
-    else
-    {
-        Serial.printf("[电源管理] ❌ 无效的IMU中断引脚: %d\n", IMU_INT_PIN);
-        return false;
+        Serial.println("[电源管理] ✅ IMU已配置为深度睡眠模式");
     }
 
-    // 配置定时器唤醒作为备份
-    Serial.println("[电源管理] 配置定时器唤醒...");
-    const uint64_t WAKEUP_INTERVAL_US = 30 * 60 * 1000000ULL; // 30分钟
-    esp_err_t ret = esp_sleep_enable_timer_wakeup(WAKEUP_INTERVAL_US);
-    if (ret != ESP_OK)
-    {
+    // 3. 配置定时器唤醒（小时）
+    const uint64_t BACKUP_WAKEUP_TIME = 60 * 60 * 1000000ULL;
+    esp_err_t ret = esp_sleep_enable_timer_wakeup(BACKUP_WAKEUP_TIME);
+    if (ret != ESP_OK) {
         Serial.printf("[电源管理] ❌ 定时器唤醒配置失败: %s\n", esp_err_to_name(ret));
         return false;
     }
-    Serial.println("[电源管理] ✅ 定时器唤醒源配置完成");
-    return true; // 全部配置成功
+    Serial.println("[电源管理] ✅ 定时器唤醒配置成功");
+
+    return true;
 }
 
 void PowerManager::disablePeripherals()
 {
-    Serial.println("[电源管理] 正在关闭所有外设电路...");
+    // ===== 第一阶段：高级通信协议关闭 =====
+    Serial.println("[电源管理] 开始第一阶段：关闭通信协议...");
+    Serial.flush();
+    delay(50);
 
-    // ===== 0. 断开MQTT连接 =====
+    // 1. MQTT断开
     mqtt.disconnect();
+    Serial.println("[电源管理] MQTT已断开");
+    Serial.flush();
+    delay(50);
 
-    // ===== 1. 通信模块关闭 =====
-
-    // WiFi完全关闭
+    // 2. WiFi关闭
     wifiManager.safeDisableWiFi();
+    Serial.println("[电源管理] WiFi已安全关闭");
+    Serial.flush();
+    delay(50);
 
-    // 蓝牙完全关闭
+    // 3. 蓝牙关闭
     btStop();
-    // 添加安全检查，避免重复关闭蓝牙控制器
-    // esp_bt_controller_disable();
-    // esp_bt_controller_deinit();
     Serial.println("[电源管理] 蓝牙已安全关闭");
+    Serial.flush();
+    delay(50);
 
-// ===== 2. 外设任务停止 =====
+    // ===== 第二阶段：外设任务停止 =====
+    Serial.println("[电源管理] 开始第二阶段：停止外设任务...");
+    Serial.flush();
+    delay(50);
 
-// GPS任务停止
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+    // GPS任务停止
     extern TaskHandle_t gpsTaskHandle;
-    if (gpsTaskHandle != NULL)
-    {
+    if (gpsTaskHandle != NULL) {
         vTaskDelete(gpsTaskHandle);
         gpsTaskHandle = NULL;
         Serial.println("[电源管理] GPS任务已停止");
+        Serial.flush();
+        delay(50);
     }
 
-// GPS串口关闭
+    // GPS串口关闭
 #ifdef GPS_RX_PIN
-    Serial2.end(); // 假设GPS使用Serial2
+    Serial2.end();
     pinMode(GPS_RX_PIN, INPUT);
     pinMode(GPS_TX_PIN, INPUT);
     Serial.println("[电源管理] GPS串口已关闭");
+    Serial.flush();
+    delay(50);
 #endif
 #endif
 
-    // ===== 3. 显示屏完全关闭 =====
+    // ===== 第三阶段：显示和LED关闭 =====
+    Serial.println("[电源管理] 开始第三阶段：关闭显示和LED...");
+    Serial.flush();
+    delay(50);
 
 #ifdef MODE_ALLINONE
     extern void tft_sleep();
     tft_sleep();
 
-// 安全关闭SPI总线
-// SPI.end();  // 暂时注释掉，可能引起问题
-
-// 关闭显示屏相关GPIO
+    // 关闭显示屏相关GPIO
 #ifdef TFT_CS
     pinMode(TFT_CS, INPUT);
 #endif
@@ -232,46 +237,48 @@ void PowerManager::disablePeripherals()
 #endif
 #ifdef TFT_BL
     pinMode(TFT_BL, INPUT);
-    digitalWrite(TFT_BL, LOW); // 关闭背光
+    digitalWrite(TFT_BL, LOW);
 #endif
 
     Serial.println("[电源管理] 显示屏已完全关闭");
+    Serial.flush();
+    delay(50);
 #endif
 
-    // ===== 4. LED控制关闭 =====
-
+    // LED关闭
 #ifdef PWM_LED_PIN
     extern PWMLED pwmLed;
     pwmLed.setMode(PWMLED::OFF);
     FastLED.show();
-    delay(20); // 确保数据已发出
+    delay(20);
     FastLED.show();
-    delay(20); // 确保数据已发出
+    delay(20);
     FastLED.show();
-    digitalWrite(PWM_LED_PIN, LOW); // 强制拉低
+    digitalWrite(PWM_LED_PIN, LOW);
     delay(5);
-    pinMode(PWM_LED_PIN, INPUT); // 再切换为高阻
+    pinMode(PWM_LED_PIN, INPUT);
     Serial.println("[电源管理] PWM LED已关闭");
+    Serial.flush();
+    delay(50);
 #endif
 
 #ifdef LED_PIN
     digitalWrite(LED_PIN, LOW);
     pinMode(LED_PIN, INPUT);
     Serial.println("[电源管理] 普通LED已关闭");
+    Serial.flush();
+    delay(50);
 #endif
 
-// ===== 5. I2C总线关闭 =====
+    // ===== 第四阶段：传感器和I2C关闭 =====
+    Serial.println("[电源管理] 开始第四阶段：关闭传感器和I2C...");
+    Serial.flush();
+    delay(50);
 
-// 关闭IMU I2C（但保持IMU的WakeOnMotion功能）
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    extern IMU imu;
-    // imu.configureForDeepSleep(); // 使用WakeOnMotion配置（已移至configureWakeupSources，避免重复配置导致超时）
+    // IMU已在configureWakeupSources中配置，这里不需要重复配置
 
-// 保守地关闭其他I2C设备
-// Wire.end();    // 暂时注释，可能影响IMU
-// Wire1.end();   // 暂时注释，可能影响IMU
-
-// 将非关键I2C引脚设置为输入模式
+    // 关闭其他I2C设备的引脚
 #ifdef GPS_COMPASS_SDA
     pinMode(GPS_COMPASS_SDA, INPUT);
 #endif
@@ -280,73 +287,61 @@ void PowerManager::disablePeripherals()
 #endif
 
     Serial.println("[电源管理] I2C设备已配置为低功耗模式");
+    Serial.flush();
+    delay(50);
 #endif
 
-    // ===== 6. 罗盘传感器关闭 =====
+    // ===== 第五阶段：ADC和按钮配置 =====
+    Serial.println("[电源管理] 开始第五阶段：配置ADC和按钮...");
+    Serial.flush();
+    delay(50);
 
-#ifdef MODE_ALLINONE
-#ifdef GPS_COMPASS_SDA
-    pinMode(GPS_COMPASS_SDA, INPUT);
-#endif
-#ifdef GPS_COMPASS_SCL
-    pinMode(GPS_COMPASS_SCL, INPUT);
-#endif
-    Serial.println("[电源管理] 罗盘传感器已关闭");
-#endif
-
-    // ===== 7. ADC和电池监测关闭 =====
-
-    // 安全关闭ADC
+    // ADC配置
     adc1_config_width(ADC_WIDTH_BIT_12);
     adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_11);
-    // 移除adc_power_release()调用，因为可能导致崩溃
-    // 改为使用adc_power_off()或让系统自动管理ADC电源
 
 #ifdef BAT_PIN
     pinMode(BAT_PIN, INPUT);
 #endif
 
-    Serial.println("[电源管理] ADC已配置为低功耗模式");
-
-    // ===== 8. 按钮引脚配置 =====
-
+    // 按钮配置
 #ifdef BTN_PIN
-    // 保持按钮引脚的上拉配置，作为备用唤醒源
     pinMode(BTN_PIN, INPUT_PULLUP);
-    Serial.println("[电源管理] 按钮引脚保持上拉配置");
 #endif
 
-    // ===== 9. 未使用GPIO设置为输入模式 =====
+    Serial.println("[电源管理] ADC和按钮已配置完成");
+    Serial.flush();
+    delay(50);
 
-    // 跳过GPIO循环设置，避免引脚冲突（引脚使用随时会变）
-    Serial.println("[电源管理] 跳过GPIO批量设置（避免引脚冲突）");
+    // ===== 第六阶段：GPS唤醒引脚配置 =====
+#ifdef GPS_WAKE_PIN
+    pinMode(GPS_WAKE_PIN, OUTPUT);
+    digitalWrite(GPS_WAKE_PIN, LOW);
+    rtc_gpio_hold_en((gpio_num_t)GPS_WAKE_PIN);
+    Serial.println("[电源管理] GPS_WAKE_PIN已配置为休眠状态");
+    Serial.flush();
+    delay(50);
+#endif
 
-    // ===== 10. 时钟和外设时钟关闭 =====
+    // ===== 最后阶段：关闭时钟和降低CPU频率 =====
+    Serial.println("[电源管理] 开始最后阶段：关闭时钟和降低CPU频率...");
+    Serial.flush();
+    delay(100);
 
-    // 关闭不必要的时钟
+    // 关闭不必要的外设时钟
     periph_module_disable(PERIPH_LEDC_MODULE);
     periph_module_disable(PERIPH_I2S0_MODULE);
     periph_module_disable(PERIPH_I2S1_MODULE);
     periph_module_disable(PERIPH_UART1_MODULE);
     periph_module_disable(PERIPH_UART2_MODULE);
 
-    Serial.println("[电源管理] 外设时钟已关闭");
+    Serial.println("[电源管理] 外设时钟已关闭，即将降低CPU频率...");
+    Serial.println("[电源管理] ⚠️ 如果看到此消息后出现乱码属于正常现象");
+    Serial.flush();
+    delay(200);  // 确保最后的消息能够发送完成
 
-    // ===== 11. CPU频率调整 =====
-
-    // 降低CPU频率到最低
-    setCpuFrequencyMhz(10); // 10MHz最低频率
-    Serial.println("[电源管理] CPU频率已降至10MHz");
-
-    Serial.println("[电源管理] ✅ 所有外设电路已完全关闭");
-
-#ifdef GPS_WAKE_PIN
-    pinMode(GPS_WAKE_PIN, OUTPUT);
-    digitalWrite(GPS_WAKE_PIN, LOW);
-    rtc_gpio_hold_en((gpio_num_t)GPS_WAKE_PIN); // 保持低电平
-    
-    Serial.println("[电源管理] GPS_WAKE_PIN 已拉低并保持，GPS进入休眠");
-#endif
+    // 最后才降低CPU频率
+    setCpuFrequencyMhz(10);
 }
 
 void PowerManager::loop()
@@ -420,26 +415,21 @@ bool PowerManager::isDeviceIdle()
 void PowerManager::enterLowPowerMode()
 {
 #ifdef MODE_CLIENT
-    // 客户端模式不使用睡眠功能
     Serial.println("[电源管理] 客户端模式不使用睡眠功能");
     return;
 #endif
 
 #if !ENABLE_SLEEP
-    // 编译时禁用了休眠功能
-    Serial.println("[电源管理] 休眠功能已在编译时禁用，不进入低功耗模式");
+    Serial.println("[电源管理] 休眠功能已在编译时禁用");
     return;
 #else
-    // 编译时启用了休眠功能，但需要检查运行时状态
     if (!sleepEnabled)
     {
-        Serial.println("[电源管理] 休眠功能已禁用，不进入低功耗模式");
+        Serial.println("[电源管理] 休眠功能已禁用");
         return;
     }
 
     Serial.println("[电源管理] 正在进入低功耗模式...");
-
-    // 设置电源状态为倒计时
     powerState = POWER_STATE_COUNTDOWN;
 
     // 倒计时总时间（秒）
@@ -496,54 +486,34 @@ void PowerManager::enterLowPowerMode()
     // 设置电源状态为准备睡眠
     powerState = POWER_STATE_PREPARING_SLEEP;
 
-    Serial.println("[电源管理] 倒计时结束，开始关闭外设...");
-
-    // 在进入深度睡眠前保存关键状态到RTC内存
-    RTC_DATA_ATTR static uint32_t sleepCount = 0;
-    sleepCount++;
-
-    Serial.println("[电源管理] ⏸️  开始执行外设关闭流程...");
-    // 优化外设关闭顺序
-    disablePeripherals();
-    Serial.println("[电源管理] ✅ 外设关闭完成");
-
-    Serial.println("[电源管理] ⏸️  开始配置电源域...");
-    // 配置电源域
-    configurePowerDomains();
-    Serial.println("[电源管理] ✅ 电源域配置完成");
-
-    Serial.println("[电源管理] ⏸️  开始配置唤醒源...");
-    // 配置唤醒源
+    // 1. 先配置唤醒源（在关闭外设之前）
+    Serial.println("[电源管理] ⏸️ 配置唤醒源...");
     if (!configureWakeupSources()) {
-        Serial.println("[电源管理] ❌ 唤醒源配置失败，终止休眠流程，恢复正常模式");
+        Serial.println("[电源管理] ❌ 唤醒源配置失败，终止休眠流程");
         powerState = POWER_STATE_NORMAL;
-#ifdef MODE_ALLINONE
-        tft_set_brightness(255);
-        Serial.println("[电源管理] 恢复屏幕亮度到最大");
-#endif
         return;
     }
     Serial.println("[电源管理] ✅ 唤醒源配置完成");
 
-    // 打印设备信息和统计数据
-    Serial.println("[电源管理] 设备状态汇总:");
-    Serial.printf("[电源管理] 设备ID: %s\n", device.get_device_id().c_str());
-    Serial.printf("[电源管理] 本次运行时间: %lu 毫秒\n", millis());
-    Serial.printf("[电源管理] 累计睡眠次数: %d\n", sleepCount);
+    // 2. 关闭外设
+    Serial.println("[电源管理] ⏸️ 开始关闭外设...");
+    disablePeripherals();
+    Serial.println("[电源管理] ✅ 外设关闭完成");
 
-    // 延迟一段时间以允许串口输出完成
+    // 3. 配置电源域
+    Serial.println("[电源管理] ⏸️ 配置电源域...");
+    configurePowerDomains();
+    Serial.println("[电源管理] ✅ 电源域配置完成");
+
+    // 4. 最后的准备
+    Serial.println("[电源管理] 🌙 准备进入深度睡眠...");
+    Serial.printf("[电源管理] - IMU中断引脚: GPIO%d\n", IMU_INT_PIN);
+    Serial.printf("[电源管理] - 定时器唤醒: 5分钟\n");
     Serial.flush();
     delay(100);
 
-    // 进入深度睡眠模式
-    Serial.println("[电源管理] 🌙 正在进入深度睡眠模式...");
-    Serial.flush(); // 确保最后的日志输出
-    delay(50);      // 给串口更多时间
-
+    // 5. 进入深度睡眠
     esp_deep_sleep_start();
-
-    // 这行代码永远不应该被执行到
-    Serial.println("[电源管理] ❌ 错误：深度睡眠启动失败！");
 #endif
 }
 

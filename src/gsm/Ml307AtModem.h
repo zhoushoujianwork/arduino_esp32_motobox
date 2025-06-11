@@ -8,6 +8,7 @@
 #ifndef ML307_AT_MODEM_H
 #define ML307_AT_MODEM_H
 
+#ifdef GSM_ENABLED
 #include <Arduino.h>
 #include <Client.h> // 兼容 PubSubClient
 
@@ -101,6 +102,9 @@ public:
      */
     bool checkNetworkStatus();
 
+    // isReady
+    bool isReady();
+
     // --- 下面为Client接口，兼容PubSubClient ---
     virtual int connect(IPAddress ip, uint16_t port);
     virtual int connect(const char *host, uint16_t port);
@@ -120,7 +124,6 @@ public:
     }
 };
 
-#if defined(GSM_RX_PIN) && defined(GSM_TX_PIN)
 extern Ml307AtModem ml370;
 #endif
 
