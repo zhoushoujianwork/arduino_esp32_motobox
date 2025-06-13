@@ -2,10 +2,10 @@
 #pragma once
 #include <Client.h>
 #ifdef ENABLE_WIFI
-#include "wifi/WifiManager.h"
+#include "net/WifiManager.h"
 #endif
 #ifdef ENABLE_GSM
-#include "gsm/Ml307AtModem.h"
+#include "net/Ml307AtModem.h"
 #endif
 
 class NetManager {
@@ -14,6 +14,7 @@ public:
     enum NetType { NET_NONE, NET_WIFI, NET_GSM };
     using NetworkChangedCallback = void(*)(NetType newType);
 
+    void begin();
     void loop();
     Client* getActiveClient(); // 获取当前可用的 Client
     bool isConnected();        // 当前是否有可用网络

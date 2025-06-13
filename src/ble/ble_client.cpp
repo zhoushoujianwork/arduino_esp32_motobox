@@ -258,7 +258,12 @@ bool connectToServer()
 
 BLEC::BLEC()
 {
-    Serial.println("Starting NimBLE Client");
+    
+}
+
+void BLEC::begin()
+{
+   Serial.println("Starting NimBLE Client");
     connected = false;
     doConnect = false;
     doScan = false;
@@ -311,6 +316,7 @@ BLEC::BLEC()
      *  Optional callback for when scanning stops.
      */
     pScan->start(scanTime, scanEndedCB);
+    Serial.println("NimBLE Client started");
 }
 
 void BLEC::loop()

@@ -25,6 +25,7 @@ public:
     PWMLED(uint8_t pin);
     void setMode(Mode mode, uint8_t brightness = 0);  // 0表示使用默认亮度
     void loop();
+    void begin();
     void changeMode();
     void setBrightness(uint8_t brightness);  // 单独设置亮度
 

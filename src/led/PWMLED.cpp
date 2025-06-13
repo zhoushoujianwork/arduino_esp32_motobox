@@ -13,23 +13,18 @@ PWMLED::PWMLED(uint8_t pin)
     , _increasing(true)
     , _hue(0)
 {
-    Serial.println("[PWMLED] 初始化开始");
-    Serial.printf("[PWMLED] 引脚: %d\n", _pin);
-
-    // 初始化 FastLED，直接使用传入的引脚
-    FastLED.addLeds<WS2812, PWM_LED_PIN, GRB>(_leds, NUM_LEDS);
-    Serial.printf("[PWMLED] FastLED 初始化完成，引脚: %d\n", _pin);
-    
-    // 测试LED
-    _leds[0] = CRGB::White;
-    FastLED.show();
-    delay(500);
-    _leds[0] = CRGB::Black;
-    FastLED.show();
-    
-    Serial.println("[PWMLED] 初始化测试完成");
+    // _leds[0] = CRGB::White;
+    // FastLED.show();
+    // delay(500);
+    // _leds[0] = CRGB::Black;
+    // FastLED.show();
 }
 
+void PWMLED::begin()
+{
+    FastLED.addLeds<WS2812, PWM_LED_PIN, GRB>(_leds, NUM_LEDS);
+    Serial.printf("[PWMLED] FastLED 初始化完成，引脚: %d\n", _pin);
+}   
 
 void PWMLED::setMode(Mode mode, uint8_t brightness) {
     if (_mode != mode || brightness > 0) {

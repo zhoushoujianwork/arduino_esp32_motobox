@@ -1,7 +1,7 @@
 #include "BTN.h"
 #include <Arduino.h>
 #include "gps/GPS.h"
-#include "wifi/WifiManager.h"
+#include "net/WifiManager.h"
 
 #ifdef BTN_PIN
 BTN button(BTN_PIN);
@@ -11,6 +11,10 @@ BTN::BTN(int pin)
 {
     Serial.println("[BTN] 初始化开始");
     this->pin = pin;
+}
+
+void BTN::begin()
+{
     pinMode(pin, INPUT_PULLUP); // 设置为上拉输入模式
     currentState = digitalRead(pin); // 初始化 currentState
     Serial.printf("[BTN] 引脚: %d\n", pin);

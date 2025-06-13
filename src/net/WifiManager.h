@@ -52,6 +52,8 @@ public:
     WiFiConfigManager();
     WiFiClientSecure wifiClientSecure;
     WiFiClient wifiClient;
+
+    void begin();
     void loop();
     void enterConfigMode();
     void exitConfigMode();

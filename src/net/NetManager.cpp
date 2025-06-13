@@ -1,6 +1,5 @@
 #include "NetManager.h"
 
-
 // 这里假设有全局 WiFi 配置和 GSM 配置参数
 extern HardwareSerial Serial2;
 // NetManager 成员实例
@@ -15,8 +14,18 @@ NetManager netManager;
  */
 NetManager::NetManager()
 {
-    Serial.println("NetManager::NetManager");
     selectedType = NET_WIFI;
+}
+
+void NetManager::begin()
+{
+    Serial.println("[NetManager] 初始化开始");
+#ifdef ENABLE_WIFI
+    wifiManager.begin();
+#endif
+#ifdef ENABLE_GSM
+    ml370.begin();
+#endif
 }
 
 /**

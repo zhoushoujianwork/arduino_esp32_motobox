@@ -17,15 +17,18 @@ imu_data_t imu_data;
 
 IMU::IMU(int sda, int scl, int motionIntPin)
 {
-    Serial.println("[IMU] 初始化开始");
-
     this->sda = sda;
     this->scl = scl;
     this->motionIntPin = motionIntPin;
     this->motionThreshold = MOTION_DETECTION_THRESHOLD_DEFAULT;
     this->motionDetectionEnabled = false;
     this->sampleWindow = MOTION_DETECTION_WINDOW_DEFAULT;
-#ifdef USE_WIRE
+}
+
+void IMU::begin()
+{
+    Serial.println("[IMU] 初始化完成");
+    #ifdef USE_WIRE
     Serial.printf("[IMU] SDA: %d, SCL: %d\n", sda, scl);
     if (!qmi.begin(Wire1, QMI8658_L_SLAVE_ADDRESS, sda, scl))
     {
@@ -91,7 +94,6 @@ IMU::IMU(int sda, int scl, int motionIntPin)
     }
     Serial.println("[IMU] 运动检测初始化完成");
 }
-
 
 
 void IMU::configureMotionDetection(float threshold) {

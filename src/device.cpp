@@ -1,14 +1,5 @@
 #include "device.h"
-#include "net/NetManager.h"
-#include "led/PWMLED.h"
-#include "led/LED.h"
-#include "wifi/WifiManager.h"
-#include "ble/ble_server.h"
-#include "qmi8658/IMU.h"
-#include "power/PowerManager.h"
-#include "ble/ble_client.h"
-#include "compass/Compass.h"
-#include "version.h"
+
 
 extern const VersionInfo &getVersionInfo();
 
@@ -77,22 +68,25 @@ Device device;
 
 Device::Device()
 {
-     // 从getVersionInfo()获取版本信息
-    const VersionInfo& versionInfo = getVersionInfo();
-    device_state.device_id = get_device_id();
-    device_state.device_firmware_version = versionInfo.firmware_version;
-    device_state.device_hardware_version = versionInfo.hardware_version;
-    device_state.sleep_time = 300; // 默认5分钟无活动进入低功耗模式
+    // 构造函数只做简单变量初始化
+    device_state.sleep_time = 300;
     device_state.wifiConnected = false;
     device_state.bleConnected = false;
     device_state.battery_voltage = 0;
     device_state.battery_percentage = 0;
     device_state.gpsReady = false;
     device_state.imuReady = false;
+    device_state.compassReady = false;
+    device_state.gsmReady = false;
 }
 
-void Device::initializeHardware()
-{
+void Device::begin() {
+    // 从getVersionInfo()获取版本信息
+    const VersionInfo& versionInfo = getVersionInfo();
+    device_state.device_id = get_device_id();
+    device_state.device_firmware_version = versionInfo.firmware_version;
+    device_state.device_hardware_version = versionInfo.hardware_version;
+
     // 检查是否从深度睡眠唤醒
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
     bool isWakeFromDeepSleep = (wakeup_reason != ESP_SLEEP_WAKEUP_UNDEFINED);
@@ -110,10 +104,12 @@ void Device::initializeHardware()
 
     // LED初始化
 #ifdef PWM_LED_PIN
+    pwmLed.begin();
     pwmLed.setMode(PWMLED::OFF); // 启动时设置为彩虹模式
 #endif
 
 #ifdef LED_PIN
+    led.begin();
     led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
 #endif
 
@@ -124,8 +120,27 @@ void Device::initializeHardware()
     Serial.println("[电源管理] GPS_WAKE_PIN 保持已解除");
 #endif
 
+
+
+#if defined(ENABLE_WIFI) || defined(ENABLE_GSM)
+    netManager.begin();
+#endif
+
+#ifdef ENABLE_GPS
+    gps.begin();
+#endif
+
+#ifdef BLE_SERVER
+    bs.begin();
+#endif
+
+#ifdef BLE_CLIENT
+    bc.begin();
+#endif
+
     // IMU初始化
-    #ifdef ENABLE_IMU
+#ifdef ENABLE_IMU
+    imu.begin();
     // 如果是从深度睡眠唤醒，检查唤醒原因
     if (isWakeFromDeepSleep)
     {
@@ -141,7 +156,6 @@ void Device::initializeHardware()
             break;
         }
     }
-    #endif
+#endif
 }
-
 

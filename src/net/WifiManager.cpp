@@ -1,6 +1,6 @@
 #include "WifiManager.h"
 #include "power/PowerManager.h"
-#include "wifi/wifi_config_page.h"
+#include "net/wifi_config_page.h"
 #include "utils/PreferencesUtils.h"
 #include "nvs_flash.h"
 
@@ -60,8 +60,14 @@ unsigned long lastConnectAttempt = 0;
 
 WiFiConfigManager::WiFiConfigManager()
 {
-    Serial.println("[WiFi] 初始化开始");
+    
+}
 
+void WiFiConfigManager::begin()
+{
+    
+    Serial.println("[WiFi] 初始化开始");
+    
     // 注册WiFi事件回调
     WiFi.onEvent(WiFiEvent);
 
@@ -73,12 +79,7 @@ WiFiConfigManager::WiFiConfigManager()
     wifiClientSecure.setInsecure();  // 允许自签名证书
     wifiClientSecure.setTimeout(15); // 设置15秒超时
 
-    // 初始化NVS（非易失性存储），避免Preferences和WiFi初始化失败
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        nvs_flash_erase();
-        nvs_flash_init();
-    }
+    
 
     if (!preferences.begin(PREF_NAMESPACE, false))
     {
@@ -88,7 +89,6 @@ WiFiConfigManager::WiFiConfigManager()
         return;
     }
     Serial.println("配置存储初始化成功");
-    
 }
 
 // 阻塞的

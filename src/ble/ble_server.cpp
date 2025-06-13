@@ -88,7 +88,11 @@ class DeviceCharacteristicCallbacks : public NimBLECharacteristicCallbacks
 
 BLES::BLES()
 {
-    Serial.println("初始化BLE服务器...");
+}
+
+void BLES::begin()
+{
+   Serial.println("初始化BLE服务器...");
 
     pServer = NULL;
     pCharacteristic = NULL;
@@ -124,12 +128,14 @@ BLES::BLES()
     pGPSCharacteristic->setCallbacks(new GpsCharacteristicCallbacks());
 #endif
 
+#ifdef ENABLE_IMU
     // 创建IMU特征值
     pIMUCharacteristic = pService->createCharacteristic(
         IMU_CHAR_UUID,
         NIMBLE_PROPERTY::READ);
 
     pIMUCharacteristic->setCallbacks(new ImuCharacteristicCallbacks());
+#endif
 
     // 启动服务
     pService->start();

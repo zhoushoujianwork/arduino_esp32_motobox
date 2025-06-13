@@ -32,6 +32,12 @@ PowerManager::PowerManager()
 
     powerState = POWER_STATE_NORMAL;
 
+}
+
+void PowerManager::begin()
+{
+    Serial.println("[电源管理] 初始化开始");
+
     // 启动时从存储读取休眠时间（秒），如无则用默认值
     sleepTimeSec = PreferencesUtils::loadULong(PreferencesUtils::NS_POWER, PreferencesUtils::KEY_SLEEP_TIME, get_device_state()->sleep_time);
     idleThreshold = sleepTimeSec * 1000;
@@ -42,7 +48,6 @@ PowerManager::PowerManager()
     Serial.println("[电源管理] 休眠功能已启用 (编译时配置)");
     Serial.printf("[电源管理] 当前休眠时间: %lu 秒\n", sleepTimeSec);
 }
-
 
 void PowerManager::handleWakeup()
 {

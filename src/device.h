@@ -7,6 +7,16 @@
 #include "compass/Compass.h"
 #include "config.h"
 #include "version.h"  // 包含版本信息头文件
+#include "net/NetManager.h"
+#include "led/PWMLED.h"
+#include "led/LED.h"
+#include "qmi8658/IMU.h"
+#include "power/PowerManager.h"
+#include "ble/ble_client.h"
+#include "ble/ble_server.h"
+#include "compass/Compass.h"
+#include "gps/GPS.h"
+#include "bat/BAT.h"
 
 
 typedef struct
@@ -41,7 +51,7 @@ public:
     String get_device_id();
 
     // 硬件初始化
-    void initializeHardware();
+    void begin();
 
 };
 

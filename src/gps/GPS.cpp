@@ -50,11 +50,16 @@ gps_data_t gps_data;
 
 GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
 {
-    Serial.println("[GPS] 开始初始化 txPin:" + String(_txPin) + " rxPin:" + String(_rxPin));
     _rxPin = rxPin;
     _txPin = txPin;
     gps_data.gpsHz = 2;
-    // delay(1000);设置串口波特率
+   
+}
+
+void GPS::begin()
+{
+    Serial.println("[GPS] 开始初始化 txPin:" + String(_txPin) + " rxPin:" + String(_rxPin));
+     // delay(1000);设置串口波特率
     gpsSerial.begin(GPS_DEFAULT_BAUDRATE);
     _currentBaudRate = GPS_DEFAULT_BAUDRATE;
 #ifdef GPS_BAUDRATE

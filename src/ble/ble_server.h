@@ -6,7 +6,7 @@
 #include "config.h"
 #include "gps/GPS.h"
 #include "qmi8658/IMU.h"
-#include "wifi/WifiManager.h"
+#include "net/WifiManager.h"
 #include "power/PowerManager.h"
 
 // 胎压数据结构
@@ -21,6 +21,7 @@ class BLES
 {
 public:
     BLES();
+    void begin();
     void loop();
     bool isConnected() const { return connected; }
     void startScan();

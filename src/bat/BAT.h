@@ -13,6 +13,7 @@ class BAT
 {
 public:
     BAT(int pin);
+    void begin();
     void loop();
     void print_voltage();
 
@@ -33,8 +34,6 @@ private:
     int output_counter;      // 输出分频计数器
 };
 
-#ifdef BAT_PIN
 extern BAT bat;
-#endif
 
 #endif

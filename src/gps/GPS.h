@@ -5,6 +5,7 @@
 #include <TinyGPS++.h>
 #include <ArduinoJson.h>
 #include "device.h"
+#include "config.h"
 
 
 typedef struct
@@ -46,6 +47,7 @@ class GPS
 {
 public:
     GPS(int rxPin, int txPin);
+    void begin();
     void loop();
     void printRawData();
     int changeHz();

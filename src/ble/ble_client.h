@@ -13,6 +13,7 @@ class BLEC
 public:
     BLEC();
     void loop();
+    void begin();
 };
 
 #ifdef BLE_CLIENT

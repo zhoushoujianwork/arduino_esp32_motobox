@@ -17,6 +17,7 @@ public:
     bool isReleased();
     bool isClicked();
     bool isLongPressed();
+    void begin();
     void loop();
 
     // 新增：静态按钮事件处理函数

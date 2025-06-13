@@ -17,6 +17,7 @@ public:
 
     LED(uint8_t pin);
     void setMode(Mode mode);
+    void begin();
     void loop();
 
 private:

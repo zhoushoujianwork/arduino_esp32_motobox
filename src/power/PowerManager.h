@@ -8,7 +8,7 @@
 #include "device.h"
 #include "qmi8658/IMU.h"
 #include "gps/GPS.h"
-#include "wifi/WifiManager.h"
+#include "net/WifiManager.h"
 
 // 低功耗模式状态枚举
 enum PowerState {
@@ -21,6 +21,7 @@ class PowerManager {
 public:
     PowerManager();
     PowerState powerState;        // 当前电源状态
+    void begin();
     void loop();
     bool requestLowPowerMode;
     void enterLowPowerMode();

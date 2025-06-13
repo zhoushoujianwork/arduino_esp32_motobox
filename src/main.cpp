@@ -14,6 +14,7 @@
 #include "config.h"
 #include "power/PowerManager.h"
 #include "device.h"
+#include "nvs_flash.h"
 
 #if defined(ENABLE_GSM) || defined(ENABLE_WIFI)
 #include "net/NetManager.h"
@@ -50,7 +51,7 @@
 #endif
 
 #ifdef ENABLE_WIFI
-#include "wifi/WifiManager.h"
+#include "net/WifiManager.h"
 #endif
 
 #include "version.h"
@@ -213,6 +214,11 @@ void taskDataProcessing(void *parameter)
 
 void setup()
 {
+  esp_err_t err = nvs_flash_init();
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    nvs_flash_erase();
+    nvs_flash_init();
+  }
   Serial.begin(115200);
   delay(100);
 
@@ -221,13 +227,16 @@ void setup()
   Serial.println("[系统] 启动次数: " + String(bootCount));
 
   Serial.println("step 2");
+  powerManager.begin();
+
+  Serial.println("step 3");
   powerManager.printWakeupReason();
 
   Serial.println("step 3");
   powerManager.checkWakeupCause();
 
   Serial.println("step 4");
-  device.initializeHardware();
+  device.begin();
 
   Serial.println("step 5");
 #ifdef ENABLE_WIFI

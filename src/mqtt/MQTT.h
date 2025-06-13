@@ -10,7 +10,7 @@
 #include "qmi8658/IMU.h"
 #endif
 #ifdef ENABLE_WIFI
-#include "wifi/WifiManager.h"
+#include "net/WifiManager.h"
 #endif
 
 #include "power/PowerManager.h"

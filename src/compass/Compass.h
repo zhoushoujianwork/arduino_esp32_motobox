@@ -65,6 +65,10 @@ public:
      */
     float getDeclination();
 
+    /**
+     * @brief 初始化罗盘
+     */
+    void begin();
 
 private:
     int _sda;

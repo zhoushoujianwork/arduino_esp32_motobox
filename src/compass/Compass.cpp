@@ -12,6 +12,10 @@ compass_data_t compass_data;
 Compass::Compass(int sda, int scl)
     : _sda(sda), _scl(scl), _declination(-6.5f) // 默认江苏磁偏角
 {
+    // 构造函数只保存参数，不做硬件/外设操作
+}
+
+void Compass::begin() {
     Serial.printf("[罗盘] 初始化: SDA=%d, SCL=%d, 磁偏角=%.2f\n", _sda, _scl, _declination);
     Wire.begin(_sda, _scl);
     qmc.init();

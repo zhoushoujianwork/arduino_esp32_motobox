@@ -1,8 +1,6 @@
 #include "BAT.h"
 
-#ifdef BAT_PIN
 BAT bat(BAT_PIN);
-#endif
 
 // 3300, 4200
 BAT::BAT(int pin)
@@ -24,12 +22,18 @@ BAT::BAT(int pin)
       stable_voltage(0),
       output_counter(0)
 {
+    // 构造函数只保存参数，不做硬件/外设操作
+}
+
+void BAT::begin()
+{
+    pinMode(pin, INPUT);
+    // 初始化缓冲区
+    memset(voltage_buffer, 0, sizeof(voltage_buffer));
     Serial.println("[BAT] 初始化开始");
     Serial.printf("[BAT] 引脚: %d, 最小电压: %d, 最大电压: %d\n", pin, min_voltage, max_voltage);
-    // 使用memset初始化缓冲区更高效
-    memset(voltage_buffer, 0, sizeof(voltage_buffer));
     Serial.println("[BAT] 初始化完成");
-}
+}   
 
 void BAT::loop()
 {
