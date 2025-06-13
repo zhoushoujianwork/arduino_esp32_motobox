@@ -14,21 +14,6 @@ extern const VersionInfo &getVersionInfo();
 
 device_state_t device_state;
 
-Device::Device()
-{
-     // 从getVersionInfo()获取版本信息
-    const VersionInfo& versionInfo = getVersionInfo();
-    device_state.device_firmware_version = versionInfo.firmware_version;
-    device_state.device_hardware_version = versionInfo.hardware_version;
-    device_state.sleep_time = 300; // 默认5分钟无活动进入低功耗模式
-    device_state.wifiConnected = false;
-    device_state.bleConnected = false;
-    device_state.battery_voltage = 0;
-    device_state.battery_percentage = 0;
-    device_state.gpsReady = false;
-    device_state.imuReady = false;
-}
-
 void print_device_info()
 {
     // 如果休眠倒计时的时候不打印
@@ -86,6 +71,24 @@ String device_state_to_json(device_state_t *state)
     doc["bat_v"] = device_state.battery_voltage;
     doc["bat_pct"] = device_state.battery_percentage;
     return doc.as<String>();
+}
+
+Device device;
+
+Device::Device()
+{
+     // 从getVersionInfo()获取版本信息
+    const VersionInfo& versionInfo = getVersionInfo();
+    device_state.device_id = get_device_id();
+    device_state.device_firmware_version = versionInfo.firmware_version;
+    device_state.device_hardware_version = versionInfo.hardware_version;
+    device_state.sleep_time = 300; // 默认5分钟无活动进入低功耗模式
+    device_state.wifiConnected = false;
+    device_state.bleConnected = false;
+    device_state.battery_voltage = 0;
+    device_state.battery_percentage = 0;
+    device_state.gpsReady = false;
+    device_state.imuReady = false;
 }
 
 void Device::initializeHardware()

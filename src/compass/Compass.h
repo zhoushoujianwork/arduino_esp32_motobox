@@ -3,6 +3,7 @@
 
 #include <Wire.h>
 #include <QMC5883LCompass.h>
+#include "config.h"
 
 typedef struct
 {
@@ -11,6 +12,9 @@ typedef struct
     float z;          // Z轴磁场强度
     float heading; // 航向角 0-360
 } compass_data_t;
+
+extern compass_data_t compass_data;
+
 
 /**
  * @brief QMC5883L 罗盘传感器驱动
@@ -76,6 +80,5 @@ private:
 extern Compass compass;  // 全局罗盘对象
 #endif
 
-extern compass_data_t compass_data;
 
 #endif  

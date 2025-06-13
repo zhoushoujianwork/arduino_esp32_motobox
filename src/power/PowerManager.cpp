@@ -381,8 +381,8 @@ void PowerManager::loop()
                 {
                     Serial.printf("[电源管理] 设备已静止超过%lu秒，准备进入低功耗模式...\n", sleepTimeSec);
                     Serial.printf("[电源管理] 电池状态: %d%%, 电压: %dmV\n",
-                                  device.get_device_state()->battery_percentage,
-                                  device.get_device_state()->battery_voltage);
+                                  get_device_state()->battery_percentage,
+                                  get_device_state()->battery_voltage);
                     
                     enterLowPowerMode();
                 }

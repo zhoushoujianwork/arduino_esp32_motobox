@@ -287,7 +287,7 @@ void tft_loop()
         // 依据方向移动Compass
         // 0-360度角度显示, 0度为北, 90度为东, 180度为南, 270度为西 不用小数
         char compassText[20];
-        snprintf(compassText, sizeof(compassText), "%d", (int)device.get_compass_data()->heading);
+        snprintf(compassText, sizeof(compassText), "%d", compass_data.heading);
         lv_label_set_text(ui_Compass, compassText);
 #endif
         lv_slider_set_value(ui_SliderBat, device_state.battery_percentage, LV_ANIM_ON);

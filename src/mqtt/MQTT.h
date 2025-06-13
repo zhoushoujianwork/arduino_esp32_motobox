@@ -13,7 +13,6 @@
 #include "wifi/WifiManager.h"
 #endif
 
-#include "device.h"
 #include "power/PowerManager.h"
 #include "config.h"
 #include <ArduinoJson.h>

@@ -12,8 +12,8 @@
 
 #include "Arduino.h"
 #include "config.h"
-#include "device.h"
 #include "power/PowerManager.h"
+#include "device.h"
 
 #if defined(ENABLE_GSM) || defined(ENABLE_WIFI)
 #include "net/NetManager.h"
@@ -66,9 +66,6 @@
 #include "tft/TFT.h"
 #endif
 //============================= 全局变量 =============================
-
-// 设备管理实例
-Device device;
 
 // RTC内存变量（深度睡眠后保持）
 RTC_DATA_ATTR int bootCount = 0;
@@ -199,7 +196,7 @@ void taskDataProcessing(void *parameter)
       bs.loop();
 #endif
 
-#ifdef DISABLE_TFT
+#ifdef ENABLE_TFT
     // 显示屏更新
     tft_loop();
 #endif

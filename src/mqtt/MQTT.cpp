@@ -57,7 +57,7 @@ bool MQTT::reconnect()
         Serial.printf("[MQTT] 第%d次尝试连接...\n", attempts);
         
         if (netManager.isConnected() && 
-            mqttClient.connect(device.get_device_id().c_str(), mqtt_user, mqtt_password))
+            mqttClient.connect(device_state.device_id.c_str(), mqtt_user, mqtt_password))
         {
             Serial.printf("[MQTT] 通过%s网络连接成功\n",
                 currentNetType == NetManager::NET_WIFI ? "WiFi" : "4G");
