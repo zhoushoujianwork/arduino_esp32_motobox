@@ -15,6 +15,31 @@
 #define MOTION_DETECTION_WINDOW_DEFAULT 32       // 增加窗口大小到32
 #define MOTION_DETECTION_DEBOUNCE_MS 200        // 增加去抖时间到200ms
 
+
+typedef struct
+{
+    // 加速度计数据，单位：g
+    float accel_x; // X轴加速度
+    float accel_y; // Y轴加速度
+    float accel_z; // Z轴加速度
+
+    // 陀螺仪数据，单位：°/s
+    float gyro_x; // X轴角速度
+    float gyro_y; // Y轴角速度
+    float gyro_z; // Z轴角速度
+
+    // 姿态角，单位：度
+    float roll;  // 横滚角
+    float pitch; // 俯仰角
+    float yaw;   // 偏航角
+
+    float temperature; // 温度，单位：摄氏度
+} imu_data_t;
+
+extern imu_data_t imu_data;
+
+String imu_data_to_json(imu_data_t& imu_data);
+
 class IMU
 {
 public:
@@ -43,6 +68,12 @@ public:
      */
     bool detectMotion();
 
+    /**
+     * @brief 打印IMU数据
+     */
+    void printImuData();
+
+
 private:
     int sda;
     int scl;
@@ -59,6 +90,7 @@ private:
     float accumulatedDelta = 0;
     int sampleIndex = 0;
     int sampleWindow = MOTION_DETECTION_WINDOW_DEFAULT;
+
 };
 
 #ifdef ENABLE_IMU

@@ -58,11 +58,6 @@ public:
     Ml307AtModem(HardwareSerial& serial, uint32_t baudrate, int8_t rxPin, int8_t txPin, int8_t resetPin = -1);
 
     /**
-     * 初始化串口
-     */
-    void begin();
-
-    /**
      * 获取本地IP地址
      */
     String getLocalIP();

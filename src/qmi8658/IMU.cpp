@@ -13,19 +13,18 @@ void IRAM_ATTR IMU::motionISR() {
     IMU::motionInterruptFlag = true;
 }
 
+imu_data_t imu_data;
+
 IMU::IMU(int sda, int scl, int motionIntPin)
 {
+    Serial.println("[IMU] 初始化开始");
+
     this->sda = sda;
     this->scl = scl;
     this->motionIntPin = motionIntPin;
     this->motionThreshold = MOTION_DETECTION_THRESHOLD_DEFAULT;
     this->motionDetectionEnabled = false;
     this->sampleWindow = MOTION_DETECTION_WINDOW_DEFAULT;
-}
-
-void IMU::begin()
-{
-    Serial.println("[IMU] 初始化开始");
 #ifdef USE_WIRE
     Serial.printf("[IMU] SDA: %d, SCL: %d\n", sda, scl);
     if (!qmi.begin(Wire1, QMI8658_L_SLAVE_ADDRESS, sda, scl))
@@ -92,6 +91,7 @@ void IMU::begin()
     }
     Serial.println("[IMU] 运动检测初始化完成");
 }
+
 
 
 void IMU::configureMotionDetection(float threshold) {
@@ -242,28 +242,28 @@ void IMU::loop()
 {
     if (qmi.getDataReady())
     {
-        device.get_device_state()->imuReady = true;
-        qmi.getAccelerometer(device.get_imu_data()->accel_x, device.get_imu_data()->accel_y, device.get_imu_data()->accel_z);
+        get_device_state()->imuReady = true;
+        qmi.getAccelerometer(imu_data.accel_x, imu_data.accel_y, imu_data.accel_z);
 
         // 应用传感器旋转（如果定义了）
 #if defined(IMU_ROTATION) 
         // 顺时针旋转90度（适用于传感器侧装）
-        float temp = device.get_imu_data()->accel_x;
-        device.get_imu_data()->accel_x = device.get_imu_data()->accel_y;
-        device.get_imu_data()->accel_y = -temp;
+        float temp = imu_data.accel_x;
+        imu_data.accel_x = imu_data.accel_y;
+        imu_data.accel_y = -temp;
 #endif
 
-        qmi.getGyroscope(device.get_imu_data()->gyro_x, device.get_imu_data()->gyro_y, device.get_imu_data()->gyro_z);
+        qmi.getGyroscope(imu_data.gyro_x, imu_data.gyro_y, imu_data.gyro_z);
 
         // 使用加速度计计算姿态角
-        float roll_acc = atan2(device.get_imu_data()->accel_y, device.get_imu_data()->accel_z) * 180 / M_PI;
-        float pitch_acc = atan2(-device.get_imu_data()->accel_x, sqrt(device.get_imu_data()->accel_y * device.get_imu_data()->accel_y + device.get_imu_data()->accel_z * device.get_imu_data()->accel_z)) * 180 / M_PI;
+        float roll_acc = atan2(imu_data.accel_y, imu_data.accel_z) * 180 / M_PI;
+        float pitch_acc = atan2(-imu_data.accel_x, sqrt(imu_data.accel_y * imu_data.accel_y + imu_data.accel_z * imu_data.accel_z)) * 180 / M_PI;
 
         // 使用陀螺仪数据和互补滤波更新姿态角
-        device.get_imu_data()->roll = ALPHA * (device.get_imu_data()->roll + device.get_imu_data()->gyro_x * dt) + (1.0 - ALPHA) * roll_acc;
-        device.get_imu_data()->pitch = ALPHA * (device.get_imu_data()->pitch + device.get_imu_data()->gyro_y * dt) + (1.0 - ALPHA) * pitch_acc;
+        imu_data.roll = ALPHA * (imu_data.roll + imu_data.gyro_x * dt) + (1.0 - ALPHA) * roll_acc;
+        imu_data.pitch = ALPHA * (imu_data.pitch + imu_data.gyro_y * dt) + (1.0 - ALPHA) * pitch_acc;
 
-        device.get_imu_data()->temperature = qmi.getTemperature_C();
+        imu_data.temperature = qmi.getTemperature_C();
         
         // 处理运动检测中断
         if (motionDetectionEnabled && isMotionDetected()) {
@@ -283,11 +283,10 @@ void IMU::loop()
  */
 bool IMU::detectMotion()
 {
-    imu_data_t *imuData = device.get_imu_data();
     float accelMagnitude = sqrt(
-        imuData->accel_x * imuData->accel_x +
-        imuData->accel_y * imuData->accel_y +
-        imuData->accel_z * imuData->accel_z);
+        imu_data.accel_x * imu_data.accel_x +
+        imu_data.accel_y * imu_data.accel_y +
+        imu_data.accel_z * imu_data.accel_z);
     float delta = fabs(accelMagnitude - lastAccelMagnitude);
     lastAccelMagnitude = accelMagnitude;
     accumulatedDelta += delta;
@@ -302,4 +301,32 @@ bool IMU::detectMotion()
         return motionDetected;
     }
     return false;
+}
+
+/**
+ * @brief 打印IMU数据
+ */
+void IMU::printImuData()
+{
+    Serial.println("imu_data: " + String(imu_data.roll) + ", " + String(imu_data.pitch) + ", " + String(imu_data.yaw) + ", " + String(imu_data.temperature));
+}
+
+// 生成精简版IMU数据JSON
+String imu_data_to_json(imu_data_t& imu_data)
+{
+    StaticJsonDocument<256> doc;
+    doc["ax"] = imu_data.accel_x; // X轴加速度
+    doc["ay"] = imu_data.accel_y; // Y轴加速度
+    doc["az"] = imu_data.accel_z; // Z轴加速度
+    doc["gx"] = imu_data.gyro_x;  // X轴角速度
+    doc["gy"] = imu_data.gyro_y;  // Y轴角速度
+    doc["gz"] = imu_data.gyro_z;  // Z轴角速度
+    // doc["mx"] = imu_data.mag_x;            // X轴磁场
+    // doc["my"] = imu_data.mag_y;            // Y轴磁场
+    // doc["mz"] = imu_data.mag_z;            // Z轴磁场
+    doc["roll"] = imu_data.roll;        // 横滚角
+    doc["pitch"] = imu_data.pitch;      // 俯仰角
+    doc["yaw"] = imu_data.yaw;          // 航向角
+    doc["temp"] = imu_data.temperature; // 温度
+    return doc.as<String>();
 }

@@ -1,5 +1,9 @@
 #include "PWMLED.h"
 
+#ifdef PWM_LED_PIN
+PWMLED pwmLed(PWM_LED_PIN);
+#endif
+
 PWMLED::PWMLED(uint8_t pin)
     : _pin(pin)
     , _mode(OFF)
@@ -11,9 +15,7 @@ PWMLED::PWMLED(uint8_t pin)
 {
     Serial.println("[PWMLED] 初始化开始");
     Serial.printf("[PWMLED] 引脚: %d\n", _pin);
-}
 
-void PWMLED::begin() {
     // 初始化 FastLED，直接使用传入的引脚
     FastLED.addLeds<WS2812, PWM_LED_PIN, GRB>(_leds, NUM_LEDS);
     Serial.printf("[PWMLED] FastLED 初始化完成，引脚: %d\n", _pin);
@@ -27,6 +29,7 @@ void PWMLED::begin() {
     
     Serial.println("[PWMLED] 初始化测试完成");
 }
+
 
 void PWMLED::setMode(Mode mode, uint8_t brightness) {
     if (_mode != mode || brightness > 0) {

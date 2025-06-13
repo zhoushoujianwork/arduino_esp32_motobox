@@ -33,4 +33,8 @@ private:
     int output_counter;      // 输出分频计数器
 };
 
+#ifdef BAT_PIN
+extern BAT bat;
+#endif
+
 #endif

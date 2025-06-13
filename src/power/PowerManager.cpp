@@ -19,25 +19,21 @@ RTC_DATA_ATTR bool PowerManager::sleepEnabled = true;
 RTC_DATA_ATTR bool PowerManager::sleepEnabled = false;
 #endif
 
-extern MQTT mqtt;
-
 PowerManager powerManager;
 
 
 PowerManager::PowerManager()
 {
+    Serial.println("[电源管理] 初始化开始");
     // 设置默认值
     lastMotionTime = 0;
     powerState = POWER_STATE_NORMAL;
-    sleepTimeSec = device.get_device_state()->sleep_time;
-}
+    sleepTimeSec = get_device_state()->sleep_time;
 
-void PowerManager::begin()
-{
     powerState = POWER_STATE_NORMAL;
 
     // 启动时从存储读取休眠时间（秒），如无则用默认值
-    sleepTimeSec = PreferencesUtils::loadULong(PreferencesUtils::NS_POWER, PreferencesUtils::KEY_SLEEP_TIME, device.get_device_state()->sleep_time);
+    sleepTimeSec = PreferencesUtils::loadULong(PreferencesUtils::NS_POWER, PreferencesUtils::KEY_SLEEP_TIME, get_device_state()->sleep_time);
     idleThreshold = sleepTimeSec * 1000;
 
     // 处理唤醒事件
@@ -46,6 +42,7 @@ void PowerManager::begin()
     Serial.println("[电源管理] 休眠功能已启用 (编译时配置)");
     Serial.printf("[电源管理] 当前休眠时间: %lu 秒\n", sleepTimeSec);
 }
+
 
 void PowerManager::handleWakeup()
 {
@@ -602,7 +599,7 @@ void PowerManager::checkWakeupCause()
 
 // 新增：设置休眠时间（秒），并保存到存储，同时更新设备状态，重新计时休眠
 void PowerManager::setSleepTime(unsigned long seconds) {
-    device.get_device_state()->sleep_time = seconds; // 更新设备状态
+    get_device_state()->sleep_time = seconds; // 更新设备状态
     sleepTimeSec = seconds;
     idleThreshold = sleepTimeSec * 1000;
     lastMotionTime = millis(); // 新增：重置空闲计时
@@ -612,8 +609,8 @@ void PowerManager::setSleepTime(unsigned long seconds) {
 
 // 新增：获取休眠时间（秒）
 unsigned long PowerManager::getSleepTime() const {
-    if (device.get_device_state()->sleep_time != sleepTimeSec) {
-        Serial.printf("[电源管理] 出现问题：休眠时间不一致 %lu 秒，device: %lu 秒\n", sleepTimeSec, device.get_device_state()->sleep_time);
+    if (get_device_state()->sleep_time != sleepTimeSec) {
+        Serial.printf("[电源管理] 出现问题：休眠时间不一致 %lu 秒，device: %lu 秒\n", sleepTimeSec, get_device_state()->sleep_time);
     }
     return sleepTimeSec;
 }

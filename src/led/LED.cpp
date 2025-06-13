@@ -1,16 +1,16 @@
 #include "LED.h"
 
+#ifdef LED_PIN
+LED led(LED_PIN);
+#endif
+
 LED::LED(uint8_t pin) : _pin(pin), _mode(OFF), _lastToggle(0), _state(false), _blinkCount(0)
 {
+    Serial.println("[LED] 初始化开始");
     _lastMode = OFF; // 初始化上一次模式为OFF
-}
-
-void LED::begin()
-{
     // 配置LED引脚为输出
     pinMode(_pin, OUTPUT);
     digitalWrite(_pin, HIGH); // 初始状态为关闭 (LED是低电平点亮的)
-    Serial.println("[LED] 初始化开始");
     Serial.printf("[LED] 引脚: %d\n", _pin);
 }
 

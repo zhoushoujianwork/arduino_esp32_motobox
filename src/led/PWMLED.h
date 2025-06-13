@@ -23,7 +23,6 @@ public:
     static const uint8_t DEFAULT_BRIGHTNESS = 25;  // 默认亮度为 10%
 
     PWMLED(uint8_t pin);
-    void begin();
     void setMode(Mode mode, uint8_t brightness = 0);  // 0表示使用默认亮度
     void loop();
     void changeMode();
@@ -53,5 +52,9 @@ private:
     void updateRainbow();
     const char* modeToString(Mode mode);
 };
+
+#ifdef PWM_LED_PIN
+extern PWMLED pwmLed;
+#endif
 
 #endif 

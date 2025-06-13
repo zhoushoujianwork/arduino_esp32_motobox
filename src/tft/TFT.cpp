@@ -204,9 +204,9 @@ void tft_loop()
 
     // Show battery level
     // 如果蓝牙没有连接则显示自己的电池电量！
-    if (!device.get_device_state()->bleConnected)
+    if (!device_state.bleConnected)
     {
-        lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
+        lv_slider_set_value(ui_SliderBat, device_state.battery_percentage, LV_ANIM_ON);
         lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
 
         // 其他归零
@@ -232,10 +232,10 @@ void tft_loop()
         lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0); // 默认完全不透明
 
         // GPS图标根据数据有效性显示
-        lv_obj_set_style_img_opa(ui_imgGps, device.get_device_state()->gpsReady ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+        lv_obj_set_style_img_opa(ui_imgGps, device_state.gpsReady ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
 
         // 根据WiFi连接状态更新图标
-        if (device.get_device_state()->wifiConnected)
+        if (device_state.wifiConnected)
         {
             // WiFi已连接 - 显示正常图标但完全不透明
             lv_obj_set_style_img_opa(ui_imgWifi, LV_OPA_COVER, 0);
@@ -248,25 +248,25 @@ void tft_loop()
 
         // Show Gps
         char gpsTextnu[4]; // 增加缓冲区大小以容纳两位数字和结束符
-        snprintf(gpsTextnu, sizeof(gpsTextnu), "%d", device.get_gps_data()->satellites);
+        snprintf(gpsTextnu, sizeof(gpsTextnu), "%d", gps_data.satellites);
         lv_label_set_text(ui_textGpsNu, gpsTextnu);
 
         char gpsTextHz[4]; // 增加缓冲区大小以容纳两位数字和结束符
-        snprintf(gpsTextHz, sizeof(gpsTextHz), "%d", device.get_gps_data()->gpsHz);
+        snprintf(gpsTextHz, sizeof(gpsTextHz), "%d", gps_data.gpsHz);
         lv_label_set_text(ui_textGpsHz, gpsTextHz);
 
         char gpsTextTime[20]; // 2024-09-05 10:00:00
-        snprintf(gpsTextTime, sizeof(gpsTextTime), "%04d-%02d-%02d %02d:%02d:%02d", device.get_gps_data()->year,
-                 device.get_gps_data()->month, device.get_gps_data()->day, device.get_gps_data()->hour,
-                 device.get_gps_data()->minute, device.get_gps_data()->second);
+        snprintf(gpsTextTime, sizeof(gpsTextTime), "%04d-%02d-%02d %02d:%02d:%02d", gps_data.year,
+                 gps_data.month, gps_data.day, gps_data.hour,
+                 gps_data.minute, gps_data.second);
         lv_label_set_text(ui_textTime, gpsTextTime);
         char gpsTextLocation[20]; // 120'123456 / 21'654321
-        snprintf(gpsTextLocation, sizeof(gpsTextLocation), "%s / %s", String(device.get_gps_data()->latitude, 6), String(device.get_gps_data()->longitude, 6));
+        snprintf(gpsTextLocation, sizeof(gpsTextLocation), "%s / %s", String(gps_data.latitude, 6), String(gps_data.longitude, 6));
         lv_label_set_text(ui_textLocation, gpsTextLocation);
 
         // 处理GPS无数据的情况
-        int currentSpeedValue = device.get_gps_data()->speed;
-        if (!device.get_device_state()->gpsReady)
+        int currentSpeedValue = gps_data.speed;
+        if (!device_state.gpsReady)
         {
             currentSpeedValue = 0;
         }
@@ -274,8 +274,14 @@ void tft_loop()
         lv_slider_set_value(ui_SliderSpeed, currentSpeedValue, LV_ANIM_OFF);
         lv_event_send(ui_SliderSpeed, LV_EVENT_VALUE_CHANGED, NULL);
         char tripText[20]; // Ensure this buffer is large enough for your number
-        snprintf(tripText, sizeof(tripText), "Trip:%.0f km", device.getTotalDistanceKm());
+#ifdef ENABLE_GPS
+        snprintf(tripText, sizeof(tripText), "Trip:%.0f km", gps.getTotalDistanceKm());
         lv_label_set_text(ui_textTrip, tripText);
+#else
+        {
+            lv_label_set_text(ui_textTrip, "Trip:--- km");
+        }
+#endif
 
 #if defined(GPS_COMPASS_SDA) && defined(GPS_COMPASS_SCL)
         // 依据方向移动Compass
@@ -284,12 +290,12 @@ void tft_loop()
         snprintf(compassText, sizeof(compassText), "%d", (int)device.get_compass_data()->heading);
         lv_label_set_text(ui_Compass, compassText);
 #endif
-        lv_slider_set_value(ui_SliderBat, device.get_device_state()->battery_percentage, LV_ANIM_ON);
+        lv_slider_set_value(ui_SliderBat, device_state.battery_percentage, LV_ANIM_ON);
         lv_event_send(ui_SliderBat, LV_EVENT_VALUE_CHANGED, NULL);
 
         // Show Gyro
-        float gyro = device.get_imu_data()->pitch;
-        // float gyro = imu.get_imu_data()->roll;
+        float gyro = imu_data.pitch;
+        // float gyro = imu_data.roll;
         lv_slider_set_value(ui_SliderGyro, gyro, LV_ANIM_ON);
         lv_event_send(ui_SliderGyro, LV_EVENT_VALUE_CHANGED, NULL);
 

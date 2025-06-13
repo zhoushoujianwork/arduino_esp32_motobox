@@ -1,12 +1,7 @@
-#include <WiFi.h>
-#include <PubSubClient.h>
 #include "MQTT.h"
-#include "config.h"
-#include "wifi/WifiManager.h"
-#include <ArduinoJson.h>
-#include "net/NetManager.h"
 
-extern NetManager netManager;
+MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
+
 
 MQTT::MQTT(const char *server, int port, const char *user, const char *password)
     : mqtt_server(server), mqtt_port(port), mqtt_user(user), mqtt_password(password)
@@ -149,63 +144,24 @@ void MQTT::loop()
         Serial.printf("[MQTT] 循环失败 (当前网络: %s)\n",
             currentNetType == NetManager::NET_WIFI ? "WiFi" : "4G");
     }
-}
 
-void MQTT::publishGPS(gps_data_t gps_data)
-{
-    if (device.get_device_state()->wifiConnected)
-    {
-       
-        if (!mqttClient.publish(mqtt_topic_gps.c_str(), device.gps_data_to_json().c_str()))
-        {
-            Serial.println("GPS数据发布失败");
-            device.printGpsData();
-            Serial.println("publishGPS");
-            Serial.println(mqtt_topic_gps.c_str());
-            Serial.println(device.gps_data_to_json().c_str());
-            Serial.println(device.gps_data_to_json().length());
-        }
+#ifdef ENABLE_GPS
+    if (millis() - lastGpsPublishTime >= 1000) {
+        mqttClient.publish(mqtt_topic_gps.c_str(), gps_data_to_json(gps_data).c_str());
+        lastGpsPublishTime = millis();
     }
-    else
-    {
-        // Serial.println("GPS数据发布失败,WiFi未连接");
-    }
-}
+#endif
 
-void MQTT::publishIMU(imu_data_t imu_data)
-{
-    if (device.get_device_state()->wifiConnected)
-    {
-        if (!mqttClient.publish(mqtt_topic_imu.c_str(), device.imu_data_to_json().c_str()))
-        {
-            Serial.println("IMU数据发布失败");
-        }
+#ifdef ENABLE_IMU
+    if (millis() - lastImuPublishTime >= 1000) {
+        mqttClient.publish(mqtt_topic_imu.c_str(), imu_data_to_json(imu_data).c_str());
+        lastImuPublishTime = millis();
     }
-    else
-    {
-        // Serial.println("IMU数据发布失败,WiFi未连接");
-    }
-}
+#endif
 
-void MQTT::publishDeviceInfo(device_state_t device_state)
-{
-    if (device.get_device_state()->wifiConnected)
-    {
-        if (!mqttClient.publish(mqtt_topic_device_info.c_str(), device.device_state_to_json().c_str(), true))
-        {
-            Serial.println(mqtt_topic_device_info.c_str());
-            Serial.println(device.device_state_to_json().c_str());
-            Serial.println(device.device_state_to_json().length());
-            Serial.println("设备信息发布失败");
-        }
-        else
-        {
-            // Serial.println(mqttClient.connected() ? "MQTT已连接" : "MQTT未连接");
-        }
-    }
-    else
-    {
-        // Serial.println("设备信息发布失败,WiFi未连接");
+    if (millis() - lastDeviceInfoPublishTime >= 1000) {
+        mqttClient.publish(mqtt_topic_device_info.c_str(), device_state_to_json(get_device_state()).c_str());
+        lastDeviceInfoPublishTime = millis();
     }
 }
 

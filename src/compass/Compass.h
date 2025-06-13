@@ -2,8 +2,15 @@
 #define COMPASS_H
 
 #include <Wire.h>
-#include "device.h"
 #include <QMC5883LCompass.h>
+
+typedef struct
+{
+    float x;          // X轴磁场强度
+    float y;          // Y轴磁场强度
+    float z;          // Z轴磁场强度
+    float heading; // 航向角 0-360
+} compass_data_t;
 
 /**
  * @brief QMC5883L 罗盘传感器驱动
@@ -17,11 +24,6 @@ public:
      * @param scl I2C SCL引脚
      */
     Compass(int sda, int scl);
-
-    /**
-     * @brief 初始化罗盘模块
-     */
-    void begin();
 
     /**
      * @brief 读取罗盘数据并更新到 device
@@ -59,6 +61,7 @@ public:
      */
     float getDeclination();
 
+
 private:
     int _sda;
     int _scl;
@@ -69,6 +72,10 @@ private:
     float calculateHeading(int16_t x, int16_t y);
 };
 
+#ifdef  ENABLE_COMPASS
 extern Compass compass;  // 全局罗盘对象
-
 #endif
+
+extern compass_data_t compass_data;
+
+#endif  

@@ -10,10 +10,12 @@
 #include "config.h"
 #include "esp_wifi.h"
 #include "utils/PreferencesUtils.h"
+#include "esp_wifi.h"
 
 class WiFiConfigManager
 {
 private:
+
     WebServer server;
     DNSServer dnsServer;
     Preferences preferences;
@@ -48,9 +50,9 @@ private:
    
 
 public:
+    WiFiConfigManager();
     WiFiClientSecure wifiClientSecure;
     WiFiClient wifiClient;
-    void begin();
     void loop();
     void enterConfigMode();
     void exitConfigMode();
@@ -67,7 +69,9 @@ public:
 
 };
 
+#ifdef ENABLE_WIFI
 // 全局实例和接口函数
 extern WiFiConfigManager wifiManager;
+#endif
 
 #endif // WIFI_MANAGER_H

@@ -7,10 +7,7 @@ Ml307AtModem ml370(Serial2, 115200, GSM_RX_PIN, GSM_TX_PIN);
 
 // 修改构造函数实现，添加resetPin参数
 Ml307AtModem::Ml307AtModem(HardwareSerial& serial, uint32_t baudrate, int8_t rxPin, int8_t txPin, int8_t resetPin)
-    : _serial(serial), _baudrate(baudrate), _rxPin(rxPin), _txPin(txPin), _resetPin(resetPin) {}
-
-// 初始化串口并等待网络注册
-void Ml307AtModem::begin() {
+    : _serial(serial), _baudrate(baudrate), _rxPin(rxPin), _txPin(txPin), _resetPin(resetPin) {
     Serial.println("[GSM] 开始初始化...");
     
     // 先尝试自动检测波特率
@@ -70,7 +67,7 @@ void Ml307AtModem::begin() {
     // 6. 等待网络就绪
     Serial.println("[GSM] 等待网络就绪...");
     waitForNetwork();
-}
+    }
 
 // 等待网络注册
 bool Ml307AtModem::waitForNetwork(uint32_t timeout) {

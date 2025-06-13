@@ -31,4 +31,8 @@ private:
     ButtonState lastState = NONE;
 };
 
+#ifdef BTN_PIN
+extern BTN button;
+#endif
+
 #endif

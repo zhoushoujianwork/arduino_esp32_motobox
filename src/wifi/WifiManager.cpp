@@ -7,6 +7,10 @@
 unsigned long wifiConnectedTime = 0;
 bool needCheckInternet = false;
 
+#ifdef ENABLE_WIFI
+WiFiConfigManager wifiManager;
+#endif
+
 void WiFiEvent(WiFiEvent_t event)
 {
     // 电源倒计时的时候不处理
@@ -23,20 +27,20 @@ void WiFiEvent(WiFiEvent_t event)
         break;
     case SYSTEM_EVENT_STA_CONNECTED:
         Serial.println("STA WiFi已连接");
-        device.set_wifi_connected(true);
+        device_state.wifiConnected = true;
         wifiConnectedTime = millis();
         needCheckInternet = true;
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         Serial.println("STA WiFi已断开");
-        device.set_wifi_connected(false);
+        device_state.wifiConnected = false;
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
         Serial.printf("STA 获取到IP地址: %s\n", WiFi.localIP().toString().c_str());
         break;
     case SYSTEM_EVENT_AP_START:
         Serial.println("AP模式已启动");
-        device.set_wifi_connected(false);
+        device_state.wifiConnected = false;
         break;
     case SYSTEM_EVENT_AP_STOP:
         Serial.println("AP模式已停止");
@@ -46,15 +50,16 @@ void WiFiEvent(WiFiEvent_t event)
     }
 }
 
-WiFiConfigManager wifiManager;
+
 
 // 在类成员变量中添加
 unsigned long lastConnectAttempt = 0;
 
-void WiFiConfigManager::begin()
+
+
+WiFiConfigManager::WiFiConfigManager()
 {
-    Serial.println("WiFiConfigManager::begin");
-    delay(1000); // 添加启动延迟
+    Serial.println("[WiFi] 初始化开始");
 
     // 注册WiFi事件回调
     WiFi.onEvent(WiFiEvent);
@@ -75,6 +80,7 @@ void WiFiConfigManager::begin()
         return;
     }
     Serial.println("配置存储初始化成功");
+    
 }
 
 // 阻塞的
@@ -93,7 +99,7 @@ void WiFiConfigManager::loop()
     {
         if (WiFi.status() != WL_CONNECTED)
         {
-            device.set_wifi_connected(false);
+            device_state.wifiConnected = false;
 
             // 每5秒重试一次
             if (millis() - lastConnectAttempt > 5000)
@@ -102,7 +108,7 @@ void WiFiConfigManager::loop()
                 if (tryConnectWithSavedCredentials())
                 {
                     Serial.println("\nWiFi连接成功!");
-                    device.set_wifi_connected(true);
+                    device_state.wifiConnected = true;
                 }
             }
         }
@@ -170,7 +176,7 @@ void WiFiConfigManager::enterConfigMode()
     delay(100);
 
     isConfigMode = true;
-    device.set_wifi_connected(false);
+    device_state.wifiConnected = false;
 
     setupAP();
     setupDNS();

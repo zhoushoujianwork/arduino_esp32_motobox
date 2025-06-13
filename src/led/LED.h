@@ -16,7 +16,6 @@ public:
     };
 
     LED(uint8_t pin);
-    void begin();
     void setMode(Mode mode);
     void loop();
 
@@ -33,6 +32,10 @@ private:
 
     static const unsigned long BLINK_INTERVAL = 100;    // 闪烁间隔(ms)
     static const unsigned long PATTERN_INTERVAL = 1000; // 整体模式重复间隔
-};
+};  
+
+#ifdef LED_PIN
+extern LED led;
+#endif
 
 #endif

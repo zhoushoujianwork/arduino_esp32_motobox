@@ -1,27 +1,21 @@
 #include "NetManager.h"
-#include "wifi/WifiManager.h"
-#include "gsm/Ml307AtModem.h"
+
 
 // 这里假设有全局 WiFi 配置和 GSM 配置参数
 extern HardwareSerial Serial2;
 // NetManager 成员实例
 
+#if defined(ENABLE_WIFI) || defined(ENABLE_GSM)
 NetManager netManager;
+#endif
 
 /**
  * @brief 初始化网络管理器
  * 根据编译配置决定是否启用GSM功能
  */
-void NetManager::begin()
+NetManager::NetManager()
 {
-    Serial.println("NetManager::begin");
-
-#ifdef ENABLE_GSM
-    ml370.begin();
-#endif
-
-    wifiManager.begin();
-
+    Serial.println("NetManager::NetManager");
     selectedType = NET_WIFI;
 }
 

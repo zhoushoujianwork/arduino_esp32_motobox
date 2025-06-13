@@ -3,11 +3,21 @@
 
 #include <Arduino.h>
 #include <PubSubClient.h>
+#ifdef ENABLE_GPS
 #include "gps/GPS.h"
+#endif
+#ifdef ENABLE_IMU
 #include "qmi8658/IMU.h"
+#endif
+#ifdef ENABLE_WIFI
 #include "wifi/WifiManager.h"
+#endif
+
 #include "device.h"
 #include "power/PowerManager.h"
+#include "config.h"
+#include <ArduinoJson.h>
+#include "net/NetManager.h"
 
 class MQTT
 {
@@ -22,6 +32,12 @@ private:
     String mqtt_topic_device_info;
     String mqtt_topic_command;
     Client* networkClient = nullptr; // 新增，当前底层 Client
+
+    // 发布时间记录
+    unsigned long lastGpsPublishTime = 0;
+    unsigned long lastImuPublishTime = 0;
+    unsigned long lastDeviceInfoPublishTime = 0;
+
     bool reconnect();
 
     void subscribeCommand(); // 订阅命令
@@ -32,13 +48,7 @@ public:
     void setClient(Client* client); // 新增，动态切换底层 Client
     void loop();
     void disconnect(); // 新增，断开MQTT连接，适配低功耗
-
-    // 发送GPS数据
-    void publishGPS(gps_data_t gps_data);
-    // 发送IMU数据
-    void publishIMU(imu_data_t imu_data);
-    // 发送设备信息
-    void publishDeviceInfo(device_state_t device_state);
 };
 
+extern MQTT mqtt;
 #endif

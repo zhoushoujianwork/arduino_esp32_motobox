@@ -1,5 +1,4 @@
 #include "GPS.h"
-#include "device.h"
 #include <TinyGPS++.h>
 
 // \r\n 是回车换行符的组合
@@ -43,16 +42,18 @@ const int NUM_BAUD_RATES = 8;
     #define GPS_DEFAULT_BAUDRATE 9600
 #endif
 
+#ifdef ENABLE_GPS
+GPS gps(GPS_RX_PIN, GPS_TX_PIN);
+#endif
+
+gps_data_t gps_data;
+
 GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin)
 {
+    Serial.println("[GPS] 开始初始化 txPin:" + String(_txPin) + " rxPin:" + String(_rxPin));
     _rxPin = rxPin;
     _txPin = txPin;
-    device.get_gps_data()->gpsHz = 2;
-}
-
-void GPS::begin()
-{
-    Serial.println("[GPS] 开始初始化 txPin:" + String(_txPin) + " rxPin:" + String(_rxPin));
+    gps_data.gpsHz = 2;
     // delay(1000);设置串口波特率
     gpsSerial.begin(GPS_DEFAULT_BAUDRATE);
     _currentBaudRate = GPS_DEFAULT_BAUDRATE;
@@ -63,10 +64,10 @@ void GPS::begin()
         Serial.println("[GPS] 设置波特率成功,波特率:" + String(GPS_BAUDRATE));
     }
     // 设置频率
-    if (!setHz(device.get_gps_data()->gpsHz)) {
+    if (!setHz(gps_data.gpsHz)) {
         Serial.println("[GPS] 设置频率失败");
     }else {
-        Serial.println("[GPS] 设置频率成功,频率:" + String(device.get_gps_data()->gpsHz));
+        Serial.println("[GPS] 设置频率成功,频率:" + String(gps_data.gpsHz));
     }
 #endif
 
@@ -85,60 +86,67 @@ void GPS::loop()
         char c = (char)gpsSerial.read();
         if (gps.encode(c))  
         {
+            
             if (gps.location.isUpdated())
             {
                 // 使用更高效的时间获取方式
                 auto loc = gps.location;
-                device.get_gps_data()->latitude = loc.lat();
-                device.get_gps_data()->longitude = loc.lng();
+                gps_data.latitude = loc.lat();
+                gps_data.longitude = loc.lng();
             }
 
             if (gps.altitude.isUpdated())
             {
                 auto alt = gps.altitude;
-                device.get_gps_data()->altitude = alt.meters();
+                gps_data.altitude = alt.meters();
             }
 
              if (gps.course.isUpdated())
             {
                 auto course = gps.course;
-                device.get_gps_data()->heading = course.deg();
+                gps_data.heading = course.deg();
             }
 
             if (gps.time.isUpdated())
             {
                 auto time = gps.time;
-                device.get_gps_data()->hour = time.hour();
-                device.get_gps_data()->minute = time.minute();
-                device.get_gps_data()->second = time.second();
-                device.get_gps_data()->centisecond = time.centisecond();
+                gps_data.hour = time.hour();
+                gps_data.minute = time.minute();
+                gps_data.second = time.second();
+                gps_data.centisecond = time.centisecond();
             }
 
             if (gps.date.isUpdated())
             {
                 auto date = gps.date;
-                device.get_gps_data()->year = date.year();
-                device.get_gps_data()->month = date.month();
-                device.get_gps_data()->day = date.day();
+                gps_data.year = date.year();
+                gps_data.month = date.month();
+                gps_data.day = date.day();
             }
             
             if (gps.hdop.isUpdated())
             {
                 // 获取
                 auto hdop = gps.hdop;
-                device.get_gps_data()->hdop = hdop.value();
+                gps_data.hdop = hdop.value();
             }
             
             if (gps.satellites.isUpdated())
             {
                 auto satellites = gps.satellites;
-                device.get_gps_data()->satellites = satellites.value();
+                gps_data.satellites = satellites.value();
+                // 超过 3 个表示GPS准备好了
+                if (gps_data.satellites > 3) {
+                    device_state.gpsReady = true;
+                    loopAutoAdjustHz();
+                }
             }
             
             if (gps.speed.isUpdated())
             {
                 auto speed = gps.speed;
-                device.get_gps_data()->speed = speed.kmph();
+                gps_data.speed = speed.kmph();
+                loopDistance();
             }
             
         }
@@ -162,17 +170,17 @@ void GPS::printRawData()
 int GPS::changeHz()
 {
     // 计算下一个目标频率
-    int nextHz = device.get_gps_data()->gpsHz == 1 ? 2 : device.get_gps_data()->gpsHz == 2 ? 5 : device.get_gps_data()->gpsHz == 5 ? 10 : 1;
+    int nextHz = gps_data.gpsHz == 1 ? 2 : gps_data.gpsHz == 2 ? 5 : gps_data.gpsHz == 5 ? 10 : 1;
     
     // 尝试设置新频率
     if (setHz(nextHz)) {
         Serial.println("[GPS] 频率切换成功: " + String(nextHz) + "Hz");
-        device.get_gps_data()->gpsHz = nextHz;  // 只有在设置成功时才更新频率值
+        gps_data.gpsHz = nextHz;  // 只有在设置成功时才更新频率值
     } else {
-        Serial.println("[GPS] 频率切换失败，保持当前频率: " + String(device.get_gps_data()->gpsHz) + "Hz");
+        Serial.println("[GPS] 频率切换失败，保持当前频率: " + String(gps_data.gpsHz) + "Hz");
     }
     
-    return device.get_gps_data()->gpsHz;  // 返回实际的频率值
+    return gps_data.gpsHz;  // 返回实际的频率值
 }
 
 /**
@@ -323,30 +331,36 @@ bool GPS::sendGpsCommand(const String& cmd, int retries, int retryDelay) {
 }
 
 /*
-* 依据卫星数量自动调节频率，20颗星以上10Hz，10-20颗星5Hz，10颗星以下2Hz，
+* 依据卫星数量自动调节频率，20颗星以上10Hz，10-20颗星5Hz，10颗星以下2Hz， 5s 检查执行一次
 * @param satellites 卫星数量
 * @return 调节后的频率
 */
+void GPS::loopAutoAdjustHz() {
+    if (millis() - lastAutoAdjustHzTime >= 5000) {
+        autoAdjustHz(gps_data.satellites);
+        lastAutoAdjustHzTime = millis();
+    }
+}
 int GPS::autoAdjustHz(uint8_t satellites) {
     // 波特率在 9600 的时候不启用
     if (_currentBaudRate == 9600) {
-        return device.get_gps_data()->gpsHz;
+        return gps_data.gpsHz;
     }
 
     const int hz = satellites > 20 ? 10 : satellites > 10 ? 5 : 2;
 
-    if (hz == device.get_gps_data()->gpsHz) {
+    if (hz == gps_data.gpsHz) {
         // 符合预期直接返回
         return hz;
     }
 
     if (setHz(hz)) {
         Serial.println("[GPS] 自动调节频率成功: " + String(hz) + "Hz");
-        device.get_gps_data()->gpsHz = hz;
+        gps_data.gpsHz = hz;
         return hz;
     } else {
-        Serial.println("[GPS] 自动调节频率失败，保持当前频率: " + String(device.get_gps_data()->gpsHz) + "Hz");
-        return device.get_gps_data()->gpsHz;
+        Serial.println("[GPS] 自动调节频率失败，保持当前频率: " + String(gps_data.gpsHz) + "Hz");
+        return gps_data.gpsHz;
     }
 }
 
@@ -362,4 +376,101 @@ int GPS::changeBaudRate() {
         return nextBaudRate;
     }
     return currentBaudRate;
+}
+
+/**
+ * @brief 打印GPS数据
+ */
+void GPS::printGpsData()
+{
+    char timeStr[30];
+    sprintf(timeStr, "%04d-%02d-%02d %02d:%02d:%02d",
+            gps_data.year, gps_data.month, gps_data.day,
+            gps_data.hour, gps_data.minute, gps_data.second);
+
+    Serial.println("gps_data: " + String(timeStr) + ", " +
+                   String(gps_data.latitude) + ", " +
+                   String(gps_data.longitude) + ", " +
+                   String(gps_data.altitude) + ", " +
+                   String(gps_data.speed) + ", " +
+                   String(gps_data.heading) + ", " +
+                   String(gps_data.satellites));
+
+    // 添加HDOP状态显示
+    const char *hdopStatus = "";
+    if (gps_data.hdop == 0)
+    {
+        hdopStatus = "无数据";
+    }
+    else if (gps_data.hdop < 1.0)
+    {
+        hdopStatus = "优秀";
+    }
+    else if (gps_data.hdop < 2.0)
+    {
+        hdopStatus = "良好";
+    }
+    else if (gps_data.hdop < 5.0)
+    {
+        hdopStatus = "一般";
+    }
+    else
+    {
+        hdopStatus = "较差";
+    }
+
+    Serial.println("HDOP: " + String(gps_data.hdop, 1) + " (" + hdopStatus + ")");
+}
+
+void GPS::loopDistance() {
+    // 获取当前GPS数据
+    // 如果没有有效的GPS数据或卫星数量不足，返回当前累积距离
+    if (gps_data.satellites < 3)
+    {
+        return;
+    }
+
+    // 获取当前时间
+    unsigned long currentTime = millis();
+
+    // 如果是第一次计算，初始化lastDistanceTime
+    if (lastDistanceTime == 0)
+    {
+        lastDistanceTime = currentTime;
+        return;
+    }
+
+    // 计算时间间隔（秒）
+    float timeInterval = (currentTime - lastDistanceTime) / 1000.0;
+
+    // 计算距离增量
+    float distanceIncrement = (gps_data.speed / 3600.0) * timeInterval;
+
+    // 累加距离
+    totalDistanceKm += distanceIncrement;
+    // 更新最后计算时间
+    lastDistanceTime = currentTime;
+}
+
+
+String gps_data_to_json(const gps_data_t& data) {
+   // 使用ArduinoJson库将gps_data转换为JSON字符串
+    StaticJsonDocument<256> doc;
+    doc["lat"] = gps_data.latitude;
+    doc["lon"] = gps_data.longitude;
+    doc["alt"] = gps_data.altitude;
+    doc["speed"] = gps_data.speed;
+    doc["satellites"] = gps_data.satellites;
+    doc["heading"] = gps_data.heading;
+    doc["year"] = gps_data.year;
+    doc["month"] = gps_data.month;
+    doc["day"] = gps_data.day;
+    doc["hour"] = gps_data.hour;
+    doc["minute"] = gps_data.minute;
+    doc["second"] = gps_data.second;
+    doc["hdop"] = gps_data.hdop;
+
+    String jsonString;
+    serializeJson(doc, jsonString);
+    return jsonString;
 }

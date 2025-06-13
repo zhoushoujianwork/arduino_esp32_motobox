@@ -1,5 +1,4 @@
 #include "ble_client.h"
-#include <algorithm> // 为了使用 std::transform
 
 void scanEndedCB(NimBLEScanResults results);
 
@@ -7,13 +6,12 @@ static NimBLEAdvertisedDevice *myDevice;
 static NimBLERemoteCharacteristic *pRemoteCharacteristic;
 static NimBLERemoteCharacteristic *pRemoteIMUCharacteristic;
 static NimBLERemoteCharacteristic *pRemoteGPSCharacteristic;
-
+BLEC bc;
 static bool doConnect = false;
 static bool connected = false;
 static boolean doScan = false;
 
 static uint32_t scanTime = 0; /** 0 = scan forever */
-
 
 /** Define a class to handle the callbacks when advertisments are received */
 class AdvertisedDeviceCallbacks : public NimBLEAdvertisedDeviceCallbacks
@@ -39,7 +37,8 @@ class AdvertisedDeviceCallbacks : public NimBLEAdvertisedDeviceCallbacks
 /** Notification / Indication receiving handler callback */
 void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify)
 {
-    if (pRemoteCharacteristic == nullptr || pData == nullptr) {
+    if (pRemoteCharacteristic == nullptr || pData == nullptr)
+    {
         Serial.println("Invalid notification data or characteristic");
         return;
     }
@@ -58,8 +57,8 @@ void notifyCB(NimBLERemoteCharacteristic *pRemoteCharacteristic, uint8_t *pData,
             // 使用安全的内存拷贝
             device_state_t deviceState;
             memcpy(&deviceState, pData, sizeof(device_state_t));
-            device.set_device_state(&deviceState);
-            device.print_device_info();
+            set_device_state(&deviceState);
+            print_device_info();
         }
     }
 }
@@ -243,7 +242,7 @@ bool connectToServer()
             return false;
 
         // GPS数据特征值
-        pRemoteGPSCharacteristic = pSvc->getCharacteristic(GPS_CHAR_UUID);
+       pRemoteGPSCharacteristic = pSvc->getCharacteristic(GPS_CHAR_UUID);
         if (pRemoteGPSCharacteristic == nullptr)
             return false;
     }
@@ -259,15 +258,12 @@ bool connectToServer()
 
 BLEC::BLEC()
 {
+    Serial.println("Starting NimBLE Client");
     connected = false;
     doConnect = false;
     doScan = false;
     scanTime = 0;
-}
 
-void BLEC::setup()
-{
-    Serial.println("Starting NimBLE Client");
     /** Initialize NimBLE, no device name spcified as we are not advertising */
     NimBLEDevice::init(BLE_NAME);
 
@@ -330,11 +326,11 @@ void BLEC::loop()
             Serial.println("Success! we should now be getting notifications, scanning for more!");
             connected = true;
             doConnect = false;
-            device.get_device_state()->bleConnected = true;
+            device_state.bleConnected = true;
         }
         else
         {
-            device.get_device_state()->bleConnected = false;
+            device_state.bleConnected = false;
             Serial.println("Failed to connect, starting scan");
             doScan = true;
             connected = false;
@@ -347,34 +343,36 @@ void BLEC::loop()
         // 添加额外的空指针检查
         if (pRemoteGPSCharacteristic->canRead())
         {
-            try {
+            try
+            {
                 std::string value = pRemoteGPSCharacteristic->readValue();
-                if (value.length() == sizeof(gps_data_t))
+                if (value.length() == sizeof(gps_data))
                 {
-                    gps_data_t gpsData;
-                    memcpy(&gpsData, value.data(), sizeof(gps_data_t));
-                    device.set_gps_data(&gpsData);
+                    memcpy(&gps_data, value.data(), sizeof(gps_data));
                 }
-            } catch (const std::exception& e) {
+            }
+            catch (const std::exception &e)
+            {
                 Serial.printf("Error reading GPS characteristic: %s\n", e.what());
             }
         }
 
         if (pRemoteIMUCharacteristic->canRead())
         {
-            try {
+            try
+            {
                 std::string value = pRemoteIMUCharacteristic->readValue();
-                if (value.length() == sizeof(imu_data_t))
+                if (value.length() == sizeof(imu_data))
                 {
-                    imu_data_t imuData;
-                    memcpy(&imuData, value.data(), sizeof(imu_data_t));
-                    device.set_imu_data(&imuData);
+                    memcpy(&imu_data, value.data(), sizeof(imu_data));
                 }
                 else
                 {
                     Serial.printf("IMU data length error: %d\n", value.length());
                 }
-            } catch (const std::exception& e) {
+            }
+            catch (const std::exception &e)
+            {
                 Serial.printf("Error reading IMU characteristic: %s\n", e.what());
             }
         }
@@ -385,6 +383,6 @@ void BLEC::loop()
         Serial.println("Starting scan");
         NimBLEDevice::getScan()->start(scanTime, scanEndedCB);
         doScan = false;
-        device.get_device_state()->bleConnected = false;
+        device_state.bleConnected = false;
     }
 }

@@ -21,7 +21,6 @@ class PowerManager {
 public:
     PowerManager();
     PowerState powerState;        // 当前电源状态
-    void begin();
     void loop();
     bool requestLowPowerMode;
     void enterLowPowerMode();

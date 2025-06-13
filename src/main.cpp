@@ -11,26 +11,58 @@
  */
 
 #include "Arduino.h"
-#include "bat/BAT.h"
-#include "ble/ble_server.h"
-#include "ble/ble_client.h"
-#include "btn/BTN.h"
 #include "config.h"
 #include "device.h"
-#include "gps/GPS.h"
-#include "led/LED.h"
-#include "led/PWMLED.h"
-#include "mqtt/MQTT.h"
 #include "power/PowerManager.h"
-#include "qmi8658/IMU.h"
-#include "wifi/WifiManager.h"
+
+#if defined(ENABLE_GSM) || defined(ENABLE_WIFI)
 #include "net/NetManager.h"
-#include "esp_wifi.h"
+#include "mqtt/MQTT.h"
+#endif
+
+#ifdef BAT_PIN
+#include "bat/BAT.h"
+#endif
+
+#ifdef BTN_PIN
+#include "btn/BTN.h"
+#endif
+
+#ifdef LED_PIN
+#include "led/LED.h"
+#endif
+
+#ifdef PWM_LED_PIN
+#include "led/PWMLED.h"
+#endif
+
+#ifdef ENABLE_COMPASS
+#include "compass/Compass.h"
+#endif
+
+#ifdef ENABLE_GPS
+#include "gps/GPS.h"
+#endif
+
+
+#ifdef ENABLE_IMU
+#include "qmi8658/IMU.h"
+#endif
+
+#ifdef ENABLE_WIFI
+#include "wifi/WifiManager.h"
+#endif
+
 #include "version.h"
-#include "gsm/GsmManager.h"
+#ifdef BLE_CLIENT
+#include "ble/ble_client.h"
+#endif
+#ifdef BLE_SERVER
+#include "ble/ble_server.h"
+#endif
 
 // 仅在未定义DISABLE_TFT时包含TFT相关头文件
-#ifndef DISABLE_TFT
+#ifdef ENABLE_TFT
 #include "tft/TFT.h"
 #endif
 //============================= 全局变量 =============================
@@ -45,74 +77,30 @@ RTC_DATA_ATTR int bootCount = 0;
 TaskHandle_t gpsTaskHandle = NULL;
 TaskHandle_t wifiTaskHandle = NULL;
 
-// 发布时间记录
-unsigned long lastGpsPublishTime = 0;
-unsigned long lastImuPublishTime = 0;
-unsigned long lastBlePublishTime = 0;
-unsigned long lastDeviceInfoPublishTime = 0;
-//============================= 设备实例 =============================
 
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-GPS gps(GPS_RX_PIN, GPS_TX_PIN);
-
-
-
-MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
-BLES bs;
-#endif
-
-#ifdef BTN_PIN
-BTN button(BTN_PIN);
-#endif
-
-#ifdef MODE_CLIENT
-BLEC bc;
-#endif
-
-#ifdef BAT_PIN
-BAT bat(BAT_PIN);
-#endif
-
-#ifdef PWM_LED_PIN
-PWMLED pwmLed(PWM_LED_PIN);
-#endif
-#ifdef LED_PIN
-led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
-#endif
-
-extern PowerManager powerManager;
-extern NetManager netManager;
-#if defined(GPS_COMPASS_SDA) && defined(GPS_COMPASS_SCL)
-#include "compass/Compass.h"
-Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
-#endif
-
-//============================= 函数声明 =============================
-
-//============================= 任务定义 =============================
 
 /**
  * WiFi管理任务
  * 负责WiFi连接和配置
  */
+#ifdef ENABLE_WIFI
 void taskWifi(void *parameter)
 {
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   while (true)
   {
     netManager.loop();
     delay(5);
   }
-#endif
 }
+#endif
 
 /**
  * GPS任务
  * 负责GPS数据获取和处理
  */
+#ifdef ENABLE_GPS
 void taskGps(void *parameter)
 {
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
   while (true)
   {
     // 使用printRawData直接打印原始NMEA数据
@@ -120,8 +108,8 @@ void taskGps(void *parameter)
     gps.loop();
     delay(5);
   }
-#endif
 }
+#endif
 
 /**
  * 系统监控任务
@@ -136,19 +124,17 @@ void taskSystem(void *parameter)
   {
 // LED状态更新
 #ifdef PWM_LED_PIN
+#include "led/PWMLED.h"
     pwmLed.loop();
 #endif
+
 #ifdef LED_PIN
+#include "led/LED.h"
     led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
 #endif
 
 // 电池监控
-#ifdef MODE_CLIENT
-    if (!device.get_device_state()->bleConnected)
-    {
-      bat.loop();
-    }
-#else
+#ifdef BAT_PIN
     bat.loop();
 #endif
 
@@ -157,7 +143,7 @@ void taskSystem(void *parameter)
 // - MQTT连接时显示蓝色
 // - 无连接时显示红色
 #ifdef PWM_LED_PIN
-    if (device.get_device_state()->wifiConnected)
+    if (device_state.wifiConnected)
     {
       pwmLed.setMode(PWMLED::GREEN, 5);
       // } else if (device.get_device_state()->bleConnected) {
@@ -194,71 +180,31 @@ void taskDataProcessing(void *parameter)
 {
   while (true)
   {
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    // IMU数据处理
-    #ifdef ENABLE_IMU
+// IMU数据处理
+#ifdef ENABLE_IMU
     imu.loop();
-    #endif
-
-    // MQTT数据发布
-    mqtt.loop();
-
-    // deviceinfo 数据发布 2000ms
-    if (millis() - lastDeviceInfoPublishTime >= 2000)
-    {
-      mqtt.publishDeviceInfo(*device.get_device_state());
-      device.print_device_info();
-      lastDeviceInfoPublishTime = millis();
-    }
-
-    // GPS数据发布 (1Hz)
-    if (millis() - lastGpsPublishTime >= 1000)
-    {
-      // device.printGpsData();
-      lastGpsPublishTime = millis();
-      // 更新GPS就绪状态
-      if (device.get_gps_data()->satellites > 3)
-      {
-        device.set_gps_ready(true);
-        gps.autoAdjustHz(device.get_gps_data()->satellites);
-        mqtt.publishGPS(*device.get_gps_data()); // 节省带宽，有定位数据才发布
-      }
-      else
-      {
-        device.set_gps_ready(false);
-      }
-    }
-
-    // IMU数据发布 (1Hz)
-    #ifdef ENABLE_IMU
-    if (millis() - lastImuPublishTime >= 1000)
-    {
-      mqtt.publishIMU(*device.get_imu_data());
-      lastImuPublishTime = millis();
-    }
-    #endif
 #endif
 
-#ifdef MODE_CLIENT
+#ifdef ENABLE_WIFI
+    // MQTT数据发布
+    mqtt.loop();
+#endif
+
+#ifdef BLE_CLIENT
     // 蓝牙客户端处理
     bc.loop();
 #endif
 
-#ifdef MODE_SERVER
-    // 蓝牙服务器广播 (1Hz)
-    if (millis() - lastBlePublishTime >= 1000)
-    {
+#ifdef BLE_SERVER
       bs.loop();
-      lastBlePublishTime = millis();
-    }
 #endif
 
-#if defined(MODE_ALLINONE) || defined(MODE_CLIENT)
+#ifdef DISABLE_TFT
     // 显示屏更新
     tft_loop();
 #endif
 
-#if defined(GPS_COMPASS_SDA) && defined(GPS_COMPASS_SCL)
+#ifdef ENABLE_COMPASS
     // 罗盘数据处理
     compass.loop();
 #endif
@@ -267,33 +213,31 @@ void taskDataProcessing(void *parameter)
   }
 }
 
-//============================= 辅助函数 =============================
-
-//============================= ARDUINO框架函数 =============================
 
 void setup()
 {
-  // 初始化串口
   Serial.begin(115200);
   delay(100);
 
-  // 增加启动计数并打印
+  Serial.println("step 1");
   bootCount++;
   Serial.println("[系统] 启动次数: " + String(bootCount));
 
-  // 打印唤醒原因
+  Serial.println("step 2");
   powerManager.printWakeupReason();
 
-  // 检查唤醒原因并处理
+  Serial.println("step 3");
   powerManager.checkWakeupCause();
 
-  // 初始化硬件
+  Serial.println("step 4");
   device.initializeHardware();
 
-
-// 创建任务
-#if defined(MODE_ALLINONE) || defined(MODE_SERVER)
+  Serial.println("step 5");
+#ifdef ENABLE_WIFI
   xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 2, &wifiTaskHandle);
+#endif
+
+#ifdef ENABLE_GPS
   xTaskCreatePinnedToCore(taskGps, "TaskGps", 1024 * 10, NULL, 1, &gpsTaskHandle, 1);
 #endif
 

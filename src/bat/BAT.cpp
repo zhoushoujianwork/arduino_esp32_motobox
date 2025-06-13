@@ -1,5 +1,9 @@
 #include "BAT.h"
 
+#ifdef BAT_PIN
+BAT bat(BAT_PIN);
+#endif
+
 // 3300, 4200
 BAT::BAT(int pin)
     : pin(pin),
@@ -20,10 +24,11 @@ BAT::BAT(int pin)
       stable_voltage(0),
       output_counter(0)
 {
-    // 使用memset初始化缓冲区更高效
-    memset(voltage_buffer, 0, sizeof(voltage_buffer));
     Serial.println("[BAT] 初始化开始");
     Serial.printf("[BAT] 引脚: %d, 最小电压: %d, 最大电压: %d\n", pin, min_voltage, max_voltage);
+    // 使用memset初始化缓冲区更高效
+    memset(voltage_buffer, 0, sizeof(voltage_buffer));
+    Serial.println("[BAT] 初始化完成");
 }
 
 void BAT::loop()
@@ -104,8 +109,8 @@ void BAT::loop()
     percentage = constrain(percentage, 0, 100);
 
     // 更新设备状态
-    device.get_device_state()->battery_voltage = stable_voltage;
-    device.get_device_state()->battery_percentage = percentage;
+    device_state.battery_voltage = stable_voltage;
+    device_state.battery_percentage = percentage;
 }
 
 void BAT::print_voltage()
@@ -113,5 +118,5 @@ void BAT::print_voltage()
     // 添加单位并优化输出格式
     Serial.printf("Battery: %dmV (%.1f%%)\n",
                   stable_voltage,
-                  device.get_device_state()->battery_percentage);
+                  device_state.battery_percentage);
 }
