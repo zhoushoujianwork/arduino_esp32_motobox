@@ -54,7 +54,8 @@ unsigned long lastDeviceInfoPublishTime = 0;
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
 GPS gps(GPS_RX_PIN, GPS_TX_PIN);
-IMU imu(IMU_SDA_PIN, IMU_SCL_PIN, IMU_INT_PIN);
+
+
 
 MQTT mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USER, MQTT_PASSWORD);
 BLES bs;
@@ -195,7 +196,9 @@ void taskDataProcessing(void *parameter)
   {
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     // IMU数据处理
+    #ifdef ENABLE_IMU
     imu.loop();
+    #endif
 
     // MQTT数据发布
     mqtt.loop();
@@ -227,11 +230,13 @@ void taskDataProcessing(void *parameter)
     }
 
     // IMU数据发布 (1Hz)
+    #ifdef ENABLE_IMU
     if (millis() - lastImuPublishTime >= 1000)
     {
       mqtt.publishIMU(*device.get_imu_data());
       lastImuPublishTime = millis();
     }
+    #endif
 #endif
 
 #ifdef MODE_CLIENT

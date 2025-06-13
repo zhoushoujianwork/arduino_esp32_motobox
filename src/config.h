@@ -11,11 +11,11 @@
  */
 
 /* 是否启用睡眠模式，在platformio.ini中定义 
- * 默认值: ENABLE_SLEEP=1 (启用)
- * 禁用值: ENABLE_SLEEP=0 (禁用)
  */
-#ifndef ENABLE_SLEEP
-#define ENABLE_SLEEP 0 
+
+// GSM引脚配置检查
+#if defined(GSM_RX_PIN) && defined(GSM_TX_PIN)
+#define ENABLE_GSM
 #endif
 
 #ifndef FIRMWARE_VERSION
@@ -44,10 +44,12 @@
 #define LED_BLINK_INTERVAL 100
 
 /* IMU Configuration */
-#define IMU_MAX_D          68     /* Marquis GP retention */
-#ifndef IMU_INT_PIN
-#define IMU_INT_PIN       -1      /* GPIO1 used for IMU interrupt */
+#if defined(IMU_SDA_PIN) && defined(IMU_SCL_PIN) && defined(IMU_INT_PIN)
+#define ENABLE_IMU  // 默认启用IMU
 #endif
+
+#define IMU_MAX_D          68     /* Marquis GP retention */
+
 
 /* MQTT Configuration */
 #define MQTT_SERVER        "mq-hub.daboluo.cc"

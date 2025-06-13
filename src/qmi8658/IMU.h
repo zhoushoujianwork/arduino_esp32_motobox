@@ -1,6 +1,7 @@
 #ifndef IMU_H
 #define IMU_H
 
+
 #include <Wire.h>
 #include <SPI.h>
 #include "SensorQMI8658.hpp"
@@ -60,7 +61,9 @@ private:
     int sampleWindow = MOTION_DETECTION_WINDOW_DEFAULT;
 };
 
+#ifdef ENABLE_IMU
 extern IMU imu;
+#endif
 
 #endif
 

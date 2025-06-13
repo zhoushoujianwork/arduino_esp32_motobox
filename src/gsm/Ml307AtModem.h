@@ -8,9 +8,9 @@
 #ifndef ML307_AT_MODEM_H
 #define ML307_AT_MODEM_H
 
-#ifdef GSM_ENABLED
 #include <Arduino.h>
 #include <Client.h> // 兼容 PubSubClient
+#include "config.h"
 
 #define DEFAULT_COMMAND_TIMEOUT 3000
 #define DEFAULT_BAUD_RATE 115200
@@ -123,7 +123,7 @@ public:
         stop();
     }
 };
-
+#ifdef ENABLE_GSM
 extern Ml307AtModem ml370;
 #endif
 

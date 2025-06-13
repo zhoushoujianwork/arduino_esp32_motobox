@@ -379,8 +379,9 @@ void Device::initializeHardware()
     
 
     // IMU初始化
+    #ifdef ENABLE_IMU
     imu.begin();
-
+    
     // 如果是从深度睡眠唤醒，检查唤醒原因
     if (isWakeFromDeepSleep)
     {
@@ -391,12 +392,12 @@ void Device::initializeHardware()
             break;
         case ESP_SLEEP_WAKEUP_TIMER:
             Serial.println("[系统] 定时器唤醒，检查系统状态");
-            // 这里可以添加定期状态检查代码
             break;
         default:
             break;
         }
     }
+    #endif
 #endif
 
     // 电源管理初始化

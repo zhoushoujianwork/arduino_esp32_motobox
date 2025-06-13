@@ -3,6 +3,11 @@
 
 #define USE_WIRE
 
+#ifdef ENABLE_IMU
+IMU imu(IMU_SDA_PIN, IMU_SCL_PIN, IMU_INT_PIN);
+#endif
+
+
 volatile bool IMU::motionInterruptFlag = false;
 void IRAM_ATTR IMU::motionISR() {
     IMU::motionInterruptFlag = true;

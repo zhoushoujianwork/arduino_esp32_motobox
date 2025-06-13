@@ -13,10 +13,10 @@
 #include "mqtt/MQTT.h"
 
 // 初始化静态变量
-#if ENABLE_SLEEP
-RTC_DATA_ATTR bool PowerManager::sleepEnabled = true; // 默认启用休眠功能
+#ifdef ENABLE_SLEEP
+RTC_DATA_ATTR bool PowerManager::sleepEnabled = true; 
 #else
-RTC_DATA_ATTR bool PowerManager::sleepEnabled = false; // 默认禁用休眠功能
+RTC_DATA_ATTR bool PowerManager::sleepEnabled = false;
 #endif
 
 extern MQTT mqtt;
@@ -59,6 +59,7 @@ void PowerManager::handleWakeup()
     {
     case ESP_SLEEP_WAKEUP_EXT0:
     {
+        #if defined(ENABLE_IMU) && defined(IMU_INT_PIN)
         if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21)
         {
             // 等待引脚状态稳定
@@ -80,6 +81,7 @@ void PowerManager::handleWakeup()
                 Serial.println("[电源管理] ⚠️ 未检测到运动事件，可能为其他原因唤醒");
             }
         }
+        #endif
         break;
     }
     case ESP_SLEEP_WAKEUP_TIMER:
@@ -111,6 +113,7 @@ bool PowerManager::configureWakeupSources()
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
 
     // 2. 配置IMU运动唤醒
+    #if defined(ENABLE_IMU) && defined(IMU_INT_PIN)
     if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21)
     {
         // 检查是否为有效的RTC GPIO
@@ -151,6 +154,7 @@ bool PowerManager::configureWakeupSources()
         }
         Serial.println("[电源管理] ✅ IMU已配置为深度睡眠模式");
     }
+    #endif
 
     // 3. 配置定时器唤醒（小时）
     const uint64_t BACKUP_WAKEUP_TIME = 60 * 60 * 1000000ULL;
@@ -354,7 +358,7 @@ void PowerManager::loop()
         lastMotionCheck = now;
 
 
-#if !ENABLE_SLEEP
+#ifndef ENABLE_SLEEP
         // 如果编译时禁用了休眠功能，始终保持在正常状态
         if (powerState != POWER_STATE_NORMAL)
         {
@@ -362,17 +366,8 @@ void PowerManager::loop()
         }
         return;
 #else
-        // 编译时启用了休眠功能，但需要检查运行时状态
-        if (!sleepEnabled)
-        {
-            // 保持在正常状态，不进入休眠
-            if (powerState != POWER_STATE_NORMAL)
-            {
-                powerState = POWER_STATE_NORMAL;
-            }
-            return;
-        }
 
+#ifdef ENABLE_IMU
         // 仅在正常工作状态下检测运动和空闲状态
         if (powerState == POWER_STATE_NORMAL)
         {
@@ -397,6 +392,7 @@ void PowerManager::loop()
             }
         }
 #endif
+#endif
     }
     // 其他低频逻辑可以继续执行
 }
@@ -419,7 +415,7 @@ void PowerManager::enterLowPowerMode()
     return;
 #endif
 
-#if !ENABLE_SLEEP
+#ifndef ENABLE_SLEEP
     Serial.println("[电源管理] 休眠功能已在编译时禁用");
     return;
 #else
@@ -507,7 +503,9 @@ void PowerManager::enterLowPowerMode()
 
     // 4. 最后的准备
     Serial.println("[电源管理] 🌙 准备进入深度睡眠...");
+    #if defined(ENABLE_IMU) && defined(IMU_INT_PIN)
     Serial.printf("[电源管理] - IMU中断引脚: GPIO%d\n", IMU_INT_PIN);
+    #endif
     Serial.printf("[电源管理] - 定时器唤醒: 5分钟\n");
     Serial.flush();
     delay(100);
@@ -534,6 +532,7 @@ void PowerManager::printWakeupReason()
     switch (wakeup_reason)
     {
     case ESP_SLEEP_WAKEUP_EXT0:
+        #if defined(ENABLE_IMU) && defined(IMU_INT_PIN)
         if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21)
         {
             Serial.printf("[系统] 从IMU运动检测唤醒 (GPIO%d)\n", IMU_INT_PIN);
@@ -542,6 +541,7 @@ void PowerManager::printWakeupReason()
         {
             Serial.println("[系统] 从外部RTC_IO唤醒，但IMU引脚配置无效");
         }
+        #endif
         break;
     case ESP_SLEEP_WAKEUP_EXT1:
         Serial.println("[系统] 从外部RTC_CNTL唤醒");
@@ -575,6 +575,7 @@ void PowerManager::checkWakeupCause()
     {
     case ESP_SLEEP_WAKEUP_EXT0:
         Serial.println("[系统] 通过外部中断唤醒 (EXT0)");
+        #if defined(ENABLE_IMU) && defined(IMU_INT_PIN)
         if (IMU_INT_PIN >= 0 && IMU_INT_PIN <= 21)
         {
             if (digitalRead(IMU_INT_PIN) == LOW)
@@ -588,6 +589,7 @@ void PowerManager::checkWakeupCause()
                 // 这里可以添加特定的按钮唤醒处理逻辑
             }
         }
+        #endif
         break;
     case ESP_SLEEP_WAKEUP_TIMER:
         Serial.println("[系统] 通过定时器唤醒");
