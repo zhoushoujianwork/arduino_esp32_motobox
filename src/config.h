@@ -62,17 +62,17 @@
 
 
 /* MQTT Configuration */
-#define MQTT_SERVER        "mq-hub.daboluo.cc"
+#define MQTT_BROKER        "mq-hub.daboluo.cc"
 // #define MQTT_SERVER        "222.186.32.152"
 #define MQTT_PORT         32571
 #define MQTT_USER         ""
 #define MQTT_PASSWORD     ""
+#define MQTT_KEEP_ALIVE   60
 
 /* MQTT Topics - These must stay in C++ code because they include runtime expressions */
-#define MQTT_TOPIC_DEVICE_INFO  String("vehicle/v1/") + device.get_device_id() + "/device/info"
-#define MQTT_TOPIC_GPS         String("vehicle/v1/") + device.get_device_id() + "/gps/position"
-#define MQTT_TOPIC_IMU         String("vehicle/v1/") + device.get_device_id() + "/imu/gyro"
-#define MQTT_TOPIC_COMMAND     String("vehicle/v1/") + device.get_device_id() + "/command"
+#define MQTT_TOPIC_DEVICE_INFO  String("vehicle/v1/") + device_state.device_id + "/device/info"
+#define MQTT_TOPIC_GPS         String("vehicle/v1/") + device_state.device_id + "/gps/position"
+#define MQTT_TOPIC_IMU         String("vehicle/v1/") + device_state.device_id + "/imu/gyro"
 /* MQTT Intervals (in milliseconds) */
 #define MQTT_DEVICE_INFO_INTERVAL  5000
 #define MQTT_IMU_PUBLISH_INTERVAL   200

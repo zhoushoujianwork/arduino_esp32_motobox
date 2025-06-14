@@ -1,7 +1,6 @@
 #include "BTN.h"
 #include <Arduino.h>
 #include "gps/GPS.h"
-#include "net/WifiManager.h"
 
 #ifdef BTN_PIN
 BTN button(BTN_PIN);
@@ -129,9 +128,6 @@ void BTN::handleButtonEvents() {
 #ifdef BTN_PIN
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     // 获取按钮状态
-    extern BTN button;
-    extern GPS gps;
-    extern WiFiConfigManager wifiManager;
     BTN::ButtonState state = button.getState();
 
     // 处理按钮事件
@@ -156,7 +152,6 @@ void BTN::handleButtonEvents() {
 
     case BTN::LONG_PRESS:
         Serial.println("[按钮] 长按");
-        wifiManager.reset();
         break;
 
     default:

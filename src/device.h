@@ -7,7 +7,6 @@
 #include "compass/Compass.h"
 #include "config.h"
 #include "version.h"  // 包含版本信息头文件
-#include "net/NetManager.h"
 #include "led/PWMLED.h"
 #include "led/LED.h"
 #include "qmi8658/IMU.h"
@@ -17,6 +16,8 @@
 #include "compass/Compass.h"
 #include "gps/GPS.h"
 #include "bat/BAT.h"
+#include "ml370/MqttManager.h"
+
 
 
 typedef struct
@@ -52,7 +53,11 @@ public:
 
     // 硬件初始化
     void begin();
-
+    void loop();
+    void configureMqttTopics();
+    
+private:
+    
 };
 
 extern Device device;

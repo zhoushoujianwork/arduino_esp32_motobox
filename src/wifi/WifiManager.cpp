@@ -1,6 +1,6 @@
 #include "WifiManager.h"
 #include "power/PowerManager.h"
-#include "net/wifi_config_page.h"
+#include "wifi/wifi_config_page.h"
 #include "utils/PreferencesUtils.h"
 #include "nvs_flash.h"
 
@@ -420,10 +420,10 @@ void WiFiConfigManager::saveWiFiCredentials(const String &ssid, const String &pa
 bool WiFiConfigManager::checkInternetConnection()
 {
     WiFiClient client;
-    Serial.printf("检测MQTT服务器连通性: %s:%d\n", MQTT_SERVER, MQTT_PORT);
+    Serial.printf("检测MQTT服务器连通性: %s:%d\n", MQTT_BROKER, MQTT_PORT);
 
     // 尝试连接
-    if (!client.connect(MQTT_SERVER, MQTT_PORT))
+    if (!client.connect(MQTT_BROKER, MQTT_PORT))
     {
         Serial.println("MQTT服务器连接失败！");
         return false;

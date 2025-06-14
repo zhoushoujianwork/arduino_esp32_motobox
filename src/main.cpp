@@ -17,8 +17,7 @@
 #include "nvs_flash.h"
 
 #if defined(ENABLE_GSM) || defined(ENABLE_WIFI)
-#include "net/NetManager.h"
-#include "mqtt/MQTT.h"
+#include "ml370/MqttManager.h"
 #endif
 
 #ifdef BAT_PIN
@@ -45,13 +44,8 @@
 #include "gps/GPS.h"
 #endif
 
-
 #ifdef ENABLE_IMU
 #include "qmi8658/IMU.h"
-#endif
-
-#ifdef ENABLE_WIFI
-#include "net/WifiManager.h"
 #endif
 
 #include "version.h"
@@ -73,24 +67,6 @@ RTC_DATA_ATTR int bootCount = 0;
 
 // 任务句柄
 TaskHandle_t gpsTaskHandle = NULL;
-TaskHandle_t wifiTaskHandle = NULL;
-
-
-
-/**
- * WiFi管理任务
- * 负责WiFi连接和配置
- */
-#ifdef ENABLE_WIFI
-void taskWifi(void *parameter)
-{
-  while (true)
-  {
-    netManager.loop();
-    delay(5);
-  }
-}
-#endif
 
 /**
  * GPS任务
@@ -183,18 +159,13 @@ void taskDataProcessing(void *parameter)
     imu.loop();
 #endif
 
-#ifdef ENABLE_WIFI
-    // MQTT数据发布
-    mqtt.loop();
-#endif
-
 #ifdef BLE_CLIENT
     // 蓝牙客户端处理
     bc.loop();
 #endif
 
 #ifdef BLE_SERVER
-      bs.loop();
+    bs.loop();
 #endif
 
 #ifdef ENABLE_TFT
@@ -211,11 +182,11 @@ void taskDataProcessing(void *parameter)
   }
 }
 
-
 void setup()
 {
   esp_err_t err = nvs_flash_init();
-  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+  {
     nvs_flash_erase();
     nvs_flash_init();
   }
@@ -238,11 +209,6 @@ void setup()
   Serial.println("step 4");
   device.begin();
 
-  Serial.println("step 5");
-#ifdef ENABLE_WIFI
-  xTaskCreate(taskWifi, "TaskWifi", 1024 * 10, NULL, 2, &wifiTaskHandle);
-#endif
-
 #ifdef ENABLE_GPS
   xTaskCreatePinnedToCore(taskGps, "TaskGps", 1024 * 10, NULL, 1, &gpsTaskHandle, 1);
 #endif
@@ -256,5 +222,23 @@ void setup()
 void loop()
 {
   // 主循环留空，所有功能都在RTOS任务中处理
-  delay(1000);
+  delay(20);
+  // MQTT 消息处理
+  mqttManager.loop();
+  device.loop();
+
+  // 每 30 秒发送一次状态消息
+  static unsigned long lastMsg = 0;
+  if (millis() - lastMsg > 30000)
+  {
+    lastMsg = millis();
+
+    // 获取网络信息
+    String networkInfo = mqttManager.getNetworkInfo();
+    Serial.println("网络状态: " + networkInfo);
+
+    // 发送状态消息
+    String status = String("设备运行时间: ") + (millis() / 1000) + "秒";
+    mqttManager.publish("test/status", status.c_str());
+  }
 }

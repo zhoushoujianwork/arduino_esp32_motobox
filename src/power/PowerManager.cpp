@@ -10,7 +10,7 @@
 #include "led/PWMLED.h"
 #include "device.h"
 #include "utils/PreferencesUtils.h"
-#include "mqtt/MQTT.h"
+#include "ml370/MqttManager.h"
 
 // 初始化静态变量
 #ifdef ENABLE_SLEEP
@@ -178,14 +178,8 @@ void PowerManager::disablePeripherals()
     delay(50);
 
     // 1. MQTT断开
-    mqtt.disconnect();
+    mqttManager.disconnect();
     Serial.println("[电源管理] MQTT已断开");
-    Serial.flush();
-    delay(50);
-
-    // 2. WiFi关闭
-    wifiManager.safeDisableWiFi();
-    Serial.println("[电源管理] WiFi已安全关闭");
     Serial.flush();
     delay(50);
 
@@ -402,10 +396,6 @@ void PowerManager::loop()
 bool PowerManager::isDeviceIdle()
 {
     // 新增：AP模式下有客户端连接时不判定为空闲
-    if (wifiManager.isAPModeActive() && wifiManager.hasAPClient()) {
-        // Serial.println("[电源管理] AP模式下有客户端连接，禁止休眠");
-        return false;
-    }
     // 检查设备是否空闲足够长的时间
     return (millis() - lastMotionTime) > idleThreshold;
 }

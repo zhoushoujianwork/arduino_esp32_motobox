@@ -6,6 +6,7 @@
 #include <SPI.h>
 #include "SensorQMI8658.hpp"
 #include "device.h"
+#include "ml370/MqttManager.h"
 
 #define ALPHA 0.98 // 互补滤波的系数，范围在0到1之间
 #define dt 0.01    // 时间间隔，单位是秒（假设采样率为100Hz）
