@@ -172,11 +172,11 @@ void Device::begin()
     config.wifiSsid = WIFI_SSID;
     config.wifiPassword = WIFI_PASSWORD;
 #else
-    ml307.setDebug(true);
+    // ml307.setDebug(true);
     ml307.begin(921600);
 #endif
 
-    mqttManager.setDebug(true);
+    // mqttManager.setDebug(true);
     // 初始化 MQTT 管理器
     if (!mqttManager.begin(config))
     {

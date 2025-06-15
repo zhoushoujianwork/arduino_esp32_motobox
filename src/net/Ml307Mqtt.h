@@ -36,6 +36,9 @@ public:
     // 消息处理
     void loop();
 
+    // 设置调试模式
+    void setDebug(bool debug);
+
 private:
     Ml307AtModem& _modem;
     MqttMessageCallback _messageCallback;

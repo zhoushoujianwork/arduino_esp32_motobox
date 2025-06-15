@@ -9,7 +9,7 @@ Ml307Mqtt ml307Mqtt(ml307);
 Ml307Mqtt::Ml307Mqtt(Ml307AtModem& modem)
     : _modem(modem)
     , _connected(false) 
-    , _debug(true) {
+    , _debug(false) {
 }
 
 /**
@@ -242,4 +242,8 @@ void Ml307Mqtt::debugPrint(const String& msg) {
     if (_debug) {
         Serial.println("[ml307] [debug] " + msg);
     }
+}
+
+void Ml307Mqtt::setDebug(bool debug) {
+    _debug = debug;
 }
