@@ -1,32 +1,36 @@
 #include "compass/Compass.h"
 
+#ifdef ENABLE_COMPASS
+Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
+#endif
+
+compass_data_t compass_data;
+
 /**
  * @brief QMC5883L 罗盘传感器驱动实现
  */
 Compass::Compass(int sda, int scl)
     : _sda(sda), _scl(scl), _declination(-6.5f) // 默认江苏磁偏角
 {
-    Serial.printf("[罗盘] 初始化: SDA=%d, SCL=%d, 磁偏角=%.2f\n", _sda, _scl, _declination);
+    // 构造函数只保存参数，不做硬件/外设操作
 }
 
 void Compass::begin() {
-    // 不再调用 Wire.begin()
+    Serial.printf("[罗盘] 初始化: SDA=%d, SCL=%d, 磁偏角=%.2f\n", _sda, _scl, _declination);
+    Wire.begin(_sda, _scl);
     qmc.init();
-    // 如有校准参数，建议在此设置
-    // qmc.setCalibrationOffsets(...);
-    // qmc.setCalibrationScales(...);
+    qmc.setCalibrationOffsets(0, 0, 0);
+    qmc.setCalibrationScales(1.0, 1.0, 1.0);
 }
 
 void Compass::loop() {
     qmc.read();
     int16_t x, y, z;
     getRawData(x, y, z);
-    compass_data_t compassData;
-    compassData.x = x;
-    compassData.y = y;
-    compassData.z = z;
-    compassData.heading = calculateHeading(x, y);
-    device.set_compass_data(&compassData);
+    compass_data.x = x;
+    compass_data.y = y;
+    compass_data.z = z;
+    compass_data.heading = calculateHeading(x, y);
 }
 
 bool Compass::calibrate() {

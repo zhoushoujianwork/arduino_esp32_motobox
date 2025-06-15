@@ -11,11 +11,23 @@
  */
 
 /* 是否启用睡眠模式，在platformio.ini中定义 
- * 默认值: ENABLE_SLEEP=1 (启用)
- * 禁用值: ENABLE_SLEEP=0 (禁用)
  */
-#ifndef ENABLE_SLEEP
-#define ENABLE_SLEEP 0 
+
+// GSM引脚配置检查
+#if defined(GSM_RX_PIN) && defined(GSM_TX_PIN)
+#define ENABLE_GSM
+#else
+#define ENABLE_WIFI
+#endif
+
+// GPS引脚配置检查
+#if defined(GPS_RX_PIN) && defined(GPS_TX_PIN)
+#define ENABLE_GPS
+#endif
+
+// 罗盘引脚配置检查
+#if defined(GPS_COMPASS_SDA) && defined(GPS_COMPASS_SCL)
+#define ENABLE_COMPASS
 #endif
 
 #ifndef FIRMWARE_VERSION
@@ -44,26 +56,20 @@
 #define LED_BLINK_INTERVAL 100
 
 /* IMU Configuration */
-#define IMU_MAX_D          68     /* Marquis GP retention */
-#ifndef IMU_INT_PIN
-#define IMU_INT_PIN       -1      /* GPIO1 used for IMU interrupt */
+#if defined(IMU_SDA_PIN) && defined(IMU_SCL_PIN) && defined(IMU_INT_PIN)
+#define ENABLE_IMU  // 默认启用IMU
 #endif
 
+#define IMU_MAX_D          68     /* Marquis GP retention */
+
+
 /* MQTT Configuration */
-#define MQTT_SERVER        "mq-hub.daboluo.cc"
+#define MQTT_BROKER        "mq-hub.daboluo.cc"
+// #define MQTT_SERVER        "222.186.32.152"
 #define MQTT_PORT         32571
 #define MQTT_USER         ""
 #define MQTT_PASSWORD     ""
-
-/* MQTT Topics - These must stay in C++ code because they include runtime expressions */
-#define MQTT_TOPIC_DEVICE_INFO  String("vehicle/v1/") + device.get_device_id() + "/device/info"
-#define MQTT_TOPIC_GPS         String("vehicle/v1/") + device.get_device_id() + "/gps/position"
-#define MQTT_TOPIC_IMU         String("vehicle/v1/") + device.get_device_id() + "/imu/gyro"
-#define MQTT_TOPIC_COMMAND     String("vehicle/v1/") + device.get_device_id() + "/command"
-/* MQTT Intervals (in milliseconds) */
-#define MQTT_DEVICE_INFO_INTERVAL  5000
-#define MQTT_IMU_PUBLISH_INTERVAL   200
-#define MQTT_BAT_PRINT_INTERVAL   10000
+#define MQTT_KEEP_ALIVE   60
 
 /* 
 TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
@@ -72,9 +78,7 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 /* Display Configuration */
 #define TFT_HOR_RES        172
 #define TFT_VER_RES        320
-#ifndef TFT_ROTATION
 #define TFT_ROTATION       1 // 0: 0度, 1: 90度, 2: 180度, 3: 270度
-#endif
 #define UI_MAX_SPEED       199    /* Maximum speed in km/h */
 
 #endif /* CONFIG_H */

@@ -1,14 +1,21 @@
 #include "BTN.h"
 #include <Arduino.h>
 #include "gps/GPS.h"
-#include "wifi/WifiManager.h"
+
+#ifdef BTN_PIN
+BTN button(BTN_PIN);
+#endif
 
 BTN::BTN(int pin)
 {
+    Serial.println("[BTN] 初始化开始");
     this->pin = pin;
+}
+
+void BTN::begin()
+{
     pinMode(pin, INPUT_PULLUP); // 设置为上拉输入模式
     currentState = digitalRead(pin); // 初始化 currentState
-    Serial.println("[BTN] 初始化开始");
     Serial.printf("[BTN] 引脚: %d\n", pin);
 }
 
@@ -121,9 +128,6 @@ void BTN::handleButtonEvents() {
 #ifdef BTN_PIN
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
     // 获取按钮状态
-    extern BTN button;
-    extern GPS gps;
-    extern WiFiConfigManager wifiManager;
     BTN::ButtonState state = button.getState();
 
     // 处理按钮事件
@@ -131,9 +135,10 @@ void BTN::handleButtonEvents() {
     {
     case BTN::SINGLE_CLICK:
     {
-        Serial.println("[按钮] 单击");
+        Serial.println("[按钮] 单击 重启");
         int hz = gps.changeHz();
         Serial.printf("[GPS] 当前频率: %dHz\n", hz);
+        esp_restart();
         break;
     }
 
@@ -147,7 +152,6 @@ void BTN::handleButtonEvents() {
 
     case BTN::LONG_PRESS:
         Serial.println("[按钮] 长按");
-        wifiManager.reset();
         break;
 
     default:

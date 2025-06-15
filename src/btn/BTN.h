@@ -17,6 +17,7 @@ public:
     bool isReleased();
     bool isClicked();
     bool isLongPressed();
+    void begin();
     void loop();
 
     // 新增：静态按钮事件处理函数
@@ -30,5 +31,9 @@ private:
     static const unsigned long DEBOUNCE_DELAY = 50;    // 添加消抖延时常量
     ButtonState lastState = NONE;
 };
+
+#ifdef BTN_PIN
+extern BTN button;
+#endif
 
 #endif

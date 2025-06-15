@@ -6,7 +6,6 @@
 #include "config.h"
 #include "gps/GPS.h"
 #include "qmi8658/IMU.h"
-#include "wifi/WifiManager.h"
 #include "power/PowerManager.h"
 
 // 胎压数据结构
@@ -21,8 +20,9 @@ class BLES
 {
 public:
     BLES();
-    void setup();
+    void begin();
     void loop();
+    bool isConnected() const { return connected; }
     void startScan();
     static void handleScanResults(NimBLEAdvertisedDevice* advertisedDevice);
     static TirePressureData lastTirePressureData;
@@ -32,9 +32,17 @@ private:
     NimBLECharacteristic *pCharacteristic;
     NimBLECharacteristic *pGPSCharacteristic;
     NimBLECharacteristic *pIMUCharacteristic;
+
+    bool connected;
+
+    unsigned long lastBlePublishTime = 0;
     
     static bool isValidTirePressureData(NimBLEAdvertisedDevice* advertisedDevice);
     static TirePressureData parseTirePressureData(uint8_t* data, size_t length);
 };
+
+#ifdef BLE_SERVER
+extern BLES bs;
+#endif
 
 #endif

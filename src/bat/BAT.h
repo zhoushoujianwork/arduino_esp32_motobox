@@ -13,6 +13,7 @@ class BAT
 {
 public:
     BAT(int pin);
+    void begin();
     void loop();
     void print_voltage();
 
@@ -32,5 +33,7 @@ private:
     int stable_voltage;      // 稳定输出的电压值
     int output_counter;      // 输出分频计数器
 };
+
+extern BAT bat;
 
 #endif

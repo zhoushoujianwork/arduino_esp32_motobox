@@ -9,49 +9,76 @@
 
 class PWMLED {
 public:
+    // LED显示模式
     enum Mode {
         OFF,           // 关闭
-        RED,           // 红色
-        GREEN,         // 绿色
-        BLUE,          // 蓝色
-        YELLOW,        // 黄色
-        BREATH,        // 呼吸效果
-        RAINBOW        // 彩虹效果
+        SOLID,         // 常亮（稳定状态）
+        BREATH,        // 呼吸（过渡状态）
+        BLINK_SLOW,    // 慢闪（连接中）
+        BLINK_FAST,    // 快闪（错误）
     };
 
-    static const uint8_t MAX_BRIGHTNESS = 255;  // 最大亮度值
-    static const uint8_t DEFAULT_BRIGHTNESS = 25;  // 默认亮度为 10%
+    // 模块颜色定义
+    enum ModuleColor {
+        NONE,          // 关闭
+        WHITE,         // GPS模块 - 白色
+        BLUE,          // WiFi模块 - 蓝色
+        YELLOW,        // 4G模块 - 黄色
+        PURPLE,        // IMU模块 - 紫色
+        GREEN,         // 系统正常状态 - 绿色
+        RED           // 系统错误状态 - 红色
+    };
 
-    PWMLED(uint8_t pin);
-    void begin();
-    void setMode(Mode mode, uint8_t brightness = 0);  // 0表示使用默认亮度
-    void loop();
-    void changeMode();
-    void setBrightness(uint8_t brightness);  // 单独设置亮度
+    // RGB颜色结构
+    struct RGB {
+        uint8_t r, g, b;
+    };
 
-private:
-    uint8_t _pin;
-    Mode _mode;
-    Mode _lastMode;
-    unsigned long _lastUpdate;
-    uint8_t _brightness;
-    bool _increasing;
-    uint8_t _hue;      // 用于彩虹效果的色相值
-    
-    // WS2812 LED 参数
-    static const uint8_t NUM_LEDS = 1;    // LED数量
-    CRGB _leds[NUM_LEDS];                 // LED数组
+    // 常量定义
+    static const uint8_t MAX_BRIGHTNESS = 255;
+    static const uint8_t DEFAULT_BRIGHTNESS = 25;
+    static const uint8_t NUM_LEDS = 1;
     
     // 效果参数
-    static const uint8_t BREATH_STEP = 5;     // 每次亮度变化步长
-    static const uint8_t BREATH_INTERVAL = 40; // 亮度更新间隔(ms)
-    static const uint8_t RAINBOW_STEP = 2;     // 色相变化步长
-    static const uint8_t RAINBOW_INTERVAL = 20; // 彩虹效果更新间隔(ms)
+    static const uint8_t BREATH_STEP = 5;
+    static const uint8_t BREATH_INTERVAL = 40;
+    static const uint16_t BLINK_SLOW_INTERVAL = 1000;
+    static const uint16_t BLINK_FAST_INTERVAL = 200;
+
+    // 构造函数
+    PWMLED(uint8_t pin);
     
-    // 辅助函数
-    void updateBreath();
-    void updateRainbow();
-    const char* modeToString(Mode mode);
+    // 公共方法
+    void begin();
+    void loop();
+    void setMode(Mode mode);
+    void setColor(ModuleColor color);
+    void setBrightness(uint8_t brightness);
+
+private:
+    // 成员变量
+    uint8_t _pin;
+    Mode _mode;
+    ModuleColor _currentColor;
+    uint8_t _brightness;
+    unsigned long _lastUpdate;
+    bool _blinkState;
+    uint8_t _breathValue;
+    bool _breathIncreasing;
+    CRGB _leds[NUM_LEDS];
+
+    // 颜色映射表声明
+    static const RGB COLOR_MAP[];  // 只声明，不定义
+
+    // 私有方法
+    void updateBreathEffect();
+    void updateBlinkEffect();
+    void updateColor();
+    void showLED();
 };
+
+#ifdef PWM_LED_PIN
+extern PWMLED pwmLed;
+#endif
 
 #endif 

@@ -2,10 +2,15 @@
 #include "power/PowerManager.h"
 #include "wifi/wifi_config_page.h"
 #include "utils/PreferencesUtils.h"
+#include "nvs_flash.h"
 
 // WiFi事件回调函数
 unsigned long wifiConnectedTime = 0;
 bool needCheckInternet = false;
+
+#ifdef ENABLE_WIFI
+WiFiConfigManager wifiManager;
+#endif
 
 void WiFiEvent(WiFiEvent_t event)
 {
@@ -23,20 +28,20 @@ void WiFiEvent(WiFiEvent_t event)
         break;
     case SYSTEM_EVENT_STA_CONNECTED:
         Serial.println("STA WiFi已连接");
-        device.set_wifi_connected(true);
+        device_state.wifiConnected = true;
         wifiConnectedTime = millis();
         needCheckInternet = true;
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         Serial.println("STA WiFi已断开");
-        device.set_wifi_connected(false);
+        device_state.wifiConnected = false;
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
         Serial.printf("STA 获取到IP地址: %s\n", WiFi.localIP().toString().c_str());
         break;
     case SYSTEM_EVENT_AP_START:
         Serial.println("AP模式已启动");
-        device.set_wifi_connected(false);
+        device_state.wifiConnected = false;
         break;
     case SYSTEM_EVENT_AP_STOP:
         Serial.println("AP模式已停止");
@@ -46,16 +51,23 @@ void WiFiEvent(WiFiEvent_t event)
     }
 }
 
-WiFiConfigManager wifiManager;
+
 
 // 在类成员变量中添加
 unsigned long lastConnectAttempt = 0;
 
+
+
+WiFiConfigManager::WiFiConfigManager()
+{
+    
+}
+
 void WiFiConfigManager::begin()
 {
-    Serial.println("WiFiConfigManager::begin");
-    delay(1000); // 添加启动延迟
-
+    
+    Serial.println("[WiFi] 初始化开始");
+    
     // 注册WiFi事件回调
     WiFi.onEvent(WiFiEvent);
 
@@ -66,6 +78,8 @@ void WiFiConfigManager::begin()
     // 配置SSL客户端
     wifiClientSecure.setInsecure();  // 允许自签名证书
     wifiClientSecure.setTimeout(15); // 设置15秒超时
+
+    
 
     if (!preferences.begin(PREF_NAMESPACE, false))
     {
@@ -80,6 +94,11 @@ void WiFiConfigManager::begin()
 // 阻塞的
 void WiFiConfigManager::loop()
 {
+    // 如果在进入倒计时休眠状态直接条幅
+    if (powerManager.powerState == POWER_STATE_COUNTDOWN) {
+        return;
+    }
+    
     if (isConfigMode)
     {
         handleClient();
@@ -88,7 +107,7 @@ void WiFiConfigManager::loop()
     {
         if (WiFi.status() != WL_CONNECTED)
         {
-            device.set_wifi_connected(false);
+            device_state.wifiConnected = false;
 
             // 每5秒重试一次
             if (millis() - lastConnectAttempt > 5000)
@@ -97,7 +116,7 @@ void WiFiConfigManager::loop()
                 if (tryConnectWithSavedCredentials())
                 {
                     Serial.println("\nWiFi连接成功!");
-                    device.set_wifi_connected(true);
+                    device_state.wifiConnected = true;
                 }
             }
         }
@@ -165,7 +184,7 @@ void WiFiConfigManager::enterConfigMode()
     delay(100);
 
     isConfigMode = true;
-    device.set_wifi_connected(false);
+    device_state.wifiConnected = false;
 
     setupAP();
     setupDNS();
@@ -401,10 +420,10 @@ void WiFiConfigManager::saveWiFiCredentials(const String &ssid, const String &pa
 bool WiFiConfigManager::checkInternetConnection()
 {
     WiFiClient client;
-    Serial.printf("检测MQTT服务器连通性: %s:%d\n", MQTT_SERVER, MQTT_PORT);
+    Serial.printf("检测MQTT服务器连通性: %s:%d\n", MQTT_BROKER, MQTT_PORT);
 
     // 尝试连接
-    if (!client.connect(MQTT_SERVER, MQTT_PORT))
+    if (!client.connect(MQTT_BROKER, MQTT_PORT))
     {
         Serial.println("MQTT服务器连接失败！");
         return false;
