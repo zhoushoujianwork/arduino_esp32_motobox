@@ -115,6 +115,9 @@ private:
     WiFiClient _wifiClient;
     PubSubClient* _wifiMqttClient;
     bool _isInitialized;
+
+    unsigned long _lastNetworkCheckTime;
+    static const unsigned long NETWORK_CHECK_INTERVAL = 2000; // 2秒检查一次
     
     // 回调函数
     static void wifiMqttCallback(char* topic, byte* payload, unsigned int length);

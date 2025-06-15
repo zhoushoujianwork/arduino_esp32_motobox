@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <QMC5883LCompass.h>
 #include "config.h"
+#include "device.h"
 
 typedef struct
 {
@@ -70,14 +71,25 @@ public:
      */
     void begin();
 
+    /**
+     * @brief 设置调试模式
+     */
+    void setDebug(bool debug);
+
+
 private:
     int _sda;
     int _scl;
+    bool _debug;
+    TwoWire& _wire; // 使用 Wire1 作为 I2C 总线
     float _declination;  // 磁偏角校正值
     QMC5883LCompass qmc;  // QMC5883L传感器对象
     
     // 数据处理函数
     float calculateHeading(int16_t x, int16_t y);
+
+    void debugPrint(const String& message);
+    unsigned long _lastDebugPrintTime;
 };
 
 #ifdef  ENABLE_COMPASS

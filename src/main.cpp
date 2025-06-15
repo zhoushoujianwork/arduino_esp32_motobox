@@ -214,13 +214,19 @@ void loop()
 
   // 每 30 秒发送一次状态消息
   static unsigned long lastMsg = 0;
-  if (millis() - lastMsg > 10000)
+  if (millis() - lastMsg > 1000)
   {
     lastMsg = millis();
 
+    print_device_info();
+
+    // Serial.printf("Compass Heading: %f\n", compass_data.heading);
+
+    // Serial.printf("Compass Heading: %f\n", compass.getDeclination());
+
     // 发送状态消息
-    String status = String("设备运行时间: ") + (millis() / 1000) + "秒";
-    mqttManager.publish("test/status", status.c_str());
-    mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
+    // String status = String("设备运行时间: ") + (millis() / 1000) + "秒";
+    // mqttManager.publish("test/status", status.c_str());
+    // mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
   }
 }

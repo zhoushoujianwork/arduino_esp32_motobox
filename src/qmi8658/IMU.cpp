@@ -7,36 +7,46 @@
 IMU imu(IMU_SDA_PIN, IMU_SCL_PIN, IMU_INT_PIN);
 #endif
 
+imu_data_t imu_data;
+
 
 volatile bool IMU::motionInterruptFlag = false;
 void IRAM_ATTR IMU::motionISR() {
     IMU::motionInterruptFlag = true;
 }
 
-imu_data_t imu_data;
 
 IMU::IMU(int sda, int scl, int motionIntPin)
+    : _wire(Wire1)
 {
-    this->sda = sda;
-    this->scl = scl;
-    this->motionIntPin = motionIntPin;
-    this->motionThreshold = MOTION_DETECTION_THRESHOLD_DEFAULT;
-    this->motionDetectionEnabled = false;
-    this->sampleWindow = MOTION_DETECTION_WINDOW_DEFAULT;
+    _debug = true;
+    sda = sda;
+    scl = scl;
+    motionIntPin = motionIntPin;
+    motionThreshold = MOTION_DETECTION_THRESHOLD_DEFAULT;
+    motionDetectionEnabled = false;
+    sampleWindow = MOTION_DETECTION_WINDOW_DEFAULT;
 }
+
+void IMU::debugPrint(const String& message) {
+    if (_debug) {
+        Serial.println(message);
+    }
+}
+
 
 void IMU::begin()
 {
     Serial.println("[IMU] 初始化完成");
     #ifdef USE_WIRE
     Serial.printf("[IMU] SDA: %d, SCL: %d\n", sda, scl);
-    if (!qmi.begin(Wire1, QMI8658_L_SLAVE_ADDRESS, sda, scl))
+    if (!qmi.begin(_wire, QMI8658_L_SLAVE_ADDRESS, sda, scl))
     {
         Serial.println("[IMU] 初始化失败");
         for (int i = 0; i < 3; i++) {
             delay(1000);
             Serial.println("[IMU] 重试初始化...");
-            if (qmi.begin(Wire1, QMI8658_L_SLAVE_ADDRESS, sda, scl)) {
+            if (qmi.begin(_wire, QMI8658_L_SLAVE_ADDRESS, sda, scl)) {
                 Serial.println("[IMU] 重试成功");
                 break;
             }
@@ -276,6 +286,10 @@ void IMU::loop()
                 lastMotionTime = now;
             }
         }
+    }
+    if (millis() - _lastDebugPrintTime > 500) {
+        _lastDebugPrintTime = millis();
+        debugPrint("IMU Heading: " + String(imu_data.roll) + ", " + String(imu_data.pitch) + ", " + String(imu_data.yaw));
     }
 }
 

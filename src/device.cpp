@@ -183,13 +183,7 @@ void Device::begin()
         Serial.println("MQTT 初始化失败，将在运行时重试");
         return;
     }
-
-    // 连接MQTT
-    while (!mqttManager.connect()) {
-        Serial.println("MQTT 连接失败，将在运行时重试");
-        delay(1000);
-    }
-
+    Serial.println("完成底层网络配置，wifi/gsm/mqtt 初始化完成");
 
     // 设置回调
     mqttManager.onMessage(mqttMessageCallback);
@@ -219,8 +213,13 @@ void Device::begin()
     String controlTopic = baseTopic + "/control/#"; // control: 控制命令
 
     mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 5000);
-    mqttManager.addTopic("imu", imuTopic.c_str(), 1000);
+
+#ifdef ENABLE_IMU
+    mqttManager.addTopic("imu", imuTopic.c_str(), 1000);    
+#endif
+#ifdef ENABLE_GPS
     mqttManager.addTopic("gps", gpsTopic.c_str(), 1000);
+#endif
 
     // 订阅主题
     mqttManager.subscribe(controlTopic.c_str(), 1);

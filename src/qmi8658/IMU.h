@@ -6,6 +6,7 @@
 #include <SPI.h>
 #include "SensorQMI8658.hpp"
 #include "device.h"
+#include "config.h"
 
 #define ALPHA 0.98 // 互补滤波的系数，范围在0到1之间
 #define dt 0.01    // 时间间隔，单位是秒（假设采样率为100Hz）
@@ -73,13 +74,14 @@ public:
      */
     void printImuData();
 
-
 private:
     int sda;
     int scl;
+    bool _debug;
     int motionIntPin;           // 运动检测中断引脚
     float motionThreshold;      // 运动检测阈值
     bool motionDetectionEnabled;// 运动检测是否启用
+    TwoWire& _wire; // 使用 Wire1 作为 I2C 总线
     SensorQMI8658 qmi;
     
     // 配置运动检测参数
@@ -90,6 +92,9 @@ private:
     float accumulatedDelta = 0;
     int sampleIndex = 0;
     int sampleWindow = MOTION_DETECTION_WINDOW_DEFAULT;
+
+    void debugPrint(const String& message);
+    unsigned long _lastDebugPrintTime;
 
 };
 

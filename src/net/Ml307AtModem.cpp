@@ -7,7 +7,7 @@
 #ifdef ENABLE_GSM
 Ml307AtModem ml307(Serial1, GSM_RX_PIN, GSM_TX_PIN);
 #else
-Ml307AtModem ml307(nullptr, 0, 0);
+Ml307AtModem ml307(Serial1, 16, 17);
 #endif
 
 Ml307AtModem::Ml307AtModem(HardwareSerial& serial, int rxPin, int txPin)

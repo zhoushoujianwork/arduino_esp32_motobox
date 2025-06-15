@@ -10,14 +10,43 @@ compass_data_t compass_data;
  * @brief QMC5883L 罗盘传感器驱动实现
  */
 Compass::Compass(int sda, int scl)
-    : _sda(sda), _scl(scl), _declination(-6.5f) // 默认江苏磁偏角
+    :_wire(Wire1)
 {
-    // 构造函数只保存参数，不做硬件/外设操作
+    _debug = true;
+    _sda = sda;
+    _scl = scl;
+    _declination = -6.5f;
+}
+
+void Compass::setDebug(bool debug) {
+    _debug = debug;
+}
+
+void Compass::debugPrint(const String& message) {
+    if (_debug) {
+        Serial.println(message);
+    }
 }
 
 void Compass::begin() {
     Serial.printf("[罗盘] 初始化: SDA=%d, SCL=%d, 磁偏角=%.2f\n", _sda, _scl, _declination);
-    Wire.begin(_sda, _scl);
+    
+    // 先确保 Wire 是干净的
+    _wire.end();
+    delay(50);
+    
+    // 添加更多调试信息
+    bool wireBeginSuccess = _wire.begin(_sda, _scl);
+    if (!wireBeginSuccess) {
+        Serial.println("[罗盘] Wire.begin() 失败!");
+        return;
+    }
+    Serial.println("[罗盘] Wire.begin() 成功");
+
+    device_state.compassReady = true;
+    
+    delay(100);  // 给一些初始化时间
+    
     qmc.init();
     qmc.setCalibrationOffsets(0, 0, 0);
     qmc.setCalibrationScales(1.0, 1.0, 1.0);
@@ -31,6 +60,10 @@ void Compass::loop() {
     compass_data.y = y;
     compass_data.z = z;
     compass_data.heading = calculateHeading(x, y);
+    if (millis() - _lastDebugPrintTime > 1000) {
+        _lastDebugPrintTime = millis();
+        debugPrint("Compass Heading: " + String(compass_data.heading));
+    }
 }
 
 bool Compass::calibrate() {
