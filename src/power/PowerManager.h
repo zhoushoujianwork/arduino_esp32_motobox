@@ -6,7 +6,7 @@
 #include "driver/rtc_io.h"
 #include <WiFi.h>
 #include "device.h"
-#include "qmi8658/IMU.h"
+#include "imu/qmi8658.h"
 #include "gps/GPS.h"
 
 // 低功耗模式状态枚举

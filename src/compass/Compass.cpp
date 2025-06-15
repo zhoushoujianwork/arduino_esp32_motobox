@@ -4,18 +4,19 @@
 Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
 #endif
 
-compass_data_t compass_data;
+compass_data_t compass_data = {0, 0, 0, 0};
 
 /**
  * @brief QMC5883L 罗盘传感器驱动实现
  */
 Compass::Compass(int sda, int scl)
-    :_wire(Wire1)
+    :_wire(Wire)
 {
     _debug = true;
     _sda = sda;
     _scl = scl;
     _declination = -6.5f;
+    _initialized = false;
 }
 
 void Compass::setDebug(bool debug) {
@@ -50,9 +51,14 @@ void Compass::begin() {
     qmc.init();
     qmc.setCalibrationOffsets(0, 0, 0);
     qmc.setCalibrationScales(1.0, 1.0, 1.0);
+    _initialized = true;
 }
 
 void Compass::loop() {
+    if (!_initialized) {
+        return;
+    }
+
     qmc.read();
     int16_t x, y, z;
     getRawData(x, y, z);
@@ -60,9 +66,10 @@ void Compass::loop() {
     compass_data.y = y;
     compass_data.z = z;
     compass_data.heading = calculateHeading(x, y);
+
     if (millis() - _lastDebugPrintTime > 1000) {
         _lastDebugPrintTime = millis();
-        debugPrint("Compass Heading: " + String(compass_data.heading));
+        printCompassData();
     }
 }
 
@@ -100,14 +107,18 @@ float Compass::calculateHeading(int16_t x, int16_t y) {
     return heading;
 }
 
-char* Compass::getDirectionChar(float heading) {
+const char* Compass::getDirectionChar(float heading) {
     int direction = (int)((heading + 22.5) / 45.0);
     if (direction >= 8) direction = 0;
     static const char* directions[] = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
-    return (char*)directions[direction];
+    return directions[direction];
 }
 
 float Compass::getDeclination() {
     return _declination;
 }
 
+void printCompassData() {
+    Serial.printf("Compass Heading: %f, X: %f, Y: %f, Z: %f, Direction: %s\n", 
+        compass_data.heading, compass_data.x, compass_data.y, compass_data.z, compass.getDirectionChar(compass_data.heading));
+}

@@ -8,7 +8,7 @@
 #include "bat/BAT.h"
 #include "config.h"
 #include "gps/GPS.h"
-#include "qmi8658/IMU.h"
+#include "imu/qmi8658.h"
 #include "device.h"
 
 void tft_begin();

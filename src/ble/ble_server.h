@@ -5,7 +5,7 @@
 #include "device.h"
 #include "config.h"
 #include "gps/GPS.h"
-#include "qmi8658/IMU.h"
+#include "imu/qmi8658.h"
 #include "power/PowerManager.h"
 
 // 胎压数据结构

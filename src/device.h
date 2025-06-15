@@ -9,7 +9,7 @@
 #include "version.h"  // 包含版本信息头文件
 #include "led/PWMLED.h"
 #include "led/LED.h"
-#include "qmi8658/IMU.h"
+#include "imu/qmi8658.h"
 #include "power/PowerManager.h"
 #include "ble/ble_client.h"
 #include "ble/ble_server.h"

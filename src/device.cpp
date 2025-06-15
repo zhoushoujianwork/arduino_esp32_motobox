@@ -237,6 +237,10 @@ void Device::begin()
     bc.begin();
 #endif
 
+#ifdef ENABLE_COMPASS
+    compass.begin();
+#endif
+
     // IMU初始化
 #ifdef ENABLE_IMU
     imu.begin();

@@ -16,6 +16,8 @@ typedef struct
 
 extern compass_data_t compass_data;
 
+void printCompassData();
+
 
 /**
  * @brief QMC5883L 罗盘传感器驱动
@@ -54,7 +56,7 @@ public:
     /**
      * @brief 获取方向字符串（如"N", "NE"等）
      */
-    char* getDirectionChar(float heading);
+    const char* getDirectionChar(float heading);
 
     /**
      * @brief 设置磁偏角（单位：度）
@@ -81,6 +83,7 @@ private:
     int _sda;
     int _scl;
     bool _debug;
+    bool _initialized;
     TwoWire& _wire; // 使用 Wire1 作为 I2C 总线
     float _declination;  // 磁偏角校正值
     QMC5883LCompass qmc;  // QMC5883L传感器对象

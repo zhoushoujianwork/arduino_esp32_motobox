@@ -8,9 +8,11 @@ MqttManager mqttManager;
 MqttMessageCallback MqttManager::_messageCallback = nullptr;
 
 MqttManager::MqttManager()
-    : _wifiMqttClient(nullptr), _isInitialized(false), _lastReconnectAttempt(0), _debug(true),
-     _connectCallback(nullptr), _networkState(NetworkState::DISCONNECTED), _connectionStartTime(0), _connectionTimeout(30000)
-{ // 默认30秒超时
+    : _wifiMqttClient(nullptr), _isInitialized(false), _lastReconnectAttempt(0),
+     _debug(false),
+     _connectCallback(nullptr), _networkState(NetworkState::DISCONNECTED), 
+     _connectionStartTime(0), _connectionTimeout(30000)
+{
 }
 
 MqttManager::~MqttManager()
@@ -425,7 +427,7 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
     auto it = _topicConfigs.find(name);
     if (it == _topicConfigs.end())
     {
-        Serial.printf("[MqttManager] 主题未找到: %s\n", name.c_str());
+        debugPrint("MqttManager 主题未找到: " + name);
         return false;
     }
 
@@ -433,18 +435,18 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
 #ifdef ENABLE_WIFI
     if (!_wifiMqttClient)
     {
-        Serial.println("[MqttManager] 客户端未初始化");
+        debugPrint("MqttManager 客户端未初始化");
         return false;
     }
     if (!_wifiMqttClient->connected())
     {
-        Serial.println("[MqttManager] 客户端未连接");
+        debugPrint("MqttManager 客户端未连接");
         return false;
     }
 #else
     if (!ml307Mqtt.connected())
     {
-        Serial.println("[MqttManager] 4G MQTT未连接");
+        debugPrint("MqttManager 4G MQTT未连接");
         return false;
     }
 #endif
@@ -459,7 +461,7 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
     if (result)
     {
         it->second.lastPublishTime = now;
-        Serial.printf("[MqttManager] 发布成功 - 主题: %s\n", it->second.topic.c_str());
+        debugPrint("MqttManager 发布成功 - 主题: " + it->second.topic);
     }
     else
     {

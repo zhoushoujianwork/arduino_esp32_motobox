@@ -42,7 +42,7 @@
 #endif
 
 #ifdef ENABLE_IMU
-#include "qmi8658/IMU.h"
+#include "imu/qmi8658.h"
 #endif
 
 #include "version.h"
@@ -218,7 +218,10 @@ void loop()
   {
     lastMsg = millis();
 
-    print_device_info();
+    // print_device_info();
+
+    printCompassData();
+
 
     // Serial.printf("Compass Heading: %f\n", compass_data.heading);
 

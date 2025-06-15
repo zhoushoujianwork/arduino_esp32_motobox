@@ -4,6 +4,7 @@
 
 #include <Wire.h>
 #include <SPI.h>
+#include <math.h>
 #include "SensorQMI8658.hpp"
 #include "device.h"
 #include "config.h"

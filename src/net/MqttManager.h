@@ -13,7 +13,7 @@
 #include <map>
 #include "config.h"
 #include "device.h"
-#include "qmi8658/IMU.h"
+#include "imu/qmi8658.h"
 #include "gps/GPS.h"
 
 // MQTT 网络类型
@@ -128,7 +128,6 @@ private:
     bool initWifi();
     bool initCellular();
     void cleanup();
-    
     // WiFi 相关
     bool connectWifi(uint32_t timeout = 30000);
     void disconnectWifi();
