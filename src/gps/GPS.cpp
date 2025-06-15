@@ -144,7 +144,6 @@ void GPS::loop()
                 if (gps_data.satellites > 3) {
                     device_state.gpsReady = true;
                     loopAutoAdjustHz();
-                    mqttManager.publishToTopic("gps", gps_data_to_json(gps_data).c_str());
                 }
             }
             

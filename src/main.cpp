@@ -13,11 +13,12 @@
 #include "Arduino.h"
 #include "config.h"
 #include "power/PowerManager.h"
+#include "led/LEDManager.h"
 #include "device.h"
 #include "nvs_flash.h"
 
 #if defined(ENABLE_GSM) || defined(ENABLE_WIFI)
-#include "ml370/MqttManager.h"
+#include "net/MqttManager.h"
 #endif
 
 #ifdef BAT_PIN
@@ -30,10 +31,6 @@
 
 #ifdef LED_PIN
 #include "led/LED.h"
-#endif
-
-#ifdef PWM_LED_PIN
-#include "led/PWMLED.h"
 #endif
 
 #ifdef ENABLE_COMPASS
@@ -112,23 +109,6 @@ void taskSystem(void *parameter)
     bat.loop();
 #endif
 
-// LED状态设置
-// - WiFi连接时显示黄色
-// - MQTT连接时显示蓝色
-// - 无连接时显示红色
-#ifdef PWM_LED_PIN
-    if (device_state.wifiConnected)
-    {
-      pwmLed.setMode(PWMLED::GREEN, 5);
-      // } else if (device.get_device_state()->bleConnected) {
-      //     pwmLed.setMode(PWMLED::GREEN);
-    }
-    else
-    {
-      pwmLed.setMode(PWMLED::RED, 10);
-    }
-#endif
-
 #ifdef LED_PIN
     led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
 #endif
@@ -141,6 +121,11 @@ void taskSystem(void *parameter)
 
     // 电源管理 - 始终保持处理
     powerManager.loop();
+
+    // LED状态更新
+    ledManager.loop();
+
+  
 
     delay(5);
   }
@@ -177,6 +162,9 @@ void taskDataProcessing(void *parameter)
     // 罗盘数据处理
     compass.loop();
 #endif
+
+    // MQTT 消息处理
+    mqttManager.loop();
 
     delay(5);
   }
@@ -223,22 +211,16 @@ void loop()
 {
   // 主循环留空，所有功能都在RTOS任务中处理
   delay(20);
-  // MQTT 消息处理
-  mqttManager.loop();
-  device.loop();
 
   // 每 30 秒发送一次状态消息
   static unsigned long lastMsg = 0;
-  if (millis() - lastMsg > 30000)
+  if (millis() - lastMsg > 10000)
   {
     lastMsg = millis();
-
-    // 获取网络信息
-    String networkInfo = mqttManager.getNetworkInfo();
-    Serial.println("网络状态: " + networkInfo);
 
     // 发送状态消息
     String status = String("设备运行时间: ") + (millis() / 1000) + "秒";
     mqttManager.publish("test/status", status.c_str());
+    mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
   }
 }

@@ -276,7 +276,6 @@ void IMU::loop()
                 lastMotionTime = now;
             }
         }
-        mqttManager.publishToTopic("imu", imu_data_to_json(imu_data).c_str());
     }
 }
 

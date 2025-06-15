@@ -1,6 +1,5 @@
 #include "device.h"
 
-
 extern const VersionInfo &getVersionInfo();
 
 device_state_t device_state;
@@ -8,7 +7,8 @@ device_state_t device_state;
 void print_device_info()
 {
     // 如果休眠倒计时的时候不打印
-    if (powerManager.powerState == POWER_STATE_COUNTDOWN) {
+    if (powerManager.powerState == POWER_STATE_COUNTDOWN)
+    {
         return;
     }
     Serial.println("Device Info:");
@@ -24,7 +24,6 @@ void print_device_info()
     Serial.printf("IMU Ready: %d\n", device_state.imuReady);
     Serial.printf("Compass Ready: %d\n", device_state.compassReady);
     Serial.println("--------------------------------");
-    
 }
 
 String Device::get_device_id()
@@ -64,28 +63,41 @@ String device_state_to_json(device_state_t *state)
     return doc.as<String>();
 }
 
-
-void mqttMessageCallback(const String& topic, const String& payload) {
+void mqttMessageCallback(const String &topic, const String &payload)
+{
     Serial.printf("收到消息 [%s]: %s\n", topic.c_str(), payload.c_str());
+
+    // 解析JSON
+    StaticJsonDocument<256> doc;
+    DeserializationError error = deserializeJson(doc, payload);
+    if (error)
+    {
+        Serial.println("解析JSON失败");
+        return;
+    }
+
+    // 解析JSON
+    const char *command = doc["command"];
+    if (command)
+    {
+        Serial.printf("收到命令: %s\n", command);
+    }
 }
 
-void mqttConnectionCallback(bool connected) {
+void mqttConnectionCallback(bool connected)
+{
     Serial.printf("MQTT %s\n", connected ? "已连接" : "已断开");
-    
+
     // 连接成功后自动订阅主题
-    if (connected) {
-        // 设置 灯光状态为绿色
-        pwmLed.setMode(PWMLED::GREEN, 5);
-        // mqttManager.subscribe("test/topic");
-    }else{
-        // 设置 灯光状态为红色
-        pwmLed.setMode(PWMLED::RED, 5);
+    if (connected)
+    {
+        mqttManager.subscribe("test/topic");
     }
 }
 
 // WiFi 配置
-const char* WIFI_SSID = "mikas iPhone";
-const char* WIFI_PASSWORD = "11111111";
+const char *WIFI_SSID = "mikas iPhone";
+const char *WIFI_PASSWORD = "11111111";
 
 Device device;
 
@@ -103,9 +115,10 @@ Device::Device()
     device_state.gsmReady = false;
 }
 
-void Device::begin() {
+void Device::begin()
+{
     // 从getVersionInfo()获取版本信息
-    const VersionInfo& versionInfo = getVersionInfo();
+    const VersionInfo &versionInfo = getVersionInfo();
     device_state.device_id = get_device_id();
     device_state.device_firmware_version = versionInfo.firmware_version;
     device_state.device_hardware_version = versionInfo.hardware_version;
@@ -137,111 +150,80 @@ void Device::begin() {
 #endif
 
     delay(200);
-    
+
 #ifdef GPS_WAKE_PIN
     rtc_gpio_hold_dis((gpio_num_t)GPS_WAKE_PIN);
     Serial.println("[电源管理] GPS_WAKE_PIN 保持已解除");
 #endif
 
-
-
 #if defined(ENABLE_WIFI) || defined(ENABLE_GSM)
     // 创建 MQTT 配置
     MqttManagerConfig config;
-    
-#ifdef ENABLE_WIFI  // WiFi 模式
-    config.networkType = MqttNetworkType::WIFI;
-    config.wifiSsid = WIFI_SSID;
-    config.wifiPassword = WIFI_PASSWORD;
-    
-#else  // 4G 模式
-    config.networkType = MqttNetworkType::CELLULAR;
-    // 初始化 ML370
-    ml370.begin(115200);
-    ml370.setDebug(true);
-    
-    // 等待网络就绪
-    if (!ml370.waitForNetwork()) {
-        Serial.println("4G 网络连接失败");
-        return;
-    }
-    Serial.printf("4G 信号强度: %d\n", ml370.getCSQ());
-#endif
-
     // 通用 MQTT 配置
     config.broker = MQTT_BROKER;
     config.port = MQTT_PORT;
-    config.clientId = device_state.device_id.c_str();
+    config.clientId = "";
     config.username = MQTT_USER;
     config.password = MQTT_PASSWORD;
     config.keepAlive = MQTT_KEEP_ALIVE;
     config.cleanSession = true;
 
+#ifdef ENABLE_WIFI// WiFi 模式
+    config.wifiSsid = WIFI_SSID;
+    config.wifiPassword = WIFI_PASSWORD;
+#else
+    ml307.setDebug(true);
+    ml307.begin(921600);
+#endif
+
+    mqttManager.setDebug(true);
     // 初始化 MQTT 管理器
-    if (!mqttManager.begin(config)) {
-        Serial.println("MQTT 初始化失败");
+    if (!mqttManager.begin(config))
+    {
+        Serial.println("MQTT 初始化失败，将在运行时重试");
         return;
     }
 
-    // setdebug
-    mqttManager.setDebug(true);
+    // 连接MQTT
+    while (!mqttManager.connect()) {
+        Serial.println("MQTT 连接失败，将在运行时重试");
+        delay(1000);
+    }
+
 
     // 设置回调
     mqttManager.onMessage(mqttMessageCallback);
     mqttManager.onConnect(mqttConnectionCallback);
-    mqttManager.onNetworkState([](NetworkState state) {
-    switch (state) {
-        case NetworkState::CONNECTED:
-            Serial.println("网络已连接");
-            break;
-        case NetworkState::DISCONNECTED:
-            Serial.println("网络已断开");
-            break;
-        case NetworkState::ERROR:
-            Serial.println("网络连接错误");
-            break;
-        // ...
-    }
-});
+    mqttManager.onNetworkState([](NetworkState state)
+                               {
+        switch (state) {
+            case NetworkState::CONNECTED:
+                Serial.println("网络已连接");
+                break;
+            case NetworkState::DISCONNECTED:
+                Serial.println("网络已断开");
+                break;
+            case NetworkState::ERROR:
+                Serial.println("网络连接错误");
+                break;
+        } });
 
-    // 连接 MQTT
-    if (mqttManager.connect()) {
-        Serial.println("MQTT 连接成功");
+    // 配置主题
+    String baseTopic = String("vehicle/v1/") + device_state.device_id;
+    String telemetryTopic = baseTopic + "/telemetry/"; // telemetry: 遥测数据
 
-        // 测试发布
-        mqttManager.publish("test/topic", "设备已上线");
-        
-        // 构建基础主题
-        String baseTopic = String("vehicle/v1/") + device_state.device_id;
-        String telemetryTopic = baseTopic + "/telemetry/";
-        
-        // 构建具体主题
-        String deviceInfoTopic = telemetryTopic + "device";
-        String gpsTopic = telemetryTopic + "location";
-        String imuTopic = telemetryTopic + "motion";
-        String controlTopic = baseTopic + "/control/#";
-        
-        // 打印主题配置信息
-        Serial.println("\n[MQTT] 主题配置信息:");
-        Serial.printf("  设备信息主题: %s\n", deviceInfoTopic.c_str());
-        Serial.printf("  位置信息主题: %s\n", gpsTopic.c_str());
-        Serial.printf("  运动数据主题: %s\n", imuTopic.c_str());
-        Serial.printf("  控制命令主题: %s\n", controlTopic.c_str());
-        Serial.println("--------------------------------");
-        
-        // 配置主题
-        mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), MQTT_DEVICE_INFO_INTERVAL);
-        mqttManager.addTopic("imu", imuTopic.c_str(), MQTT_IMU_PUBLISH_INTERVAL);
-        mqttManager.addTopic("gps", gpsTopic.c_str(), MQTT_IMU_PUBLISH_INTERVAL);
-        
-        // 订阅控制主题
-        mqttManager.subscribe(controlTopic.c_str(), 1);
-        
-        // 发送上线消息
-        mqttManager.publish(deviceInfoTopic.c_str(), "设备已上线");
-    } else {
-        Serial.println("MQTT 连接失败");
-    }
+    // 构建具体主题
+    String deviceInfoTopic = telemetryTopic + "device";
+    String gpsTopic = telemetryTopic + "location";
+    String imuTopic = telemetryTopic + "motion";
+    String controlTopic = baseTopic + "/control/#"; // control: 控制命令
+
+    mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 5000);
+    mqttManager.addTopic("imu", imuTopic.c_str(), 1000);
+    mqttManager.addTopic("gps", gpsTopic.c_str(), 1000);
+
+    // 订阅主题
+    mqttManager.subscribe(controlTopic.c_str(), 1);
 #endif
 
 #ifdef ENABLE_GPS
@@ -275,9 +257,4 @@ void Device::begin() {
         }
     }
 #endif
-}
-
-void Device::loop() {
-    // 测试发布
-    mqttManager.publish("test/topic", "设备已上线");
 }

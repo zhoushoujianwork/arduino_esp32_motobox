@@ -1,20 +1,20 @@
 /*
- * ML370 MQTT 客户端
+ * ml307 MQTT 客户端
  * 使用 AT 指令实现 MQTT 功能
  */
 
-#ifndef ML370_MQTT_H
-#define ML370_MQTT_H
+#ifndef ML307_MQTT_H
+#define ML307_MQTT_H
 
 #include <Arduino.h>
 #include <functional>
-#include "Ml370AtModem.h"
+#include "Ml307AtModem.h"
 
 using MqttMessageCallback = std::function<void(const String& topic, const String& payload)>;
 
-class Ml370Mqtt {
+class Ml307Mqtt {
 public:
-    Ml370Mqtt(Ml370AtModem& modem);
+    Ml307Mqtt(Ml307AtModem& modem);
     
     // MQTT 操作
     bool connect(const char* broker, uint16_t port, 
@@ -31,14 +31,17 @@ public:
     
     // 状态检查
     bool connected();
+    bool isConnected();
     
     // 消息处理
     void loop();
 
 private:
-    Ml370AtModem& _modem;
+    Ml307AtModem& _modem;
     MqttMessageCallback _messageCallback;
     bool _connected;
+    unsigned long _lastCheckTime;
+    bool _debug;
     
     // MQTT 配置
     String _clientId;
@@ -49,8 +52,11 @@ private:
     void handleMessage(const String& topic, const String& payload);
     bool parseMessageData(const String& data);
     bool configureConnection();
+    void debugPrint(const String& msg);
+    String encodeHex(const char* payload);
+    void disconnectAndWait();
 };
 
-extern Ml370Mqtt ml370Mqtt;
+extern Ml307Mqtt ml307Mqtt;
 
-#endif // ML370_MQTT_H 
+#endif // ML307_MQTT_H 

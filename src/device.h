@@ -16,7 +16,7 @@
 #include "compass/Compass.h"
 #include "gps/GPS.h"
 #include "bat/BAT.h"
-#include "ml370/MqttManager.h"
+#include "net/MqttManager.h"
 
 
 
@@ -53,8 +53,6 @@ public:
 
     // 硬件初始化
     void begin();
-    void loop();
-    void configureMqttTopics();
     
 private:
     

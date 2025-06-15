@@ -16,6 +16,8 @@
 // GSM引脚配置检查
 #if defined(GSM_RX_PIN) && defined(GSM_TX_PIN)
 #define ENABLE_GSM
+#else
+#define ENABLE_WIFI
 #endif
 
 // GPS引脚配置检查
@@ -68,15 +70,6 @@
 #define MQTT_USER         ""
 #define MQTT_PASSWORD     ""
 #define MQTT_KEEP_ALIVE   60
-
-/* MQTT Topics - These must stay in C++ code because they include runtime expressions */
-#define MQTT_TOPIC_DEVICE_INFO  String("vehicle/v1/") + device_state.device_id + "/device/info"
-#define MQTT_TOPIC_GPS         String("vehicle/v1/") + device_state.device_id + "/gps/position"
-#define MQTT_TOPIC_IMU         String("vehicle/v1/") + device_state.device_id + "/imu/gyro"
-/* MQTT Intervals (in milliseconds) */
-#define MQTT_DEVICE_INFO_INTERVAL  5000
-#define MQTT_IMU_PUBLISH_INTERVAL   200
-#define MQTT_BAT_PRINT_INTERVAL   10000
 
 /* 
 TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择

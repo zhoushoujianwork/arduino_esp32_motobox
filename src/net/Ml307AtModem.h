@@ -1,21 +1,22 @@
 /*
- * ML370 AT Modem 驱动
+ * ml307 AT Modem 驱动
  * 支持基础 AT 通信、网络注册等功能
  */
 
-#ifndef ML370_AT_MODEM_H
-#define ML370_AT_MODEM_H
+#ifndef ML307_AT_MODEM_H
+#define ML307_AT_MODEM_H
 
 #include <Arduino.h>
+#include "config.h"
 
-class Ml370AtModem {
+class Ml307AtModem {
 public:
-    Ml370AtModem(HardwareSerial& serial = Serial2);
+    Ml307AtModem(HardwareSerial& serial, int rxPin, int txPin);
     
     // 基础功能
     bool begin(uint32_t baudrate = 115200);
     void setDebug(bool debug);
-    bool waitForNetwork(uint32_t timeout = 30000);
+    bool isNetworkReady();
     bool reset();
     
     // 网络信息
@@ -28,6 +29,7 @@ public:
     
     // AT 命令
     bool sendAT(const String& cmd, const String& expected = "OK", uint32_t timeout = 1000);
+    bool sendATWithRetry(const String& cmd, const String& expected = "OK", int maxRetry = 5, uint32_t timeout = 2000);
     String sendATWithResponse(const String& cmd, uint32_t timeout = 1000);
     
     // 状态检查
@@ -35,6 +37,8 @@ public:
 
 private:
     HardwareSerial& _serial;
+    int _rxPin;
+    int _txPin;
     bool _debug;
     static const int RX_BUFFER_SIZE = 1024;
     char _rxBuffer[RX_BUFFER_SIZE];
@@ -43,8 +47,11 @@ private:
     String waitResponse(uint32_t timeout = 1000);
     bool expectResponse(const String& expected, uint32_t timeout = 1000);
     void debugPrint(const String& msg);
+
+    bool initModem();
+    bool tryBaudrate(uint32_t baudrate);
 };
 
-extern Ml370AtModem ml370;
+extern Ml307AtModem ml307;
 
-#endif // ML370_AT_MODEM_H 
+#endif // ml307_AT_MODEM_H 

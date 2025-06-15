@@ -6,7 +6,6 @@
 #include <ArduinoJson.h>
 #include "device.h"
 #include "config.h"
-#include "ml370/MqttManager.h"
 
 
 typedef struct

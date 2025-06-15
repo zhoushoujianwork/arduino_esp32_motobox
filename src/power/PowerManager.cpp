@@ -7,10 +7,8 @@
 #include "esp_bt_main.h"
 #include "driver/periph_ctrl.h"
 #include "soc/periph_defs.h"
-#include "led/PWMLED.h"
 #include "device.h"
 #include "utils/PreferencesUtils.h"
-#include "ml370/MqttManager.h"
 
 // 初始化静态变量
 #ifdef ENABLE_SLEEP
@@ -177,12 +175,6 @@ void PowerManager::disablePeripherals()
     Serial.flush();
     delay(50);
 
-    // 1. MQTT断开
-    mqttManager.disconnect();
-    Serial.println("[电源管理] MQTT已断开");
-    Serial.flush();
-    delay(50);
-
     // 3. 蓝牙关闭
     btStop();
     Serial.println("[电源管理] 蓝牙已安全关闭");
@@ -241,31 +233,6 @@ void PowerManager::disablePeripherals()
 #endif
 
     Serial.println("[电源管理] 显示屏已完全关闭");
-    Serial.flush();
-    delay(50);
-#endif
-
-    // LED关闭
-#ifdef PWM_LED_PIN
-    extern PWMLED pwmLed;
-    pwmLed.setMode(PWMLED::OFF);
-    FastLED.show();
-    delay(20);
-    FastLED.show();
-    delay(20);
-    FastLED.show();
-    digitalWrite(PWM_LED_PIN, LOW);
-    delay(5);
-    pinMode(PWM_LED_PIN, INPUT);
-    Serial.println("[电源管理] PWM LED已关闭");
-    Serial.flush();
-    delay(50);
-#endif
-
-#ifdef LED_PIN
-    digitalWrite(LED_PIN, LOW);
-    pinMode(LED_PIN, INPUT);
-    Serial.println("[电源管理] 普通LED已关闭");
     Serial.flush();
     delay(50);
 #endif

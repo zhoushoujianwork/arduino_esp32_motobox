@@ -9,8 +9,12 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "Ml370Mqtt.h"
+#include "Ml307Mqtt.h"
 #include <map>
+#include "config.h"
+#include "device.h"
+#include "qmi8658/IMU.h"
+#include "gps/GPS.h"
 
 // MQTT 网络类型
 enum class MqttNetworkType {
@@ -30,7 +34,6 @@ enum class NetworkState {
 // MQTT 配置
 struct MqttManagerConfig {
     // 网络配置
-    MqttNetworkType networkType;
     const char* wifiSsid;      // WiFi 模式时使用
     const char* wifiPassword;  // WiFi 模式时使用
     
@@ -44,8 +47,7 @@ struct MqttManagerConfig {
     bool cleanSession;
     
     MqttManagerConfig() 
-        : networkType(MqttNetworkType::NONE)
-        , wifiSsid(nullptr)
+        : wifiSsid(nullptr)
         , wifiPassword(nullptr)
         , broker(nullptr)
         , port(1883)
@@ -74,8 +76,8 @@ public:
     
     // 连接操作
     bool connect();
-    void disconnect();
-    bool isConnected();
+    // void disconnect();
+    // bool isConnected();
     
     // MQTT 操作
     bool publish(const char* topic, const char* payload, bool retain = false);
@@ -90,7 +92,6 @@ public:
     void loop();
 
     // 网络状态
-    MqttNetworkType getNetworkType() const { return _config.networkType; }
     bool isNetworkConnected() const;
     String getNetworkInfo() const;
     
@@ -130,8 +131,8 @@ private:
     void disconnectWifi();
     
     // 状态检查
-    bool checkWifiStatus();
-    bool checkCellularStatus();
+    // bool checkWifiStatus();
+    // bool checkCellularStatus();
     
     // 重连逻辑
     bool reconnect();
