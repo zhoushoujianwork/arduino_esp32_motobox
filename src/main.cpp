@@ -66,23 +66,6 @@ RTC_DATA_ATTR int bootCount = 0;
 TaskHandle_t gpsTaskHandle = NULL;
 
 /**
- * GPS任务
- * 负责GPS数据获取和处理
- */
-#ifdef ENABLE_GPS
-void taskGps(void *parameter)
-{
-  while (true)
-  {
-    // 使用printRawData直接打印原始NMEA数据
-    // gps.printRawData();
-    gps.loop();
-    delay(5);
-  }
-}
-#endif
-
-/**
  * 系统监控任务
  * 负责电源管理、LED状态、按钮处理
  */
@@ -99,18 +82,13 @@ void taskSystem(void *parameter)
     pwmLed.loop();
 #endif
 
-#ifdef LED_PIN
-#include "led/LED.h"
-    led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
-#endif
-
 // 电池监控
 #ifdef BAT_PIN
     bat.loop();
 #endif
 
 #ifdef LED_PIN
-    led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
+    led.setMode(true ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
 #endif
 
     // 按钮状态更新
@@ -142,6 +120,12 @@ void taskDataProcessing(void *parameter)
 // IMU数据处理
 #ifdef ENABLE_IMU
     imu.loop();
+#endif
+
+// GPS
+#ifdef ENABLE_GPS
+    // gps.loop();
+    gps.printRawData();
 #endif
 
 #ifdef BLE_CLIENT
@@ -197,14 +181,14 @@ void setup()
   Serial.println("step 4");
   device.begin();
 
-#ifdef ENABLE_GPS
-  xTaskCreatePinnedToCore(taskGps, "TaskGps", 1024 * 10, NULL, 1, &gpsTaskHandle, 1);
-#endif
-
   xTaskCreate(taskSystem, "TaskSystem", 1024 * 10, NULL, 2, NULL);
   xTaskCreate(taskDataProcessing, "TaskData", 1024 * 10, NULL, 1, NULL);
 
   Serial.println("[系统] 初始化完成");
+  Serial.println();
+  Serial.println();
+  Serial.println();
+  Serial.println();
 }
 
 void loop()
@@ -220,7 +204,7 @@ void loop()
 
     // print_device_info();
 
-    printCompassData();
+    // printCompassData();
 
 
     // Serial.printf("Compass Heading: %f\n", compass_data.heading);

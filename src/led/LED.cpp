@@ -108,7 +108,28 @@ void LED::loop()
             _lastToggle = currentMillis;
         }
         break;
+
+    case INIT_BLINK:
+        if (currentMillis - _lastToggle >= INIT_BLINK_INTERVAL) {
+            if (_blinkCount < _blinkTimes * 2) { // 每个闪烁周期需要两次状态改变
+                _state = !_state;
+                digitalWrite(_pin, _state ? LOW : HIGH);
+                _blinkCount++;
+                _lastToggle = currentMillis;
+            } else {
+                // 闪烁完成，切换到常亮模式
+                setMode(ON);
+            }
+        }
+        break;
     }
+}
+
+void LED::initBlink(uint8_t times) {
+    _blinkTimes = times;
+    _blinkCount = 0;
+    _lastToggle = millis();
+    setMode(INIT_BLINK);
 }
 
 // 添加一个辅助函数将模式转换为字符串

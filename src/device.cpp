@@ -139,15 +139,11 @@ void Device::begin()
     }
 
     // LED初始化
-#ifdef PWM_LED_PIN
-    pwmLed.begin();
-    pwmLed.setMode(PWMLED::OFF); // 启动时设置为彩虹模式
+#if defined(PWM_LED_PIN) || defined(LED_PIN)
+    ledManager.initAnimation();
+    ledManager.initComplete();
 #endif
 
-#ifdef LED_PIN
-    led.begin();
-    led.setMode(isConnected ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
-#endif
 
     delay(200);
 

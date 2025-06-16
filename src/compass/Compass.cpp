@@ -2,6 +2,7 @@
 
 #ifdef ENABLE_COMPASS
 Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
+
 #endif
 
 compass_data_t compass_data = {0, 0, 0, 0};
@@ -107,18 +108,20 @@ float Compass::calculateHeading(int16_t x, int16_t y) {
     return heading;
 }
 
-const char* Compass::getDirectionChar(float heading) {
-    int direction = (int)((heading + 22.5) / 45.0);
-    if (direction >= 8) direction = 0;
-    static const char* directions[] = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
-    return directions[direction];
-}
 
 float Compass::getDeclination() {
     return _declination;
 }
 
+
 void printCompassData() {
     Serial.printf("Compass Heading: %f, X: %f, Y: %f, Z: %f, Direction: %s\n", 
-        compass_data.heading, compass_data.x, compass_data.y, compass_data.z, compass.getDirectionChar(compass_data.heading));
+        compass_data.heading, compass_data.x, compass_data.y, compass_data.z, getDirectionChar(compass_data.heading));
+}
+
+const char* getDirectionChar(float heading) {
+    int direction = (int)((heading + 22.5) / 45.0);
+    if (direction >= 8) direction = 0;
+    static const char* directions[] = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+    return directions[direction];
 }

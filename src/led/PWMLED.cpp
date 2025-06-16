@@ -2,7 +2,6 @@
 
 #ifdef PWM_LED_PIN
 PWMLED pwmLed(PWM_LED_PIN);
-#endif
 
 // 定义颜色映射表
 const PWMLED::RGB PWMLED::COLOR_MAP[] = {
@@ -13,6 +12,16 @@ const PWMLED::RGB PWMLED::COLOR_MAP[] = {
     {255, 0, 255},   // PURPLE (IMU)
     {0, 255, 0},     // GREEN (System OK)
     {255, 0, 0}      // RED (System Error)
+};
+
+const uint8_t PWMLED::RAINBOW_COLORS[7][3] = {
+    {255, 0, 0},   // 红
+    {255, 127, 0}, // 橙
+    {255, 255, 0}, // 黄
+    {0, 255, 0},   // 绿
+    {0, 0, 255},   // 蓝
+    {75, 0, 130},  // 靛
+    {148, 0, 211}  // 紫
 };
 
 PWMLED::PWMLED(uint8_t pin) :
@@ -28,7 +37,7 @@ PWMLED::PWMLED(uint8_t pin) :
 }
 
 void PWMLED::begin() {
-    FastLED.addLeds<WS2812, PWM_LED_PIN, GRB>(_leds, NUM_LEDS);
+    FastLED.addLeds<WS2812B, PWM_LED_PIN, GRB>(_leds, NUM_LEDS);
     Serial.printf("[PWMLED] 初始化完成，引脚: %d\n", _pin);
 }
 
@@ -133,3 +142,19 @@ void PWMLED::showLED() {
     _leds[0].nscale8(actualBrightness);
     FastLED.show();
 }
+
+void PWMLED::updateRainbow() {
+    if (millis() - _lastUpdate >= 100) { // 每100ms更新一次颜色
+        _leds[0].setRGB(
+            RAINBOW_COLORS[_rainbowIndex][0],
+            RAINBOW_COLORS[_rainbowIndex][1],
+            RAINBOW_COLORS[_rainbowIndex][2]
+        );
+        _leds[0].nscale8(50); // 50%亮度
+        FastLED.show();
+        
+        _rainbowIndex = (_rainbowIndex + 1) % 7;
+        _lastUpdate = millis();
+    }
+}
+#endif

@@ -56,7 +56,7 @@
 #define LED_BLINK_INTERVAL 100
 
 /* IMU Configuration */
-#if defined(IMU_SDA_PIN) && defined(IMU_SCL_PIN) && defined(IMU_INT_PIN)
+#if defined(IMU_SDA_PIN) && defined(IMU_SCL_PIN)
 #define ENABLE_IMU  // 默认启用IMU
 #endif
 

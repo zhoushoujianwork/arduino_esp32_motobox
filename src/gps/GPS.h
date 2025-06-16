@@ -69,6 +69,10 @@ private:
     int _rxPin;
     int _txPin;
     int _currentBaudRate;
+    bool _debug;
+    bool _foundBaudRate; // 是否开启自动波特率检测
+    unsigned long _lastDebugPrintTime;
+    void debugPrint(const String& message);
 
     double totalDistanceKm;
     unsigned long lastDistanceTime;

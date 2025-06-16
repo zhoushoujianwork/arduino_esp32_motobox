@@ -17,6 +17,7 @@
 #include "gps/GPS.h"
 #include "bat/BAT.h"
 #include "net/MqttManager.h"
+#include "led/LEDManager.h"
 
 
 

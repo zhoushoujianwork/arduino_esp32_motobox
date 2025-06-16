@@ -3,7 +3,11 @@
 #define USE_WIRE
 
 #ifdef ENABLE_IMU
+#ifdef IMU_INT_PIN
 IMU imu(IMU_SDA_PIN, IMU_SCL_PIN, IMU_INT_PIN);
+#else
+IMU imu(IMU_SDA_PIN, IMU_SCL_PIN);
+#endif
 #endif
 
 imu_data_t imu_data;
@@ -15,12 +19,15 @@ void IRAM_ATTR IMU::motionISR()
 }
 
 IMU::IMU(int sda, int scl, int motionIntPin)
-    : _wire(Wire1)
+    : _wire(Wire1),
+    _debug(false),
+    _lastDebugPrintTime(0),
+    motionIntPin(motionIntPin)
 {
     _debug = true;
-    sda = sda;
-    scl = scl;
-    motionIntPin = motionIntPin;
+    this->sda = sda;
+    this->scl = scl;
+    this->motionIntPin = motionIntPin;
     motionThreshold = MOTION_DETECTION_THRESHOLD_DEFAULT;
     motionDetectionEnabled = false;
     sampleWindow = MOTION_DETECTION_WINDOW_DEFAULT;
@@ -30,7 +37,7 @@ void IMU::debugPrint(const String &message)
 {
     if (_debug)
     {
-        Serial.println(message);
+        Serial.println("[IMU] [debug] " + message);
     }
 }
 

@@ -17,6 +17,7 @@ typedef struct
 extern compass_data_t compass_data;
 
 void printCompassData();
+const char* getDirectionChar(float heading);
 
 
 /**
@@ -52,11 +53,6 @@ public:
      * @brief 获取原始磁场数据
      */
     void getRawData(int16_t &x, int16_t &y, int16_t &z);
-
-    /**
-     * @brief 获取方向字符串（如"N", "NE"等）
-     */
-    const char* getDirectionChar(float heading);
 
     /**
      * @brief 设置磁偏角（单位：度）

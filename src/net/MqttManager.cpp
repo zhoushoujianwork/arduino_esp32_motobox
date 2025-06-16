@@ -305,7 +305,7 @@ void MqttManager::loop()
 
 bool MqttManager::publish(const char *topic, const char *payload, bool retain)
 {
-    Serial.printf("[%lu] [MqttManager] 发布主题: %s, 内容: %s, 保留: %d\n", millis(), topic, payload, retain);
+    debugPrint("MqttManager publish topic: " + String(topic) + ", payload: " + String(payload) + ", retain: " + String(retain));
 #ifdef ENABLE_WIFI
     if (!_wifiMqttClient)
     {
