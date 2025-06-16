@@ -32,10 +32,9 @@ public:
 
     LEDManager();
     void begin();
-    void initAnimation();
-    void initComplete();
     void setLEDState(Mode mode, Color color = GREEN, uint8_t brightness = 10);
     void loop();
+    
 
 private:
     Mode _mode;

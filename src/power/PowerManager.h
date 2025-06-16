@@ -8,6 +8,8 @@
 #include "device.h"
 #include "imu/qmi8658.h"
 #include "gps/GPS.h"
+#include "utils/PreferencesUtils.h"
+#include "config.h"
 
 // 低功耗模式状态枚举
 enum PowerState {

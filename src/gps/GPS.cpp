@@ -200,7 +200,6 @@ void GPS::loop()
                     else
                     {
                         device_state.gpsReady = false;
-                        Serial.println("[GPS] 卫星数量不足，GPS未准备好");
                     }
                 }
 

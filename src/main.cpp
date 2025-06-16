@@ -15,7 +15,6 @@
 #include "power/PowerManager.h"
 #include "led/LEDManager.h"
 #include "device.h"
-#include "nvs_flash.h"
 
 #if defined(ENABLE_GSM) || defined(ENABLE_WIFI)
 #include "net/MqttManager.h"
@@ -76,19 +75,18 @@ void taskSystem(void *parameter)
 
   while (true)
   {
-// LED状态更新
+    // LED状态更新
 #ifdef PWM_LED_PIN
-#include "led/PWMLED.h"
     pwmLed.loop();
 #endif
 
-// 电池监控
-#ifdef BAT_PIN
-    bat.loop();
+#ifdef ENABLE_WIFI
+    wifiManager.loop();
 #endif
 
-#ifdef LED_PIN
-    led.setMode(true ? LED::BLINK_5_SECONDS : LED::OFF);
+    // 电池监控
+#ifdef BAT_PIN
+    bat.loop();
 #endif
 
     // 按钮状态更新
@@ -102,8 +100,6 @@ void taskSystem(void *parameter)
 
     // LED状态更新
     ledManager.loop();
-
-  
 
     delay(5);
   }
@@ -157,14 +153,11 @@ void taskDataProcessing(void *parameter)
 
 void setup()
 {
-  esp_err_t err = nvs_flash_init();
-  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
-  {
-    nvs_flash_erase();
-    nvs_flash_init();
-  }
   Serial.begin(115200);
   delay(100);
+ // 在setup()函数开始处添加
+
+  PreferencesUtils::init();
 
   Serial.println("step 1");
   bootCount++;
@@ -203,10 +196,11 @@ void loop()
   {
     lastMsg = millis();
 
+    update_device_state();
+
     // print_device_info();
 
     // printCompassData();
-
 
     // Serial.printf("Compass Heading: %f\n", compass_data.heading);
 

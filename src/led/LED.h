@@ -15,7 +15,6 @@ public:
         BLINK_FAST, // 快闪
         BREATH, // 呼吸
         BLINK_5_SECONDS, // 5秒闪烁
-        INIT_BLINK
     };
 
     LED(uint8_t pin);

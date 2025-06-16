@@ -20,17 +20,9 @@ void LED::setMode(Mode mode)
 {
     if (_mode != mode)
     {
-        // 记录模式变化并输出
-        Mode oldMode = _mode;
         _mode = mode;
         _state = false;
         _blinkCount = 0;
-        
-        // 输出模式变化信息
-        Serial.print("LED模式变化: ");
-        Serial.print(modeToString(oldMode));
-        Serial.print(" -> ");
-        Serial.println(modeToString(mode));
         
         // 根据模式设置初始状态
         switch (mode) {
@@ -76,6 +68,7 @@ void LED::loop()
         break;
 
     case BLINK_DUAL:
+        // 修改双闪模式：两次短闪后长间隔
         if (currentMillis - _lastToggle >= PATTERN_INTERVAL)
         {
             _blinkCount = 0;
@@ -83,9 +76,9 @@ void LED::loop()
             digitalWrite(_pin, LOW); // LED打开 (低电平)
             _lastToggle = currentMillis;
         }
-        else if (currentMillis - _lastToggle < 800)
+        else if (currentMillis - _lastToggle < 600) // 缩短双闪的总时间
         {
-            unsigned long phase = (currentMillis - _lastToggle) / 200;
+            unsigned long phase = (currentMillis - _lastToggle) / 150; // 加快闪烁速度
             if (phase != _blinkCount)
             {
                 _blinkCount = phase;
@@ -98,8 +91,18 @@ void LED::loop()
             _state = false;
             digitalWrite(_pin, HIGH); // LED关闭 (高电平)
         }
-
         break;
+
+    case BLINK_FAST:
+        // 修改快闪模式：连续快速闪烁
+        if (currentMillis - _lastToggle >= 100) // 100ms 的快速闪烁
+        {
+            _state = !_state;
+            digitalWrite(_pin, _state ? LOW : HIGH);
+            _lastToggle = currentMillis;
+        }
+        break;
+
     case BLINK_5_SECONDS:
         if (currentMillis - _lastToggle >= 5000)
         {
@@ -108,28 +111,19 @@ void LED::loop()
             _lastToggle = currentMillis;
         }
         break;
-
-    case INIT_BLINK:
-        if (currentMillis - _lastToggle >= INIT_BLINK_INTERVAL) {
-            if (_blinkCount < _blinkTimes * 2) { // 每个闪烁周期需要两次状态改变
-                _state = !_state;
-                digitalWrite(_pin, _state ? LOW : HIGH);
-                _blinkCount++;
-                _lastToggle = currentMillis;
-            } else {
-                // 闪烁完成，切换到常亮模式
-                setMode(ON);
-            }
-        }
-        break;
     }
 }
 
+// 初始化闪烁,最原始的闪烁方式，配合 delay
 void LED::initBlink(uint8_t times) {
-    _blinkTimes = times;
-    _blinkCount = 0;
-    _lastToggle = millis();
-    setMode(INIT_BLINK);
+    for (int i = 0; i < times; i++) {
+        digitalWrite(_pin, LOW); // LED打开 (低电平)
+        delay(100);
+        digitalWrite(_pin, HIGH); // LED关闭 (高电平)
+        delay(100);
+    }
+    delay(100);
+    Serial.println("初始化闪烁完成");
 }
 
 // 添加一个辅助函数将模式转换为字符串
@@ -139,6 +133,7 @@ const char* LED::modeToString(Mode mode) {
         case ON: return "常亮";
         case BLINK_SINGLE: return "单闪";
         case BLINK_DUAL: return "双闪";
+        case BLINK_FAST: return "快闪";
         case BLINK_5_SECONDS: return "5秒闪烁";
         default: return "未知";
     }

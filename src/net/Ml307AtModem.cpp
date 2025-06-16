@@ -18,7 +18,7 @@ Ml307AtModem::Ml307AtModem(HardwareSerial& serial, int rxPin, int txPin)
 }
 
 bool Ml307AtModem::begin(uint32_t baudrate) {
-    debugPrint("开始初始化ml307模块...");
+    Serial.println("开始初始化ml307模块...");
     
     // 使用固定波特率初始化
     _serial.begin(baudrate, SERIAL_8N1, _rxPin, _txPin);

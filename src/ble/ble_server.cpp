@@ -9,14 +9,14 @@ class ServerCallbacks : public NimBLEServerCallbacks
 {
     void onConnect(NimBLEServer *pServer)
     {
-        Serial.println("客户端已连接");
+        Serial.println("【BLE】客户端已连接");
         // 连接后停止扫描以节省资源
         NimBLEDevice::getScan()->stop();
     };
 
     void onDisconnect(NimBLEServer *pServer)
     {
-        Serial.println("客户端已断开连接 - 重新开始广播");
+        Serial.println("【BLE】客户端已断开连接 - 重新开始广播");
         // 断开连接后恢复扫描
         NimBLEDevice::getScan()->start(0, nullptr, false);
     };
@@ -61,14 +61,17 @@ class DeviceCharacteristicCallbacks : public NimBLECharacteristicCallbacks
         {
             switch (value[0])
             {
+            case 0x00:
+                Serial.println("【BLE】收到 BLE 重置 WiFi 命令");
+                wifiManager.reset();
+                break;
             case 0x01:
-                Serial.println("收到 BLE 重置 WiFi 命令");
+                Serial.println("【BLE】收到 BLE 进入配网模式命令");
+                wifiManager.enterConfigMode();
                 break;
             case 0x02:
-                Serial.println("收到 BLE 进入配网模式命令");
-                break;
-            case 0x03:
-                Serial.println("收到 BLE 退出配网模式命令");
+                Serial.println("【BLE】收到 BLE 退出配网模式命令");
+                wifiManager.exitConfigMode();
                 break;
             // case 0x04:
             //     Serial.println("收到 BLE 进入睡眠模式");
@@ -76,7 +79,7 @@ class DeviceCharacteristicCallbacks : public NimBLECharacteristicCallbacks
             //     powerManager.enterLowPowerMode();
             //     break;
             default:
-                Serial.printf("收到未知 BLE 命令: 0x%02X\n", value[0]);
+                Serial.printf("【BLE】收到未知 BLE 命令: 0x%02X\n", value[0]);
                 break;
             }
         }
@@ -89,7 +92,7 @@ BLES::BLES()
 
 void BLES::begin()
 {
-   Serial.println("初始化BLE服务器...");
+    Serial.println("BLE】初始化BLE服务器...");
 
     pServer = NULL;
     pCharacteristic = NULL;
@@ -155,12 +158,12 @@ void BLES::begin()
     // 服务器完全初始化后再启动扫描
     startScan();
 
-    Serial.println("BLE服务器已启动");
+    Serial.println("【BLE】BLE服务器已启动");
 }
 
 void BLES::startScan()
 {
-    Serial.println("启动BLE扫描...");
+    Serial.println("【BLE】启动BLE扫描...");
     try
     {
         // 获取扫描对象

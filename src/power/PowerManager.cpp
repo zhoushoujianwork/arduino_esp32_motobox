@@ -8,7 +8,6 @@
 #include "driver/periph_ctrl.h"
 #include "soc/periph_defs.h"
 #include "device.h"
-#include "utils/PreferencesUtils.h"
 
 // 初始化静态变量
 #ifdef ENABLE_SLEEP
@@ -37,7 +36,7 @@ void PowerManager::begin()
     Serial.println("[电源管理] 初始化开始");
 
     // 启动时从存储读取休眠时间（秒），如无则用默认值
-    sleepTimeSec = PreferencesUtils::loadULong(PreferencesUtils::NS_POWER, PreferencesUtils::KEY_SLEEP_TIME, get_device_state()->sleep_time);
+    sleepTimeSec = PreferencesUtils::loadSleepTime();
     idleThreshold = sleepTimeSec * 1000;
 
     // 处理唤醒事件
@@ -565,7 +564,7 @@ void PowerManager::setSleepTime(unsigned long seconds) {
     sleepTimeSec = seconds;
     idleThreshold = sleepTimeSec * 1000;
     lastMotionTime = millis(); // 新增：重置空闲计时
-    PreferencesUtils::saveULong(PreferencesUtils::NS_POWER, PreferencesUtils::KEY_SLEEP_TIME, sleepTimeSec);
+    PreferencesUtils::saveSleepTime(sleepTimeSec);
     Serial.printf("[电源管理] 休眠时间已更新并保存: %lu 秒\n", sleepTimeSec);
 }
 

@@ -8,42 +8,29 @@ LEDManager::LEDManager() : _mode(OFF), _color(GREEN), _brightness(10) {}
 void LEDManager::begin() {
 #ifdef PWM_LED_PIN
     pwmLed.begin();
-#endif
-#ifdef LED_PIN
-    led.begin();
-#endif
-}
-
-void LEDManager::initAnimation() {
-#ifdef PWM_LED_PIN
-    // PWM LED 彩虹色初始化
+     // PWM LED 彩虹色初始化
     pwmLed.initRainbow();
-#endif
-
-#ifdef LED_PIN
-    // 普通 LED 闪烁两次
-    led.initBlink(2);
-#endif
-}
-
-void LEDManager::initComplete() {
-#ifdef PWM_LED_PIN
-    // PWM LED 设置为常亮，亮度5%
+     // PWM LED 设置为常亮，亮度5%
     pwmLed.setMode(PWMLED::SOLID);
     pwmLed.setColor(PWMLED::GREEN);
     pwmLed.setBrightness(13); // 5% of 255 ≈ 13
-#endif
 
+#endif
 #ifdef LED_PIN
+    led.begin();
+     // 普通 LED 闪烁两次
+    led.initBlink(2);
     // 普通 LED 设置为常亮
     led.setMode(LED::ON);
 #endif
 }
 
+
 void LEDManager::setLEDState(Mode mode, Color color, uint8_t brightness) {
     _mode = mode;
     _color = color;
     _brightness = brightness;
+    device_state.led_mode = mode;
     updateLED();
 }
 

@@ -27,6 +27,7 @@ typedef struct
     String device_firmware_version; // 固件版本
     String device_hardware_version; // 硬件版本
     int sleep_time; // 休眠时间 单位：秒
+    int led_mode; // LED模式 0:关闭 1:常亮 2:单闪 3:双闪 4:慢闪 5:快闪 6:呼吸 7:5秒闪烁
     int battery_voltage;
     int battery_percentage;
     bool wifiConnected; // WiFi连接状态
@@ -37,7 +38,23 @@ typedef struct
     bool gsmReady; // GSM准备状态
 } device_state_t;
 
+// 添加状态变化跟踪
+typedef struct {
+        bool battery_changed;      // 电池状态变化
+        bool wifi_changed;         // WiFi连接状态变化
+        bool ble_changed;          // BLE连接状态变化
+        bool gps_changed;          // GPS状态变化
+        bool imu_changed;          // IMU状态变化
+        bool compass_changed;      // 罗盘状态变化
+        bool gsm_changed;          // GSM状态变化
+        bool sleep_time_changed;   // 休眠时间变化
+        bool led_mode_changed;     // LED模式变化
+} state_changes_t;
+
+void update_device_state();
+
 extern device_state_t device_state;
+extern state_changes_t state_changes;
 
 String device_state_to_json(device_state_t *state);
 

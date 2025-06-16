@@ -3,6 +3,7 @@
 extern const VersionInfo &getVersionInfo();
 
 device_state_t device_state;
+state_changes_t state_changes;
 
 void print_device_info()
 {
@@ -77,27 +78,72 @@ void mqttMessageCallback(const String &topic, const String &payload)
     }
 
     // 解析JSON
-    const char *command = doc["command"];
-    if (command)
+    // {"cmd": "enter_config"}
+    const char *cmd = doc["cmd"];
+    if (cmd)
     {
-        Serial.printf("收到命令: %s\n", command);
+        Serial.printf("收到命令: %s\n", cmd);
+        if (strcmp(cmd, "enter_config") == 0)
+        {
+            wifiManager.enterConfigMode();
+        }
+        else if (strcmp(cmd, "exit_config") == 0)
+        {
+            wifiManager.exitConfigMode();
+        }
+        else if (strcmp(cmd, "reset_wifi") == 0)
+        {
+            wifiManager.reset();
+        }
+        else if (strcmp(cmd, "set_sleep_time") == 0)
+        {
+            // {"cmd": "set_sleep_time", "sleep_time": 300}
+            int sleepTime = doc["sleep_time"].as<int>();
+            if (sleepTime > 0)
+            {
+                powerManager.setSleepTime(sleepTime);
+            }
+            else
+            {
+                Serial.println("休眠时间不能小于0");
+            }
+        }
     }
 }
 
 void mqttConnectionCallback(bool connected)
 {
-    Serial.printf("MQTT %s\n", connected ? "已连接" : "已断开");
-
     // 连接成功后自动订阅主题
     if (connected)
     {
-        mqttManager.subscribe("test/topic");
+        static bool firstConnect = true; // 添加静态变量标记首次连接
+                                         // 配置主题
+        String baseTopic = String("vehicle/v1/") + device_state.device_id;
+        String telemetryTopic = baseTopic + "/telemetry/"; // telemetry: 遥测数据
+
+        // 构建具体主题
+        String deviceInfoTopic = telemetryTopic + "device";
+        String gpsTopic = telemetryTopic + "location";
+        String imuTopic = telemetryTopic + "motion";
+        String controlTopic = baseTopic + "/control/#"; // control: 控制命令
+
+        if (firstConnect)
+        {
+            firstConnect = false;
+
+            mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 5000);
+
+#ifdef ENABLE_IMU
+            mqttManager.addTopic("imu", imuTopic.c_str(), 1000);
+#endif
+#ifdef ENABLE_GPS
+            mqttManager.addTopic("gps", gpsTopic.c_str(), 1000);
+#endif
+        }
+        // 订阅主题 每次都要
+        mqttManager.subscribe(controlTopic.c_str(), 1);
     }
 }
-
-// WiFi 配置
-const char *WIFI_SSID = "mikas iPhone";
-const char *WIFI_PASSWORD = "11111111";
 
 Device device;
 
@@ -140,88 +186,12 @@ void Device::begin()
 
     // LED初始化
 #if defined(PWM_LED_PIN) || defined(LED_PIN)
-    ledManager.initAnimation();
-    ledManager.initComplete();
+    ledManager.begin();
 #endif
-
-
-    delay(200);
 
 #ifdef GPS_WAKE_PIN
     rtc_gpio_hold_dis((gpio_num_t)GPS_WAKE_PIN);
     Serial.println("[电源管理] GPS_WAKE_PIN 保持已解除");
-#endif
-
-#if defined(ENABLE_WIFI) || defined(ENABLE_GSM)
-    // 创建 MQTT 配置
-    MqttManagerConfig config;
-    // 通用 MQTT 配置
-    config.broker = MQTT_BROKER;
-    config.port = MQTT_PORT;
-    config.clientId = "";
-    config.username = MQTT_USER;
-    config.password = MQTT_PASSWORD;
-    config.keepAlive = MQTT_KEEP_ALIVE;
-    config.cleanSession = true;
-
-#ifdef ENABLE_WIFI// WiFi 模式
-    config.wifiSsid = WIFI_SSID;
-    config.wifiPassword = WIFI_PASSWORD;
-#else
-    // ml307.setDebug(true);
-    ml307.begin(921600);
-#endif
-
-    // mqttManager.setDebug(true);
-    // 初始化 MQTT 管理器
-    if (!mqttManager.begin(config))
-    {
-        Serial.println("MQTT 初始化失败，将在运行时重试");
-        return;
-    }
-    Serial.println("完成底层网络配置，wifi/gsm/mqtt 初始化完成");
-
-    // 设置回调
-    mqttManager.onMessage(mqttMessageCallback);
-    mqttManager.onConnect(mqttConnectionCallback);
-    mqttManager.onNetworkState([](NetworkState state)
-                               {
-        switch (state) {
-            case NetworkState::CONNECTED:
-                Serial.println("网络已连接");
-                led.setMode(LED::BLINK_DUAL);
-                break;
-            case NetworkState::DISCONNECTED:
-                Serial.println("网络已断开");
-                led.setMode(LED::BLINK_SLOW);
-                break;
-            case NetworkState::ERROR:
-                Serial.println("网络连接错误");
-                led.setMode(LED::BLINK_FAST);
-                break;
-        } });
-
-    // 配置主题
-    String baseTopic = String("vehicle/v1/") + device_state.device_id;
-    String telemetryTopic = baseTopic + "/telemetry/"; // telemetry: 遥测数据
-
-    // 构建具体主题
-    String deviceInfoTopic = telemetryTopic + "device";
-    String gpsTopic = telemetryTopic + "location";
-    String imuTopic = telemetryTopic + "motion";
-    String controlTopic = baseTopic + "/control/#"; // control: 控制命令
-
-    mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 5000);
-
-#ifdef ENABLE_IMU
-    mqttManager.addTopic("imu", imuTopic.c_str(), 1000);    
-#endif
-#ifdef ENABLE_GPS
-    mqttManager.addTopic("gps", gpsTopic.c_str(), 1000);
-#endif
-
-    // 订阅主题
-    mqttManager.subscribe(controlTopic.c_str(), 1);
 #endif
 
 #ifdef ENABLE_GPS
@@ -259,4 +229,152 @@ void Device::begin()
         }
     }
 #endif
+
+#if defined(ENABLE_WIFI) || defined(ENABLE_GSM)
+    // 创建 MQTT 配置
+    MqttManagerConfig config;
+    // 通用 MQTT 配置
+    config.broker = MQTT_BROKER;
+    config.port = MQTT_PORT;
+    config.clientId = "";
+    config.username = MQTT_USER;
+    config.password = MQTT_PASSWORD;
+    config.keepAlive = MQTT_KEEP_ALIVE;
+    config.cleanSession = true; // 是否清除会话，true: 清除，false: 保留
+
+#ifdef ENABLE_GSM
+    // ml307.setDebug(true);
+    ml307.begin(921600);
+#endif
+    // mqttManager.setDebug(true);
+    // 初始化 MQTT 管理器
+    if (!mqttManager.begin(config))
+    {
+        Serial.println("MQTT 初始化失败，将在运行时重试");
+        return;
+    }
+    Serial.println("完成底层网络配置，wifi/gsm/mqtt 初始化完成");
+
+    // 设置回调
+    mqttManager.onMessage(mqttMessageCallback);
+    mqttManager.onConnect(mqttConnectionCallback);
+    mqttManager.onNetworkState([](NetworkState state)
+                               {
+        switch (state) {
+            case NetworkState::CONNECTED:
+                device_state.wifiConnected = true;
+                ledManager.setLEDState(LEDManager::BLINK_DUAL); // 双闪
+                break;
+            case NetworkState::DISCONNECTED:
+                Serial.println("网络断开");
+                device_state.wifiConnected = false;
+                ledManager.setLEDState(LEDManager::ON); // 常亮
+                break;
+            case NetworkState::ERROR:
+                Serial.println("网络连接错误");
+                device_state.wifiConnected = false;
+                ledManager.setLEDState(LEDManager::BLINK_FAST); // 快闪
+                break;
+        } });
+
+#endif
+}
+
+// 通知特定状态变化
+void notify_state_change(const char *state_name, const char *old_value, const char *new_value)
+{
+    Serial.printf("[状态变化] %s: %s -> %s\n", state_name, old_value, new_value);
+}
+
+// 更新设备状态并检查变化
+void update_device_state()
+{
+    static device_state_t last_state;
+
+    // 检查电池状态变化
+    if (device_state.battery_percentage != last_state.battery_percentage)
+    {
+        notify_state_change("电池电量",
+                            String(last_state.battery_percentage).c_str(),
+                            String(device_state.battery_percentage).c_str());
+        state_changes.battery_changed = true;
+    }
+
+    // 检查WiFi状态变化
+    if (device_state.wifiConnected != last_state.wifiConnected)
+    {
+        notify_state_change("WiFi连接",
+                            last_state.wifiConnected ? "已连接" : "未连接",
+                            device_state.wifiConnected ? "已连接" : "未连接");
+        state_changes.wifi_changed = true;
+    }
+
+    // 检查BLE状态变化
+    if (device_state.bleConnected != last_state.bleConnected)
+    {
+        notify_state_change("BLE连接",
+                            last_state.bleConnected ? "已连接" : "未连接",
+                            device_state.bleConnected ? "已连接" : "未连接");
+        state_changes.ble_changed = true;
+    }
+
+    // 检查GPS状态变化
+    if (device_state.gpsReady != last_state.gpsReady)
+    {
+        notify_state_change("GPS状态",
+                            last_state.gpsReady ? "就绪" : "未就绪",
+                            device_state.gpsReady ? "就绪" : "未就绪");
+        state_changes.gps_changed = true;
+    }
+
+    // 检查IMU状态变化
+    if (device_state.imuReady != last_state.imuReady)
+    {
+        notify_state_change("IMU状态",
+                            last_state.imuReady ? "就绪" : "未就绪",
+                            device_state.imuReady ? "就绪" : "未就绪");
+        state_changes.imu_changed = true;
+    }
+
+    // 检查罗盘状态变化
+    if (device_state.compassReady != last_state.compassReady)
+    {
+        notify_state_change("罗盘状态",
+                            last_state.compassReady ? "就绪" : "未就绪",
+                            device_state.compassReady ? "就绪" : "未就绪");
+        state_changes.compass_changed = true;
+    }
+
+    // 检查GSM状态变化
+    if (device_state.gsmReady != last_state.gsmReady)
+    {
+        notify_state_change("GSM状态",
+                            last_state.gsmReady ? "就绪" : "未就绪",
+                            device_state.gsmReady ? "就绪" : "未就绪");
+        state_changes.gsm_changed = true;
+    }
+
+    // 检查休眠时间变化
+    if (device_state.sleep_time != last_state.sleep_time)
+    {
+        notify_state_change("休眠时间",
+                            String(last_state.sleep_time).c_str(),
+                            String(device_state.sleep_time).c_str());
+        state_changes.sleep_time_changed = true;
+    }
+
+    // 检查LED模式变化
+    if (device_state.led_mode != last_state.led_mode)
+    {
+        notify_state_change("LED模式",
+                            String(last_state.led_mode).c_str(),
+                            String(device_state.led_mode).c_str());
+        state_changes.led_mode_changed = true;
+    }
+
+    // 更新上一次状态
+    last_state = device_state;
+
+    // 重置状态变化标志
+    state_changes = {0};
 }

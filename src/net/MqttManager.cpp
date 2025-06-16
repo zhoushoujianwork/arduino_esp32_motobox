@@ -9,9 +9,9 @@ MqttMessageCallback MqttManager::_messageCallback = nullptr;
 
 MqttManager::MqttManager()
     : _wifiMqttClient(nullptr), _isInitialized(false), _lastReconnectAttempt(0),
-     _debug(false),
-     _connectCallback(nullptr), _networkState(NetworkState::DISCONNECTED), 
-     _connectionStartTime(0), _connectionTimeout(30000)
+      _debug(false),
+      _connectCallback(nullptr), _networkState(NetworkState::DISCONNECTED),
+      _connectionStartTime(0), _connectionTimeout(30000)
 {
 }
 
@@ -32,6 +32,7 @@ void MqttManager::cleanup()
 
 bool MqttManager::begin(const MqttManagerConfig &config)
 {
+    Serial.println("[MqttManager] begin");
     cleanup();
     _config = config;
     // 根据配置选择网络方式
@@ -42,7 +43,7 @@ bool MqttManager::begin(const MqttManagerConfig &config)
     result = initCellular();
 #endif
 
-    debugPrint("MqttManager begin result: " + String(result));
+    Serial.println("[MqttManager] begin result: " + String(result));
 
     _isInitialized = result;
 
@@ -51,16 +52,7 @@ bool MqttManager::begin(const MqttManagerConfig &config)
 
 bool MqttManager::initWifi()
 {
-    if (!_config.wifiSsid || !_config.wifiPassword)
-    {
-        debugPrint("WiFi credentials not set");
-        return false;
-    }
-
-    // 开始WiFi连接
-    WiFi.begin(_config.wifiSsid, _config.wifiPassword);
-    _networkState = NetworkState::CONNECTING;
-    _connectionStartTime = millis();
+    Serial.println("[MqttManager] initWifi");
 
     // 创建 MQTT 客户端
     _wifiMqttClient = new PubSubClient(_wifiClient);
@@ -68,6 +60,7 @@ bool MqttManager::initWifi()
     _wifiMqttClient->setCallback(wifiMqttCallback);
     _wifiMqttClient->setKeepAlive(_config.keepAlive);
 
+    _connectionStartTime = millis();
     return true;
 }
 
@@ -79,22 +72,28 @@ bool MqttManager::initCellular()
     return true;
 }
 
-bool MqttManager::connectWifi(uint32_t timeout)
+bool MqttManager::connectWifi()
 {
-    WiFi.begin(_config.wifiSsid, _config.wifiPassword);
-
-    unsigned long start = millis();
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        if (millis() - start > timeout)
-        {
-            return false;
-        }
-        delay(500);
+    String ssid, password;
+    if (!PreferencesUtils::getWifi(ssid, password)) {
+        Serial.println("[MqttManager] 未找到已保存的WiFi配置");
+        wifiManager.enterConfigMode();
+        return false;
     }
-
-    debugPrint("WiFi connected: " + WiFi.localIP().toString());
-    return true;
+    Serial.printf("[MqttManager] 读取到WiFi配置: %s\n", ssid.c_str());
+    for (int j = 0; j < 3; j++) {
+        Serial.printf("尝试连接WiFi: %s\n", ssid.c_str());
+        WiFi.begin(ssid.c_str(), password.c_str());
+        for(int k = 0; k < 10; k++) {
+            if (WiFi.status() == WL_CONNECTED) {
+                Serial.printf("WiFi连接成功: %s, IP: %s\n", ssid.c_str(), WiFi.localIP().toString().c_str());
+                return true;
+            }
+            delay(1000);
+        }
+        Serial.printf("WiFi连接失败: %s\n", ssid.c_str());
+    }
+    return false;
 }
 
 void MqttManager::disconnectWifi()
@@ -116,6 +115,21 @@ bool MqttManager::connect()
     if (!_wifiMqttClient)
         return false;
 
+    // 添加错误处理
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        debugPrint("WiFi not connected, attempting to connect...");
+        if (!connectWifi())
+        {
+            debugPrint("WiFi connection failed");
+            if (_networkStateCallback)
+            {
+                _networkStateCallback(NetworkState::ERROR);
+            }
+            return false;
+        }
+    }
+
     success = _wifiMqttClient->connect(
         _config.clientId,
         _config.username,
@@ -125,6 +139,19 @@ bool MqttManager::connect()
         false,   // will retain
         nullptr, // will message
         _config.cleanSession);
+
+    if (!success)
+    {
+        debugPrint("MQTT connection failed");
+        debugPrint("MQTT broker: " + String(_config.broker));
+        debugPrint("MQTT port: " + String(_config.port));
+        debugPrint("MQTT clientId: " + String(_config.clientId));
+        debugPrint("MQTT username: " + String(_config.username));
+        if (_networkStateCallback)
+        {
+            _networkStateCallback(NetworkState::ERROR);
+        }
+    }
 #else
     debugPrint("MqttManager connect 4G");
     debugPrint("MqttManager connect 4G broker: " + String(_config.broker));
@@ -167,6 +194,11 @@ bool MqttManager::reconnect()
 
 void MqttManager::loop()
 {
+    // 如果处于配网模式，直接返回，不做任何网络连接相关操作
+    if (wifiManager.getConfigMode()) {
+        return;
+    }
+
     if (!_isInitialized)
         return;
 
@@ -238,7 +270,15 @@ void MqttManager::loop()
 #ifdef ENABLE_WIFI
             if (_wifiMqttClient && !_wifiMqttClient->connected())
             {
-                reconnect();
+                if (!reconnect())
+                {
+                    debugPrint("MqttManager loop reconnect failed");
+                    // _networkState = NetworkState::ERROR;
+                    if (_networkStateCallback)
+                    {
+                        _networkStateCallback(_networkState);
+                    }
+                }
             }
             if (_wifiMqttClient)
             {
@@ -262,7 +302,16 @@ void MqttManager::loop()
                 _connectionStartTime = now;
 
 #ifdef ENABLE_WIFI
-                WiFi.begin(_config.wifiSsid, _config.wifiPassword);
+                // 这里还要加入一定时间间隔，避免频繁重连，不能直接 delay 阻塞其他
+                if (now - _lastReconnectTime > RECONNECT_INTERVAL)
+                {
+                    _lastReconnectTime = now;
+                }
+                else
+                {
+                    break;
+                }
+                connectWifi();
 #endif
                 // 4G模式下，会自动尝试重连
             }
@@ -375,7 +424,7 @@ String MqttManager::getNetworkInfo() const
 {
     String info;
 #ifdef ENABLE_WIFI
-    info = "WiFi SSID: " + String(_config.wifiSsid);
+    info = "WiFi SSID: " + String(WiFi.SSID());
     info += ", IP: " + WiFi.localIP().toString();
     info += ", RSSI: " + String(WiFi.RSSI());
 #else

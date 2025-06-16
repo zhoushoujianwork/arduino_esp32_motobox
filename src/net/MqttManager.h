@@ -9,12 +9,13 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "Ml307Mqtt.h"
 #include <map>
+#include "Ml307Mqtt.h"
 #include "config.h"
 #include "device.h"
 #include "imu/qmi8658.h"
 #include "gps/GPS.h"
+#include "utils/PreferencesUtils.h"
 
 // MQTT 网络类型
 enum class MqttNetworkType {
@@ -33,9 +34,6 @@ enum class NetworkState {
 
 // MQTT 配置
 struct MqttManagerConfig {
-    // 网络配置
-    const char* wifiSsid;      // WiFi 模式时使用
-    const char* wifiPassword;  // WiFi 模式时使用
     
     // MQTT 配置
     const char* broker;
@@ -47,9 +45,7 @@ struct MqttManagerConfig {
     bool cleanSession;
     
     MqttManagerConfig() 
-        : wifiSsid(nullptr)
-        , wifiPassword(nullptr)
-        , broker(nullptr)
+        : broker(nullptr)
         , port(1883)
         , clientId(nullptr)
         , username(nullptr)
@@ -129,7 +125,7 @@ private:
     bool initCellular();
     void cleanup();
     // WiFi 相关
-    bool connectWifi(uint32_t timeout = 30000);
+    bool connectWifi();
     void disconnectWifi();
     
     // 状态检查
@@ -139,6 +135,7 @@ private:
     // 重连逻辑
     bool reconnect();
     unsigned long _lastReconnectAttempt;
+    unsigned long _lastReconnectTime;
     static const unsigned long RECONNECT_INTERVAL = 5000; // 5秒重连间隔
     
     // 调试输出
