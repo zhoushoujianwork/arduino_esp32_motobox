@@ -38,20 +38,15 @@ $GPTXT,01,01,01,ANTENNA SHORT*63
 const uint32_t BAUD_RATES[] = {9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600};
 const int NUM_BAUD_RATES = 8;
 
-#ifndef GPS_DEFAULT_BAUDRATE
-    #define GPS_DEFAULT_BAUDRATE 9600
-#endif
-
 #ifdef ENABLE_GPS
 GPS gps(GPS_RX_PIN, GPS_TX_PIN);
 #endif
-
 
 gps_data_t gps_data;
 
 GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin),
                                  _debug(true),
-                                 _foundBaudRate(true),
+                                 _foundBaudRate(false),
                                  _lastDebugPrintTime(0)
 {
     _debug = true;
@@ -64,67 +59,56 @@ void GPS::begin()
 {
     Serial.println("[GPS] 开始初始化 txPin:" + String(_txPin) + " rxPin:" + String(_rxPin) + " _foundBaudRate:" + String(_foundBaudRate));
 
-    // 尝试自动检测正确的波特率
-    for (int i = 0; i < NUM_BAUD_RATES && _foundBaudRate; i++)
+    // 尝试自动检测正确的波特率，直到找到为止
+    while (!_foundBaudRate)
     {
-        debugPrint("尝试波特率: " + String(BAUD_RATES[i]));
-        uint32_t testBaudRate = BAUD_RATES[i];
-        Serial.printf("[GPS] 尝试波特率: %d\n", testBaudRate);
-
-        // 设置新的波特率
-        gpsSerial.begin(testBaudRate);
-
-        // 清空接收缓冲区
-        while (gpsSerial.available())
+        for (int i = 0; i < NUM_BAUD_RATES; i++)
         {
-            gpsSerial.read();
-        }
+            debugPrint("尝试波特率: " + String(BAUD_RATES[i]));
+            uint32_t testBaudRate = BAUD_RATES[i];
 
-        // 发送查询命令
-        String cmd = "$PCAS06,0*1B\r\n"; // 查询产品信息命令
-        gpsSerial.print(cmd);
-        gpsSerial.flush();
+            // 设置新的波特率
+            gpsSerial.begin(testBaudRate);
 
-        // 等待响应
-        unsigned long startTime = millis();
-        bool receivedData = false;
-
-        // 等待最多200ms检查是否有数据返回
-        while (millis() - startTime < 200)
-        {
-            if (gpsSerial.available())
+            // 清空接收缓冲区
+            while (gpsSerial.available())
             {
-                receivedData = true;
+                gpsSerial.read();
+            }
+
+            // 发送查询命令
+            String cmd = "$PCAS06,0*1B\r\n"; // 查询产品信息命令
+            gpsSerial.print(cmd);
+            gpsSerial.flush();
+
+            if (isValidGpsResponse())
+            {
+                _foundBaudRate = true;
+                _currentBaudRate = testBaudRate;
+                Serial.printf("[GPS] 找到正确的波特率: %d\n", testBaudRate);
                 break;
             }
-            delay(10);
         }
 
-        if (receivedData)
+        if (!_foundBaudRate)
         {
-            _foundBaudRate = true;
-            _currentBaudRate = testBaudRate;
-            Serial.printf("[GPS] 找到正确的波特率: %d\n", testBaudRate);
-            break;
+            Serial.println("[GPS] 未找到正确的波特率，重试...");
+            delay(1000); // 等待1秒后重试
         }
     }
 
-    if (!_foundBaudRate)
-    {
-        // 如果没找到正确的波特率，使用默认波特率
-        Serial.println("[GPS] 未找到正确的波特率，使用默认波特率: " + String(GPS_DEFAULT_BAUDRATE));
-        gpsSerial.begin(GPS_DEFAULT_BAUDRATE);
-        _currentBaudRate = GPS_DEFAULT_BAUDRATE;
-    }
-
+// 额外设置指定串口速率
 #ifdef GPS_BAUDRATE
-    // 如果定义了GPS_BAUDRATE，尝试设置指定的波特率
-    while (!setBaudRate(GPS_BAUDRATE))
+
+    if (_currentBaudRate != GPS_BAUDRATE)
     {
-        Serial.println("[GPS] 设置波特率失败，重试");
-        delay(100);
+        while (!setBaudRate(GPS_BAUDRATE))
+        {
+            Serial.println("[GPS] 设置波特率失败，重试");
+            delay(100);
+        }
+        Serial.println("[GPS] 设置波特率成功,波特率:" + String(GPS_BAUDRATE));
     }
-    Serial.println("[GPS] 设置波特率成功,波特率:" + String(GPS_BAUDRATE));
 #endif
 
     // 设置频率
@@ -143,77 +127,89 @@ void GPS::begin()
     }
     Serial.println("[GPS] 设置双模成功");
 
-    Serial.println("[GPS] 初始化完成"); 
+    Serial.println("[GPS] 初始化完成");
 }
 
 void GPS::loop()
 {
-    while (gpsSerial.available() > 0)
+    if (_debug)
     {
-        char c = (char)gpsSerial.read();
-        if (gps.encode(c))
+        printRawData();
+    }
+    else
+    {
+        while (gpsSerial.available() > 0)
         {
-            if (gps.location.isUpdated())
+            char c = (char)gpsSerial.read();
+            if (gps.encode(c))
             {
-                // 使用更高效的时间获取方式
-                auto loc = gps.location;
-                gps_data.latitude = loc.lat();
-                gps_data.longitude = loc.lng();
-            }
-
-            if (gps.altitude.isUpdated())
-            {
-                auto alt = gps.altitude;
-                gps_data.altitude = alt.meters();
-            }
-
-            if (gps.course.isUpdated())
-            {
-                auto course = gps.course;
-                gps_data.heading = course.deg();
-            }
-
-            if (gps.time.isUpdated())
-            {
-                auto time = gps.time;
-                gps_data.hour = time.hour();
-                gps_data.minute = time.minute();
-                gps_data.second = time.second();
-                gps_data.centisecond = time.centisecond();
-            }
-
-            if (gps.date.isUpdated())
-            {
-                auto date = gps.date;
-                gps_data.year = date.year();
-                gps_data.month = date.month();
-                gps_data.day = date.day();
-            }
-
-            if (gps.hdop.isUpdated())
-            {
-                // 获取
-                auto hdop = gps.hdop;
-                gps_data.hdop = hdop.value();
-            }
-
-            if (gps.satellites.isUpdated())
-            {
-                auto satellites = gps.satellites;
-                gps_data.satellites = satellites.value();
-                // 超过 3 个表示GPS准备好了
-                if (gps_data.satellites > 3)
+                if (gps.location.isUpdated())
                 {
-                    device_state.gpsReady = true;
-                    loopAutoAdjustHz();
+                    // 使用更高效的时间获取方式
+                    auto loc = gps.location;
+                    gps_data.latitude = loc.lat();
+                    gps_data.longitude = loc.lng();
                 }
-            }
 
-            if (gps.speed.isUpdated())
-            {
-                auto speed = gps.speed;
-                gps_data.speed = speed.kmph();
-                loopDistance();
+                if (gps.altitude.isUpdated())
+                {
+                    auto alt = gps.altitude;
+                    gps_data.altitude = alt.meters();
+                }
+
+                if (gps.course.isUpdated())
+                {
+                    auto course = gps.course;
+                    gps_data.heading = course.deg();
+                }
+
+                if (gps.time.isUpdated())
+                {
+                    auto time = gps.time;
+                    gps_data.hour = time.hour();
+                    gps_data.minute = time.minute();
+                    gps_data.second = time.second();
+                    gps_data.centisecond = time.centisecond();
+                }
+
+                if (gps.date.isUpdated())
+                {
+                    auto date = gps.date;
+                    gps_data.year = date.year();
+                    gps_data.month = date.month();
+                    gps_data.day = date.day();
+                }
+
+                if (gps.hdop.isUpdated())
+                {
+                    // 获取
+                    auto hdop = gps.hdop;
+                    gps_data.hdop = hdop.value();
+                }
+
+                if (gps.satellites.isUpdated())
+                {
+                    auto satellites = gps.satellites;
+                    gps_data.satellites = satellites.value();
+                    // 超过 3 个表示GPS准备好了
+                    if (gps_data.satellites > 3)
+                    {
+                        device_state.gpsReady = true;
+                        loopAutoAdjustHz();
+                    }
+                    else
+                    {
+                        device_state.gpsReady = false;
+                        Serial.println("[GPS] 卫星数量不足，GPS未准备好");
+                    }
+                }
+
+                if (gps.speed.isUpdated())
+                {
+                    auto speed = gps.speed;
+                    gps_data.speed = speed.kmph();
+                    loopDistance();
+                }
             }
         }
     }
@@ -262,12 +258,22 @@ int GPS::changeHz()
 bool GPS::setBaudRate(int baudRate)
 {
     String cmd = buildBaudrateCmd(baudRate);
-    if (sendGpsCommand(cmd, 3, 100))
+    // 先执行一次命令
+    sendGpsCommand(cmd, 3, 100);
+    delay(100);
+    gpsSerial.end();
+    gpsSerial.begin(baudRate);
+
+    // 然后开始判断响应
+    while (!isValidGpsResponse())
     {
-        _currentBaudRate = baudRate;
-        return true;
+        Serial.println("[GPS] 切换波特率失败，重试波特率:" + String(baudRate));
+        delay(100);
+        gpsSerial.end();
+        gpsSerial.begin(baudRate);
     }
-    return false;
+    _currentBaudRate = baudRate;
+    return true;
 }
 
 /**
@@ -410,40 +416,12 @@ bool GPS::sendGpsCommand(const String &cmd, int retries, int retryDelay)
         }
 
         gpsSerial.print(cmd);
-
-        // 等待发送完成
         gpsSerial.flush();
-
-        // 增加延时等待GPS模块处理，避免通信不稳定
         delay(retryDelay * 2);
 
-        // 检查是否收到有效的响应数据
-        unsigned long startTime = millis();
-        String response = "";
-        bool receivedValidData = false;
-
-        // 等待最多500ms检查是否有数据返回
-        while (millis() - startTime < 500)
+        // 直接调用isValidGpsResponse判断
+        if (isValidGpsResponse())
         {
-            if (gpsSerial.available())
-            {
-                char c = gpsSerial.read();
-                response += c;
-                
-                // 检查是否收到完整的NMEA语句（以$开头）
-                if (c == '\n' && response.indexOf('$') != -1)
-                {
-                    receivedValidData = true;
-                    break;
-                }
-            }
-            delay(10);
-        }
-
-        if (receivedValidData)
-        {
-            Serial.print("[GPS] 收到有效响应: ");
-            Serial.println(response);
             success = true;
         }
     }
@@ -459,6 +437,67 @@ bool GPS::sendGpsCommand(const String &cmd, int retries, int retryDelay)
     return success;
 }
 
+/**
+ * 从串口读取并判断GPS数据是否有效
+ * @return bool 数据是否有效
+ */
+bool GPS::isValidGpsResponse()
+{
+    unsigned long startTime = millis();
+    String response = "";
+    bool foundValidSentence = false;
+
+    // 等待最多2000ms检查是否有数据返回
+    while (millis() - startTime < 2000)  // 增加到2000ms
+    {
+        if (gpsSerial.available())
+        {
+            char c = gpsSerial.read();
+            response += c;
+
+            // 检查是否收到完整的NMEA语句
+            if (c == '\n')
+            {
+                // 检查是否是有效的NMEA语句
+                if (response.indexOf('$') != -1 && 
+                    response.indexOf('*') != -1 && 
+                    response.length() >= 10) // 确保语句长度合理
+                {
+                    // 验证校验和
+                    int starPos = response.indexOf('*');
+                    if (starPos != -1 && starPos + 3 <= response.length())
+                    {
+                        String data = response.substring(1, starPos);
+                        String checksum = response.substring(starPos + 1, starPos + 3);
+                        
+                        // 计算校验和
+                        byte calcChecksum = 0;
+                        for (unsigned int i = 0; i < data.length(); i++)
+                        {
+                            calcChecksum ^= data.charAt(i);
+                        }
+                        
+                        // 转换为十六进制字符串
+                        char checksumStr[3];
+                        sprintf(checksumStr, "%02X", calcChecksum);
+                        
+                        // 比较校验和
+                        if (String(checksumStr) == checksum)
+                        {
+                            foundValidSentence = true;
+                            debugPrint("[GPS] 收到有效响应: " + response);
+                            break;
+                        }
+                    }
+                }
+                response = ""; // 清空响应缓冲区
+            }
+        }
+        delay(5); // 减少CPU使用率
+    }
+    return foundValidSentence;
+}
+
 /*
  * 依据卫星数量自动调节频率，20颗星以上10Hz，10-20颗星5Hz，10颗星以下2Hz， 5s 检查执行一次
  * @param satellites 卫星数量
@@ -466,7 +505,7 @@ bool GPS::sendGpsCommand(const String &cmd, int retries, int retryDelay)
  */
 void GPS::loopAutoAdjustHz()
 {
-    if (millis() - lastAutoAdjustHzTime >= 5000)
+    if (millis() - lastAutoAdjustHzTime >= 5000 && device_state.gpsReady)
     {
         autoAdjustHz(gps_data.satellites);
         lastAutoAdjustHzTime = millis();
@@ -474,26 +513,30 @@ void GPS::loopAutoAdjustHz()
 }
 int GPS::autoAdjustHz(uint8_t satellites)
 {
-    // 波特率在 9600 的时候不启用
+    // 根据卫星数量计算目标频率
+    int targetHz = satellites > 20 ? 10 : satellites > 10 ? 5 : 2;
+
+    // 波特率在 9600 只能切换 1,2,5 hz
     if (_currentBaudRate == 9600)
     {
-        return gps_data.gpsHz;
+        // 如果目标频率是10Hz，则降级到5Hz
+        if (targetHz == 10)
+        {
+            targetHz = 5;
+        }
     }
 
-    const int hz = satellites > 20 ? 10 : satellites > 10 ? 5
-                                                          : 2;
-
-    if (hz == gps_data.gpsHz)
+    if (targetHz == gps_data.gpsHz)
     {
         // 符合预期直接返回
-        return hz;
+        return targetHz;
     }
 
-    if (setHz(hz))
+    if (setHz(targetHz))
     {
-        Serial.println("[GPS] 自动调节频率成功: " + String(hz) + "Hz");
-        gps_data.gpsHz = hz;
-        return hz;
+        Serial.println("[GPS] 自动调节频率成功: " + String(targetHz) + "Hz");
+        gps_data.gpsHz = targetHz;
+        return targetHz;
     }
     else
     {

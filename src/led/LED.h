@@ -7,11 +7,14 @@ class LED
 {
 public:
     enum Mode {
-        OFF,
-        ON,
-        BLINK_SINGLE,
-        BLINK_DUAL,
-        BLINK_5_SECONDS,
+        OFF, // 关闭
+        ON, // 常亮
+        BLINK_SINGLE, // 单闪
+        BLINK_DUAL, // 双闪
+        BLINK_SLOW, // 慢闪
+        BLINK_FAST, // 快闪
+        BREATH, // 呼吸
+        BLINK_5_SECONDS, // 5秒闪烁
         INIT_BLINK
     };
 

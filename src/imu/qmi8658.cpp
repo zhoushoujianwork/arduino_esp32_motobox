@@ -20,11 +20,10 @@ void IRAM_ATTR IMU::motionISR()
 
 IMU::IMU(int sda, int scl, int motionIntPin)
     : _wire(Wire1),
+    motionIntPin(motionIntPin),
     _debug(false),
-    _lastDebugPrintTime(0),
-    motionIntPin(motionIntPin)
+    _lastDebugPrintTime(0)
 {
-    _debug = true;
     this->sda = sda;
     this->scl = scl;
     this->motionIntPin = motionIntPin;

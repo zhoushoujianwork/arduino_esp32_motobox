@@ -75,6 +75,8 @@ public:
      */
     void printImuData();
 
+    void setDebug(bool debug) { _debug = debug; }
+
 private:
     int sda;
     int scl;

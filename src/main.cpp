@@ -88,7 +88,7 @@ void taskSystem(void *parameter)
 #endif
 
 #ifdef LED_PIN
-    led.setMode(true ? LED::BLINK_DUAL : LED::BLINK_5_SECONDS);
+    led.setMode(true ? LED::BLINK_5_SECONDS : LED::OFF);
 #endif
 
     // 按钮状态更新
@@ -119,13 +119,14 @@ void taskDataProcessing(void *parameter)
   {
 // IMU数据处理
 #ifdef ENABLE_IMU
+    imu.setDebug(false);
     imu.loop();
 #endif
 
 // GPS
 #ifdef ENABLE_GPS
-    // gps.loop();
-    gps.printRawData();
+    gps.setDebug(false);
+    gps.loop();
 #endif
 
 #ifdef BLE_CLIENT

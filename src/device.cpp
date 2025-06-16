@@ -189,12 +189,15 @@ void Device::begin()
         switch (state) {
             case NetworkState::CONNECTED:
                 Serial.println("网络已连接");
+                led.setMode(LED::BLINK_DUAL);
                 break;
             case NetworkState::DISCONNECTED:
                 Serial.println("网络已断开");
+                led.setMode(LED::BLINK_SLOW);
                 break;
             case NetworkState::ERROR:
                 Serial.println("网络连接错误");
+                led.setMode(LED::BLINK_FAST);
                 break;
         } });
 

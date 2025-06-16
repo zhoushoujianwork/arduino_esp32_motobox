@@ -63,6 +63,8 @@ public:
     
     double getTotalDistanceKm() const { return totalDistanceKm; }
 
+    void setDebug(bool debug) { _debug = debug; }
+
 private:
     SoftwareSerial gpsSerial;
     TinyGPSPlus gps;  // TinyGPS++ 对象
@@ -91,6 +93,8 @@ private:
     static String calculateChecksum(const String& cmd);
     // 发送GPS命令
     bool sendGpsCommand(const String& cmd, int retries, int retryDelay);
+    
+    bool isValidGpsResponse();
 };
 #ifdef ENABLE_GPS
 extern GPS gps;
