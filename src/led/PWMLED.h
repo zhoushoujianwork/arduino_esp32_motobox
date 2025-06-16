@@ -35,10 +35,7 @@ public:
     void setMode(Mode mode);
     void setColor(ModuleColor color);
     void setBrightness(uint8_t brightness);
-
-    // 彩虹初始化效果
     void initRainbow();
-
 private:
     static const uint8_t NUM_LEDS = 1;
     static const uint8_t DEFAULT_BRIGHTNESS = 10;
@@ -47,6 +44,8 @@ private:
     static const unsigned long BREATH_INTERVAL = 20;
     static const unsigned long BLINK_SLOW_INTERVAL = 1000;
     static const unsigned long BLINK_FAST_INTERVAL = 200;
+
+    static const uint8_t RAINBOW_COLORS[7][3];
 
     uint8_t _pin;
     Mode _mode;
@@ -66,5 +65,7 @@ private:
     void showLED();
     void updateRainbow();
 };
+
+extern PWMLED pwmLed;
 
 #endif 

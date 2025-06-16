@@ -174,7 +174,14 @@ void PowerManager::disablePeripherals()
     Serial.flush();
     delay(50);
 
-    // 3. 蓝牙关闭
+    // 1. WiFi关闭
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    Serial.println("[电源管理] WiFi已安全关闭");
+    Serial.flush();
+    delay(50);
+
+    // 2. 蓝牙关闭
     btStop();
     Serial.println("[电源管理] 蓝牙已安全关闭");
     Serial.flush();
@@ -242,7 +249,12 @@ void PowerManager::disablePeripherals()
     delay(50);
 
 #if defined(MODE_ALLINONE) || defined(MODE_SERVER)
-    // IMU已在configureWakeupSources中配置，这里不需要重复配置
+    // 先关闭I2C总线
+    Wire.end();
+    Wire1.end();
+    Serial.println("[电源管理] I2C总线已关闭");
+    Serial.flush();
+    delay(50);
 
     // 关闭其他I2C设备的引脚
 #ifdef GPS_COMPASS_SDA
@@ -278,16 +290,6 @@ void PowerManager::disablePeripherals()
     Serial.println("[电源管理] ADC和按钮已配置完成");
     Serial.flush();
     delay(50);
-
-    // ===== 第六阶段：GPS唤醒引脚配置 =====
-#ifdef GPS_WAKE_PIN
-    pinMode(GPS_WAKE_PIN, OUTPUT);
-    digitalWrite(GPS_WAKE_PIN, LOW);
-    rtc_gpio_hold_en((gpio_num_t)GPS_WAKE_PIN);
-    Serial.println("[电源管理] GPS_WAKE_PIN已配置为休眠状态");
-    Serial.flush();
-    delay(50);
-#endif
 
     // ===== 最后阶段：关闭时钟和降低CPU频率 =====
     Serial.println("[电源管理] 开始最后阶段：关闭时钟和降低CPU频率...");

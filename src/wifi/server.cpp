@@ -402,9 +402,46 @@ void WiFiConfigManager::safeDisableWiFi()
 void WiFiConfigManager::loop()
 {
     if (isConfigMode) {
-        // 处理DNS请求
-        dnsServer.processNextRequest();
-        // 处理Web服务器请求
-        server.handleClient();
+        static unsigned long lastProcessTime = 0;
+        unsigned long currentTime = millis();
+        
+        // 每10ms最多处理一次请求
+        if (currentTime - lastProcessTime >= 10) {
+            lastProcessTime = currentTime;
+            
+            // 处理DNS请求，设置超时
+            dnsServer.processNextRequest();
+            
+            // 处理Web服务器请求，设置超时
+            server.handleClient();
+        }
     }
 }
+
+void WiFiConfigManager::setConfigMode(bool mode)
+{
+    isConfigMode = mode;
+    if (mode) {
+        // 启动AP模式
+        startAP();
+    } else {
+        // 关闭AP模式
+        stopAP();
+    }
+}
+
+void WiFiConfigManager::startAP()
+{
+    setupAP();
+    setupDNS();
+    setupWebServer();
+}
+
+void WiFiConfigManager::stopAP()
+{
+    server.stop();
+    dnsServer.stop();
+}
+
+
+

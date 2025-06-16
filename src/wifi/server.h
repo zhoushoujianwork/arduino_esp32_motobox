@@ -32,7 +32,8 @@ private:
     void saveWiFiCredentials(const String &ssid, const String &password);
     void handleClient();
     bool isIp(String str);
-
+    void startAP();
+    void stopAP();
 public:
     WiFiConfigManager();
     
@@ -40,11 +41,13 @@ public:
     void enterConfigMode();  // 进入配网模式
     void exitConfigMode();   // 退出配网模式
     void reset();           // 重置所有WiFi配置
-    
+    void setConfigMode(bool mode);
+
     // 状态查询
     bool getConfigMode() const { return isConfigMode; }
     bool isAPModeActive() const;
     bool hasAPClient() const;
+
     
     // 安全关闭
     void safeDisableWiFi();

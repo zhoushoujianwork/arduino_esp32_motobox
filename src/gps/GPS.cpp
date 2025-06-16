@@ -35,7 +35,7 @@ $GPTXT,01,01,01,ANTENNA SHORT*63
 */
 
 // 定义常用的GPS波特率数组
-const uint32_t BAUD_RATES[] = {9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600};
+const uint32_t BAUD_RATES[] = {9600,19200, 38400, 57600, 115200, 230400, 460800, 921600};
 const int NUM_BAUD_RATES = 8;
 
 #ifdef ENABLE_GPS
@@ -49,7 +49,7 @@ GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin),
                                  _foundBaudRate(false),
                                  _lastDebugPrintTime(0)
 {
-    _debug = true;
+    _debug = false;
     _rxPin = rxPin;
     _txPin = txPin;
     gps_data.gpsHz = 2;
@@ -102,12 +102,17 @@ void GPS::begin()
 
     if (_currentBaudRate != GPS_BAUDRATE)
     {
-        while (!setBaudRate(GPS_BAUDRATE))
+        if (setBaudRate(GPS_BAUDRATE))
         {
-            Serial.println("[GPS] 设置波特率失败，重试");
-            delay(100);
+            Serial.println("[GPS] 设置波特率成功,波特率:" + String(GPS_BAUDRATE));
         }
-        Serial.println("[GPS] 设置波特率成功,波特率:" + String(GPS_BAUDRATE));
+
+        // 还是失败，可能是设备不兼容语句无法切换
+        if (_currentBaudRate != GPS_BAUDRATE)
+        {
+            Serial.println("[GPS] 设置波特率失败，设备不兼容语句无法切换，使用默认波特率:" + String(_currentBaudRate));
+            setBaudRate(_currentBaudRate);
+        }
     }
 #endif
 
@@ -257,22 +262,37 @@ int GPS::changeHz()
 bool GPS::setBaudRate(int baudRate)
 {
     String cmd = buildBaudrateCmd(baudRate);
+    if (cmd.isEmpty()) {
+        Serial.println("[GPS] 不支持的波特率: " + String(baudRate));
+        return false;
+    }
+
     // 先执行一次命令
     sendGpsCommand(cmd, 3, 100);
-    delay(100);
+    
+    // 等待GPS模块稳定
+    delay(500);
+    
+    // 重新初始化串口
     gpsSerial.end();
+    delay(100);
     gpsSerial.begin(baudRate);
+    delay(100);
 
-    // 然后开始判断响应
-    while (!isValidGpsResponse())
-    {
-        Serial.println("[GPS] 切换波特率失败，重试波特率:" + String(baudRate));
-        delay(100);
-        gpsSerial.end();
-        gpsSerial.begin(baudRate);
+    // 清空接收缓冲区
+    while (gpsSerial.available()) {
+        gpsSerial.read();
     }
-    _currentBaudRate = baudRate;
-    return true;
+
+    // 发送测试命令并验证响应
+    if (sendGpsCommand("$PCAS06,0*1B\r\n", 3, 100)) {
+        _currentBaudRate = baudRate;
+        Serial.println("[GPS] 切换波特率成功: " + String(baudRate));
+        return true;
+    }
+
+    Serial.println("[GPS] 切换波特率失败: " + String(baudRate));
+    return false;
 }
 
 /**
@@ -445,21 +465,23 @@ bool GPS::isValidGpsResponse()
     unsigned long startTime = millis();
     String response = "";
     bool foundValidSentence = false;
+    int totalBytes = 0; // 记录接收到的总字节数
 
     // 等待最多2000ms检查是否有数据返回
-    while (millis() - startTime < 2000)  // 增加到2000ms
+    while (millis() - startTime < 2000) // 增加到2000ms
     {
         if (gpsSerial.available())
         {
             char c = gpsSerial.read();
             response += c;
+            totalBytes++;
 
             // 检查是否收到完整的NMEA语句
             if (c == '\n')
             {
                 // 检查是否是有效的NMEA语句
-                if (response.indexOf('$') != -1 && 
-                    response.indexOf('*') != -1 && 
+                if (response.indexOf('$') != -1 &&
+                    response.indexOf('*') != -1 &&
                     response.length() >= 10) // 确保语句长度合理
                 {
                     // 验证校验和
@@ -468,32 +490,51 @@ bool GPS::isValidGpsResponse()
                     {
                         String data = response.substring(1, starPos);
                         String checksum = response.substring(starPos + 1, starPos + 3);
-                        
+
                         // 计算校验和
                         byte calcChecksum = 0;
                         for (unsigned int i = 0; i < data.length(); i++)
                         {
                             calcChecksum ^= data.charAt(i);
                         }
-                        
+
                         // 转换为十六进制字符串
                         char checksumStr[3];
                         sprintf(checksumStr, "%02X", calcChecksum);
-                        
+
                         // 比较校验和
                         if (String(checksumStr) == checksum)
                         {
                             foundValidSentence = true;
                             debugPrint("[GPS] 收到有效响应: " + response);
+                            debugPrint("[GPS] 当前波特率: " + String(_currentBaudRate) +
+                                       ", 接收字节数: " + String(totalBytes) +
+                                       ", 语句长度: " + String(response.length()));
                             break;
                         }
+                        else
+                        {
+                            debugPrint("[GPS] 校验和错误 - 计算值: " + String(checksumStr) +
+                                       ", 接收值: " + checksum);
+                        }
                     }
+                }
+                else
+                {
+                    debugPrint("[GPS] 无效NMEA语句: " + response);
                 }
                 response = ""; // 清空响应缓冲区
             }
         }
         delay(5); // 减少CPU使用率
     }
+
+    if (!foundValidSentence)
+    {
+        debugPrint("[GPS] 未找到有效响应 - 波特率: " + String(_currentBaudRate) +
+                   ", 总接收字节数: " + String(totalBytes));
+    }
+
     return foundValidSentence;
 }
 
@@ -513,7 +554,8 @@ void GPS::loopAutoAdjustHz()
 int GPS::autoAdjustHz(uint8_t satellites)
 {
     // 根据卫星数量计算目标频率
-    int targetHz = satellites > 20 ? 10 : satellites > 10 ? 5 : 2;
+    int targetHz = satellites > 20 ? 10 : satellites > 10 ? 5
+                                                          : 2;
 
     // 波特率在 9600 只能切换 1,2,5 hz
     if (_currentBaudRate == 9600)

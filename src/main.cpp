@@ -64,6 +64,9 @@ RTC_DATA_ATTR int bootCount = 0;
 // 任务句柄
 TaskHandle_t gpsTaskHandle = NULL;
 
+// 添加WiFi任务句柄
+TaskHandle_t wifiTaskHandle = NULL;
+
 /**
  * 系统监控任务
  * 负责电源管理、LED状态、按钮处理
@@ -111,15 +114,22 @@ void taskSystem(void *parameter)
  */
 void taskDataProcessing(void *parameter)
 {
+  Serial.println("[系统] 数据处理任务启动");
   while (true)
   {
-// IMU数据处理
+    static unsigned long lastDebugTime = 0;
+    if (millis() - lastDebugTime > 5000) {  // 每5秒打印一次调试信息
+      lastDebugTime = millis();
+      Serial.println("[系统] 数据处理任务运行中...");
+    }
+
+    // IMU数据处理
 #ifdef ENABLE_IMU
     imu.setDebug(false);
     imu.loop();
 #endif
 
-// GPS
+    // GPS
 #ifdef ENABLE_GPS
     gps.setDebug(false);
     gps.loop();
@@ -151,6 +161,21 @@ void taskDataProcessing(void *parameter)
   }
 }
 
+#ifdef ENABLE_WIFI
+// WiFi处理任务
+void taskWiFi(void *parameter)
+{
+    Serial.println("[系统] WiFi任务启动");
+    while (true)
+    {
+        if (wifiManager.getConfigMode()) {
+            wifiManager.loop();
+        }
+        delay(1);  // 更短的延迟，提高响应性
+    }
+}
+#endif
+
 void setup()
 {
   Serial.begin(115200);
@@ -175,8 +200,12 @@ void setup()
   Serial.println("step 4");
   device.begin();
 
-  xTaskCreate(taskSystem, "TaskSystem", 1024 * 10, NULL, 2, NULL);
-  xTaskCreate(taskDataProcessing, "TaskData", 1024 * 10, NULL, 1, NULL);
+  // 创建任务
+  xTaskCreate(taskSystem, "TaskSystem", 1024 * 15, NULL, 1, NULL);
+  xTaskCreate(taskDataProcessing, "TaskData", 1024 * 15, NULL, 2, NULL);
+  #ifdef ENABLE_WIFI
+  xTaskCreate(taskWiFi, "TaskWiFi", 1024 * 15, NULL, 3, NULL);  // 最高优先级处理WiFi
+  #endif
 
   Serial.println("[系统] 初始化完成");
   Serial.println();

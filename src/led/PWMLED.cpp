@@ -39,6 +39,12 @@ PWMLED::PWMLED(uint8_t pin) :
 void PWMLED::begin() {
     FastLED.addLeds<WS2812B, PWM_LED_PIN, GRB>(_leds, NUM_LEDS);
     Serial.printf("[PWMLED] 初始化完成，引脚: %d\n", _pin);
+
+}
+
+void PWMLED::initRainbow() {
+    _rainbowIndex = 0;
+    _lastUpdate = millis();
 }
 
 void PWMLED::loop() {

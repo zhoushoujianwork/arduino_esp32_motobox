@@ -188,8 +188,11 @@ bool IMU::configureForDeepSleep()
 bool IMU::restoreFromDeepSleep()
 {
     // 唤醒后适当延时，确保I2C/IMU电源和时钟ready
-    delay(200); // 200~500ms，根据实际硬件情况可调整
-    // 从WakeOnMotion模式恢复到正常模式需要重新初始化
+    delay(500); // 增加到500ms，确保电源稳定
+
+    // 重新初始化I2C总线
+    _wire.begin(sda, scl);
+    delay(50); // 等待I2C总线稳定
 
     // 重置设备
     if (!qmi.reset())
@@ -197,18 +200,22 @@ bool IMU::restoreFromDeepSleep()
         Serial.println("[IMU] 重置失败");
         return false;
     }
+    delay(50); // 等待重置完成
 
     // 重新配置正常的加速度计
     qmi.configAccelerometer(SensorQMI8658::ACC_RANGE_4G, SensorQMI8658::ACC_ODR_500Hz);
     qmi.enableAccelerometer();
+    delay(50); // 等待配置生效
 
     // 重新启用陀螺仪
     setGyroEnabled(true);
+    delay(50); // 等待陀螺仪稳定
 
     // 恢复正常的运动检测配置（如果之前启用了的话）
     if (motionDetectionEnabled)
     {
         configureMotionDetection(motionThreshold);
+        delay(50); // 等待运动检测配置生效
     }
 
     Serial.println("[IMU] 已从WakeOnMotion模式恢复到正常模式");
