@@ -24,6 +24,11 @@ bool Ml307Mqtt::connect(const char* broker, uint16_t port,
     _username = username ? username : "";
     _password = password ? password : "";
 
+    debugPrint("MQTT连接开始");
+
+    _modem.sendAT("AT+MQTTDISC=0");
+    delay(1000); // 等待断开完成
+
     // 1. 检查是否已连接，已连接则结束
     if (isConnected()) {
         return true;
@@ -48,6 +53,11 @@ bool Ml307Mqtt::connect(const char* broker, uint16_t port,
     }
 
     // 3. 配置clean session
+    String resp = _modem.sendATWithResponse("AT+MQTTSTATE=0");
+    if (resp.indexOf("+MQTTSTATE: 3") < 0) {
+        _modem.sendAT("AT+MQTTDISC=0");
+        delay(1000);
+    }
     if (!_modem.sendATWithRetry("AT+MQTTCFG=\"clean\",0,1")) {
         debugPrint("设置clean session失败");
         return false;
@@ -92,6 +102,8 @@ bool Ml307Mqtt::connect(const char* broker, uint16_t port,
     }
 
     _connected = true;
+    debugPrint("MQTT连接成功");
+    
     return true;
 }
 
@@ -240,7 +252,7 @@ void Ml307Mqtt::handleMessage(const String& topic, const String& payload) {
 
 void Ml307Mqtt::debugPrint(const String& msg) {
     if (_debug) {
-        Serial.println("[ml307] [debug] " + msg);
+        Serial.println("[ml307mqtt] [debug] " + msg);
     }
 }
 

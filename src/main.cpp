@@ -117,11 +117,11 @@ void taskDataProcessing(void *parameter)
   Serial.println("[系统] 数据处理任务启动");
   while (true)
   {
-    static unsigned long lastDebugTime = 0;
-    if (millis() - lastDebugTime > 5000) {  // 每5秒打印一次调试信息
-      lastDebugTime = millis();
-      Serial.println("[系统] 数据处理任务运行中...");
-    }
+    // static unsigned long lastDebugTime = 0;
+    // if (millis() - lastDebugTime > 5000) {  // 每5秒打印一次调试信息
+    //   lastDebugTime = millis();
+    //   Serial.println("[系统] 数据处理任务运行中...");
+    // }
 
     // IMU数据处理
 #ifdef ENABLE_IMU

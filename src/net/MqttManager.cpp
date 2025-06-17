@@ -47,6 +47,11 @@ bool MqttManager::begin(const MqttManagerConfig &config)
 
     _isInitialized = result;
 
+    if (result)
+    {
+        connect();
+    }
+
     return result;
 }
 
@@ -69,23 +74,30 @@ bool MqttManager::initCellular()
     debugPrint("MqttManager initCellular");
     _networkState = NetworkState::CONNECTING;
     _connectionStartTime = millis();
+
     return true;
 }
 
 bool MqttManager::connectWifi()
 {
     String ssid, password;
-    if (!PreferencesUtils::getWifi(ssid, password)) {
+    if (!PreferencesUtils::getWifi(ssid, password))
+    {
         Serial.println("[MqttManager] 未找到已保存的WiFi配置");
+#ifdef ENABLE_WIFI
         wifiManager.enterConfigMode();
+#endif
         return false;
     }
     Serial.printf("[MqttManager] 读取到WiFi配置: %s\n", ssid.c_str());
-    for (int j = 0; j < 3; j++) {
+    for (int j = 0; j < 3; j++)
+    {
         Serial.printf("尝试连接WiFi: %s\n", ssid.c_str());
         WiFi.begin(ssid.c_str(), password.c_str());
-        for(int k = 0; k < 10; k++) {
-            if (WiFi.status() == WL_CONNECTED) {
+        for (int k = 0; k < 10; k++)
+        {
+            if (WiFi.status() == WL_CONNECTED)
+            {
                 Serial.printf("WiFi连接成功: %s, IP: %s\n", ssid.c_str(), WiFi.localIP().toString().c_str());
                 return true;
             }
@@ -167,11 +179,12 @@ bool MqttManager::connect()
         _config.password);
 #endif
 
-    debugPrint("MqttManager connect result: " + String(success));
-
+    debugPrint("MqttManager connect callback success");
     if (_connectCallback)
-    {
+    { // 添加空指针检查
         _connectCallback(success);
+    }else{
+        debugPrint("_connectCallback is null");
     }
     return success;
 }
@@ -195,12 +208,18 @@ bool MqttManager::reconnect()
 void MqttManager::loop()
 {
     // 如果处于配网模式，直接返回，不做任何网络连接相关操作
-    if (wifiManager.getConfigMode()) {
+#ifdef ENABLE_WIFI
+    if (wifiManager.getConfigMode())
+    {
         return;
     }
+#endif
 
     if (!_isInitialized)
+    {
+        debugPrint("MqttManager loop not initialized");
         return;
+    }
 
     // 网络连接处理是 2s 一次
 
@@ -235,19 +254,24 @@ void MqttManager::loop()
             }
 #else
             // 4G 连接状态检查
-            // if (ml307.isNetworkReady()) {
-            //     _networkState = NetworkState::CONNECTED;
-            //     debugPrint("Cellular connected, CSQ: " + String(ml307.getCSQ()));
-            //     if (_networkStateCallback) {
-            //         _networkStateCallback(_networkState);
-            //     }
-            // } else if (millis() - _connectionStartTime > _connectionTimeout) {
-            //     _networkState = NetworkState::ERROR;
-            //     debugPrint("Cellular connection timeout");
-            //     if (_networkStateCallback) {
-            //         _networkStateCallback(_networkState);
-            //     }
-            // }
+            if (ml307.isNetworkReady())
+            {
+                _networkState = NetworkState::CONNECTED;
+                debugPrint("Cellular connected, CSQ: " + String(ml307.getCSQ()));
+                if (_networkStateCallback)
+                {
+                    _networkStateCallback(_networkState);
+                }
+            }
+            else if (millis() - _connectionStartTime > _connectionTimeout)
+            {
+                _networkState = NetworkState::ERROR;
+                debugPrint("Cellular connection timeout");
+                if (_networkStateCallback)
+                {
+                    _networkStateCallback(_networkState);
+                }
+            }
 #endif
             break;
         }

@@ -70,7 +70,7 @@ void Compass::loop() {
 
     if (millis() - _lastDebugPrintTime > 1000) {
         _lastDebugPrintTime = millis();
-        printCompassData();
+        // printCompassData();
     }
 }
 

@@ -307,6 +307,6 @@ bool Ml307AtModem::expectResponse(const String& expected, uint32_t timeout) {
 
 void Ml307AtModem::debugPrint(const String& msg) {
     if (_debug) {
-        Serial.println("[ml307] [debug] " + msg);
+        Serial.println("[ml307atmodem] [debug] " + msg);
     }
 } 

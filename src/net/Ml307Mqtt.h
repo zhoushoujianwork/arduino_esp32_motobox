@@ -21,7 +21,6 @@ public:
                 const char* clientId, 
                 const char* username = nullptr, 
                 const char* password = nullptr);
-    void disconnect();
     bool publish(const char* topic, const char* payload, bool retain = false);
     bool subscribe(const char* topic, uint8_t qos = 0);
     bool unsubscribe(const char* topic);

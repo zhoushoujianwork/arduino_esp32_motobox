@@ -85,15 +85,21 @@ void mqttMessageCallback(const String &topic, const String &payload)
         Serial.printf("收到命令: %s\n", cmd);
         if (strcmp(cmd, "enter_config") == 0)
         {
+#ifdef ENABLE_WIFI
             wifiManager.enterConfigMode();
+#endif
         }
         else if (strcmp(cmd, "exit_config") == 0)
         {
+#ifdef ENABLE_WIFI
             wifiManager.exitConfigMode();
+#endif
         }
         else if (strcmp(cmd, "reset_wifi") == 0)
         {
+#ifdef ENABLE_WIFI
             wifiManager.reset();
+#endif
         }
         else if (strcmp(cmd, "set_sleep_time") == 0)
         {
@@ -113,33 +119,30 @@ void mqttMessageCallback(const String &topic, const String &payload)
 
 void mqttConnectionCallback(bool connected)
 {
-    // 连接成功后自动订阅主题
-    if (connected)
+    Serial.println("MQTT连接成功，订阅主题");
+    static bool firstConnect = true; // 添加静态变量标记首次连接
+                                     // 配置主题
+    String baseTopic = String("vehicle/v1/") + device_state.device_id;
+    String telemetryTopic = baseTopic + "/telemetry/"; // telemetry: 遥测数据
+
+    // 构建具体主题
+    String deviceInfoTopic = telemetryTopic + "device";
+    String gpsTopic = telemetryTopic + "location";
+    String imuTopic = telemetryTopic + "motion";
+    String controlTopic = baseTopic + "/control/#"; // control: 控制命令
+
+    if (firstConnect)
     {
-        static bool firstConnect = true; // 添加静态变量标记首次连接
-                                         // 配置主题
-        String baseTopic = String("vehicle/v1/") + device_state.device_id;
-        String telemetryTopic = baseTopic + "/telemetry/"; // telemetry: 遥测数据
+        firstConnect = false;
 
-        // 构建具体主题
-        String deviceInfoTopic = telemetryTopic + "device";
-        String gpsTopic = telemetryTopic + "location";
-        String imuTopic = telemetryTopic + "motion";
-        String controlTopic = baseTopic + "/control/#"; // control: 控制命令
-
-        if (firstConnect)
-        {
-            firstConnect = false;
-
-            mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 5000);
+        mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 5000);
 
 #ifdef ENABLE_IMU
-            mqttManager.addTopic("imu", imuTopic.c_str(), 1000);
+        mqttManager.addTopic("imu", imuTopic.c_str(), 1000);
 #endif
 #ifdef ENABLE_GPS
-            mqttManager.addTopic("gps", gpsTopic.c_str(), 1000);
+        mqttManager.addTopic("gps", gpsTopic.c_str(), 1000);
 #endif
-        }
         // 订阅主题 每次都要
         mqttManager.subscribe(controlTopic.c_str(), 1);
     }
@@ -243,19 +246,11 @@ void Device::begin()
     config.cleanSession = true; // 是否清除会话，true: 清除，false: 保留
 
 #ifdef ENABLE_GSM
-    // ml307.setDebug(true);
+    ml307.setDebug(true);
+    ml307Mqtt.setDebug(true);
     ml307.begin(921600);
 #endif
-    // mqttManager.setDebug(true);
-    // 初始化 MQTT 管理器
-    if (!mqttManager.begin(config))
-    {
-        Serial.println("MQTT 初始化失败，将在运行时重试");
-        return;
-    }
-    Serial.println("完成底层网络配置，wifi/gsm/mqtt 初始化完成");
-
-    // 设置回调
+    // 设置回调在开始之前
     mqttManager.onMessage(mqttMessageCallback);
     mqttManager.onConnect(mqttConnectionCallback);
     mqttManager.onNetworkState([](NetworkState state)
@@ -276,6 +271,15 @@ void Device::begin()
                 ledManager.setLEDState(LEDManager::BLINK_FAST); // 快闪
                 break;
         } });
+
+    mqttManager.setDebug(true);
+    // 初始化 MQTT 管理器
+    if (!mqttManager.begin(config))
+    {
+        Serial.println("MQTT 初始化失败，将在运行时重试");
+        return;
+    }
+    Serial.println("完成底层网络配置，wifi/gsm/mqtt 初始化完成");
 
 #endif
 }

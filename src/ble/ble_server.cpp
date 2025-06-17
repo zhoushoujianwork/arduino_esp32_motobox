@@ -63,15 +63,21 @@ class DeviceCharacteristicCallbacks : public NimBLECharacteristicCallbacks
             {
             case 0x00:
                 Serial.println("【BLE】收到 BLE 重置 WiFi 命令");
+#ifdef ENABLE_WIFI
                 wifiManager.reset();
+#endif      
                 break;
             case 0x01:
                 Serial.println("【BLE】收到 BLE 进入配网模式命令");
+#ifdef ENABLE_WIFI
                 wifiManager.enterConfigMode();
+#endif
                 break;
             case 0x02:
                 Serial.println("【BLE】收到 BLE 退出配网模式命令");
+#ifdef ENABLE_WIFI
                 wifiManager.exitConfigMode();
+#endif
                 break;
             // case 0x04:
             //     Serial.println("收到 BLE 进入睡眠模式");
