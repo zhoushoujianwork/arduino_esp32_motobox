@@ -227,6 +227,8 @@ void loop()
 
     update_device_state();
 
+    bat.print_voltage();
+
     // print_device_info();
 
     // printCompassData();

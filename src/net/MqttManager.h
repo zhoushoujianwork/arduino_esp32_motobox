@@ -106,6 +106,9 @@ public:
     // 调试功能
     void setDebug(bool enable) { _debug = enable; }
 
+    // Add new method after other public methods
+    void onWiFiEvent(WiFiEvent_t event);
+
 private:
     MqttManagerConfig _config;
     WiFiClient _wifiClient;
@@ -151,6 +154,8 @@ private:
     
     // 主题配置映射
     std::map<String, TopicConfig> _topicConfigs;
+
+    void setNetworkState(NetworkState newState);
 };
 
 // 全局实例

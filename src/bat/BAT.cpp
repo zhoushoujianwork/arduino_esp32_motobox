@@ -17,8 +17,7 @@ BAT::BAT(int pin)
       observed_min(5000),
       last_calibration(0),
       stable_count(0),
-      _debug(false),
-      _lastDebugPrintTime(0)
+      _debug(false)
 {
     loadCalibration();  // 加载已保存的校准数据
 }
@@ -27,11 +26,10 @@ void BAT::debugPrint(const String& message) {
     if (!_debug) return;
     
     unsigned long currentTime = millis();
-    if (currentTime - _lastDebugPrintTime >= DEBUG_PRINT_INTERVAL) {
-        Serial.print("[BAT] ");
-        Serial.println(message);
-        _lastDebugPrintTime = currentTime;
-    }
+    Serial.print("[BAT] [debug] [");
+    Serial.print(currentTime);
+    Serial.print("ms] ");
+    Serial.println(message);
 }
 
 void BAT::begin()
@@ -183,8 +181,8 @@ void BAT::loop()
     // 更新校准
     updateCalibration();
 
-    // 使用校准后的参数计算百分比
-    int percentage = map(stable_voltage, min_voltage, max_voltage, 0, 100);
+    // 使用新的百分比计算方法
+    int percentage = calculatePercentage(stable_voltage);
     percentage = constrain(percentage, 0, 100);
 
     // 只有当百分比变化超过1%才更新
@@ -207,5 +205,25 @@ void BAT::print_voltage()
 {
     String debug_msg = "电压报告 -> " + String(stable_voltage) + "mV";
     debug_msg += " (" + String(device_state.battery_percentage) + "%)";
-    debugPrint(debug_msg);
+    Serial.println(debug_msg);
+}
+
+const int BAT::VOLTAGE_LEVELS[] = {4200, 4000, 3800, 3600, 3400, 3200, 3000, 2800};
+const int BAT::PERCENT_LEVELS[] = {100,   90,   80,   60,   45,   30,   15,    0};
+const int BAT::LEVEL_COUNT = 8;  // 数组大小固定为8
+
+int BAT::calculatePercentage(int voltage) {
+    if (voltage >= VOLTAGE_LEVELS[0]) return 100;
+    if (voltage <= VOLTAGE_LEVELS[LEVEL_COUNT-1]) return 0;
+    
+    // 查找电压所在区间
+    for (int i = 0; i < LEVEL_COUNT-1; i++) {
+        if (voltage <= VOLTAGE_LEVELS[i] && voltage > VOLTAGE_LEVELS[i+1]) {
+            // 线性插值计算百分比
+            return map(voltage, 
+                      VOLTAGE_LEVELS[i+1], VOLTAGE_LEVELS[i],
+                      PERCENT_LEVELS[i+1], PERCENT_LEVELS[i]);
+        }
+    }
+    return 0;
 }

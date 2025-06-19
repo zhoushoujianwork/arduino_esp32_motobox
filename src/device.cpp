@@ -192,6 +192,10 @@ void Device::begin()
                       getVersionInfo().firmware_version, getVersionInfo().build_time);
     }
 
+#ifdef BAT_PIN
+    bat.begin();
+#endif
+
     // LED初始化
 #if defined(PWM_LED_PIN) || defined(LED_PIN)
     ledManager.begin();
@@ -262,17 +266,33 @@ void Device::begin()
                                {
         switch (state) {
             case NetworkState::CONNECTED:
+#ifdef ENABLE_WIFI
                 device_state.wifiConnected = true;
+                Serial.println("WiFi连接成功");
+#else
+                device_state.gsmReady = true;
+                Serial.println("4G连接成功");
+#endif
                 ledManager.setLEDState(LEDManager::BLINK_DUAL); // 双闪
                 break;
             case NetworkState::DISCONNECTED:
-                Serial.println("网络断开");
+#ifdef ENABLE_WIFI
                 device_state.wifiConnected = false;
+                Serial.println("WiFi连接断开");
+#else
+                device_state.gsmReady = false;
+                Serial.println("4G连接断开");
+#endif
                 ledManager.setLEDState(LEDManager::OFF); // 关闭
                 break;
             case NetworkState::ERROR:
-                Serial.println("网络连接错误");
+#ifdef ENABLE_WIFI
                 device_state.wifiConnected = false;
+                Serial.println("WiFi连接错误");
+#else
+                device_state.gsmReady = false;
+                Serial.println("4G连接错误");
+#endif
                 ledManager.setLEDState(LEDManager::BLINK_5_SECONDS); // 快闪
                 break;
         } });
@@ -309,7 +329,8 @@ void update_device_state()
         state_changes.battery_changed = true;
     }
 
-    // 检查WiFi状态变化
+    // 检查网络状态变化 - 根据模式区分
+#ifdef ENABLE_WIFI
     if (device_state.wifiConnected != last_state.wifiConnected)
     {
         notify_state_change("WiFi连接",
@@ -317,6 +338,15 @@ void update_device_state()
                             device_state.wifiConnected ? "已连接" : "未连接");
         state_changes.wifi_changed = true;
     }
+#else
+    if (device_state.gsmReady != last_state.gsmReady)
+    {
+        notify_state_change("4G连接",
+                            last_state.gsmReady ? "已连接" : "未连接",
+                            device_state.gsmReady ? "已连接" : "未连接");
+        state_changes.gsm_changed = true;
+    }
+#endif
 
     // 检查BLE状态变化
     if (device_state.bleConnected != last_state.bleConnected)
@@ -352,15 +382,6 @@ void update_device_state()
                             last_state.compassReady ? "就绪" : "未就绪",
                             device_state.compassReady ? "就绪" : "未就绪");
         state_changes.compass_changed = true;
-    }
-
-    // 检查GSM状态变化
-    if (device_state.gsmReady != last_state.gsmReady)
-    {
-        notify_state_change("GSM状态",
-                            last_state.gsmReady ? "就绪" : "未就绪",
-                            device_state.gsmReady ? "就绪" : "未就绪");
-        state_changes.gsm_changed = true;
     }
 
     // 检查休眠时间变化
