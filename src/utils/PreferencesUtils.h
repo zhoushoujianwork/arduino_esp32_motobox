@@ -24,6 +24,35 @@ public:
     static unsigned long loadSleepTime();
     static void saveSleepTime(unsigned long seconds);
 
+    // 电池校准参数
+    static constexpr const char* NS_BATTERY = "battery";
+    static constexpr const char* KEY_BAT_MIN = "min_voltage";
+    static constexpr const char* KEY_BAT_MAX = "max_voltage";
+    
+    // 保存电池电压范围
+    static void saveBatteryRange(int minVoltage, int maxVoltage) {
+        _prefs.begin(NS_BATTERY, false);
+        _prefs.putInt(KEY_BAT_MIN, minVoltage);
+        _prefs.putInt(KEY_BAT_MAX, maxVoltage);
+        _prefs.end();
+    }
+    
+    // 读取电池电压范围
+    static void loadBatteryRange(int& minVoltage, int& maxVoltage) {
+        _prefs.begin(NS_BATTERY, true);
+        minVoltage = _prefs.getInt(KEY_BAT_MIN, 2800);  // 默认值
+        maxVoltage = _prefs.getInt(KEY_BAT_MAX, 4200);  // 默认值
+        _prefs.end();
+    }
+    
+    // 清除电池校准数据
+    static void clearBatteryRange() {
+        _prefs.begin(NS_BATTERY, false);
+        _prefs.remove(KEY_BAT_MIN);
+        _prefs.remove(KEY_BAT_MAX);
+        _prefs.end();
+    }
+
     static bool init();
     static bool isInitialized() { return _initialized; }
 private:

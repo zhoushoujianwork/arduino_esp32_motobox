@@ -32,6 +32,7 @@ void MqttManager::cleanup()
 
 bool MqttManager::begin(const MqttManagerConfig &config)
 {
+    // setDebug(true);
     Serial.println("[MqttManager] begin");
     cleanup();
     _config = config;
@@ -99,11 +100,21 @@ bool MqttManager::connectWifi()
             if (WiFi.status() == WL_CONNECTED)
             {
                 Serial.printf("WiFi连接成功: %s, IP: %s\n", ssid.c_str(), WiFi.localIP().toString().c_str());
+                _networkState = NetworkState::CONNECTED;
+                if (_networkStateCallback)
+                {
+                    _networkStateCallback(_networkState);
+                }
                 return true;
             }
             delay(1000);
         }
         Serial.printf("WiFi连接失败: %s\n", ssid.c_str());
+        _networkState = NetworkState::ERROR;
+        if (_networkStateCallback)
+        {
+            _networkStateCallback(_networkState);
+        }
     }
     return false;
 }
@@ -180,11 +191,13 @@ bool MqttManager::connect()
 #endif
 
     debugPrint("MqttManager connect callback success");
-    if (_connectCallback)
-    { // 添加空指针检查
-        _connectCallback(success);
-    }else{
-        debugPrint("_connectCallback is null");
+    if (success)
+    {
+        _networkState = NetworkState::CONNECTED;
+        if (_networkStateCallback)
+        {
+            _networkStateCallback(_networkState);
+        }
     }
     return success;
 }
@@ -278,22 +291,27 @@ void MqttManager::loop()
 
         case NetworkState::CONNECTED:
         {
-// 检查网络是否断开
-// bool isConnected = (_config.networkType == MqttNetworkType::WIFI)
-//     ? (WiFi.status() == WL_CONNECTED)
-//     : (Ml307Mqtt.isConnected());
-// if (!isConnected) {
-//     _networkState = NetworkState::DISCONNECTED;
-//     debugPrint("Network disconnected");
-//     if (_networkStateCallback) {
-//         _networkStateCallback(_networkState);
-//     }
-// }
+            // 检查网络是否断开
+            // bool isConnected = (WiFi.status() == WL_CONNECTED);
+            // if (!isConnected)
+            // {
+            //     _networkState = NetworkState::DISCONNECTED;
+            //     debugPrint("Network disconnected");
+            //     if (_networkStateCallback)
+            //     {
+            //         _networkStateCallback(_networkState);
+            //     }
+            // }
 
 // MQTT 相关处理
 #ifdef ENABLE_WIFI
             if (_wifiMqttClient && !_wifiMqttClient->connected())
             {
+                _networkState = NetworkState::CONNECTING;
+                if (_networkStateCallback)
+                {
+                    _networkStateCallback(_networkState);
+                }
                 if (!reconnect())
                 {
                     debugPrint("MqttManager loop reconnect failed");
@@ -354,6 +372,11 @@ void MqttManager::loop()
         }
     }
 
+// 如果网络未连接，直接跳过
+    if (_networkState != NetworkState::CONNECTED)
+    {
+        return;
+    }
     // 处理预注册的主题
     for (auto &topic : _topicConfigs)
     {
@@ -514,6 +537,11 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
     if (!_wifiMqttClient->connected())
     {
         debugPrint("MqttManager 客户端未连接");
+        _networkState = NetworkState::DISCONNECTED;
+        if (_networkStateCallback)
+        {
+            _networkStateCallback(_networkState);
+        }
         return false;
     }
 #else

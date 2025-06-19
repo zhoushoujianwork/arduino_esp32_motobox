@@ -208,6 +208,7 @@ void Ml307Mqtt::loop() {
     String response = _modem.sendATWithResponse("AT+MQTTREAD?");
     if (response.indexOf("+MQTTREAD:") >= 0) {
         parseMessageData(response);
+        Serial.println("MQTT读取到消息 " + response);
     }
 }
 
