@@ -155,6 +155,9 @@ private:
     // 主题配置映射
     std::map<String, TopicConfig> _topicConfigs;
 
+    // 添加连接状态跟踪
+    bool _lastConnectionState;
+
     void setNetworkState(NetworkState newState);
 };
 

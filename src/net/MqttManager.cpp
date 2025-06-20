@@ -11,7 +11,8 @@ MqttManager::MqttManager()
     : _wifiMqttClient(nullptr), _isInitialized(false), _lastReconnectAttempt(0),
       _debug(false),
       _connectCallback(nullptr), _networkState(NetworkState::DISCONNECTED),
-      _connectionStartTime(0), _connectionTimeout(30000)
+      _connectionStartTime(0), _connectionTimeout(30000),
+      _lastConnectionState(false)
 {
 }
 
@@ -228,11 +229,19 @@ void MqttManager::loop()
 
 #ifdef ENABLE_WIFI
         // WiFi逻辑
+        bool currentConnected = (WiFi.status() == WL_CONNECTED) && 
+                               (_wifiMqttClient && _wifiMqttClient->connected());
+        
+        // 只在连接状态发生变化时才触发回调
+        if (currentConnected != _lastConnectionState) {
+            _lastConnectionState = currentConnected;
+            if (_connectCallback) {
+                _connectCallback(currentConnected);
+            }
+        }
+        
         if (WiFi.status() != WL_CONNECTED) {
             setNetworkState(NetworkState::DISCONNECTED);
-            if (_connectCallback) {
-                _connectCallback(false);
-            }
         } else {
             // WiFi已连接，检查MQTT状态
             if (_wifiMqttClient && !_wifiMqttClient->connected()) {
@@ -244,7 +253,17 @@ void MqttManager::loop()
         }
         if (_wifiMqttClient) _wifiMqttClient->loop();
 #else
-        // 4G逻辑
+        // 4G逻辑 - 同样添加状态跟踪
+        bool currentConnected = (_networkState == NetworkState::CONNECTED);
+        
+        // 只在连接状态发生变化时才触发回调
+        if (currentConnected != _lastConnectionState) {
+            _lastConnectionState = currentConnected;
+            if (_connectCallback) {
+                _connectCallback(currentConnected);
+            }
+        }
+        
         switch (_networkState)
         {
         case NetworkState::CONNECTING:
@@ -275,9 +294,6 @@ void MqttManager::loop()
 
         case NetworkState::DISCONNECTED:
         {
-            if (_connectCallback) {
-                _connectCallback(false);
-            }
             // 尝试重新连接
             unsigned long now = millis();
             if (now - _lastReconnectAttempt > RECONNECT_INTERVAL)
