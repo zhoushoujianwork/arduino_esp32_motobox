@@ -87,7 +87,7 @@ bool MqttManager::connectWifi()
     {
         Serial.println("[MqttManager] 未找到已保存的WiFi配置");
 #ifdef ENABLE_WIFI
-        wifiManager.enterConfigMode();
+        wifiManager.enterAPMode();
 #endif
         return false;
     }
@@ -223,8 +223,8 @@ void MqttManager::loop()
 #endif
     if (!_isInitialized) return;
 
-    // 更快的检查间隔 - 改为200ms提高响应速度
-    if (millis() - _lastNetworkCheckTime > 200) {
+    // 增加检查间隔，减少重复查询 - 从200ms改为2秒
+    if (millis() - _lastNetworkCheckTime > 2000) {
         _lastNetworkCheckTime = millis();
 
 #ifdef ENABLE_WIFI
@@ -232,7 +232,6 @@ void MqttManager::loop()
         bool currentConnected = (WiFi.status() == WL_CONNECTED) && 
                                (_wifiMqttClient && _wifiMqttClient->connected());
         
-        // 只在连接状态发生变化时才触发回调
         if (currentConnected != _lastConnectionState) {
             _lastConnectionState = currentConnected;
             if (_connectCallback) {
@@ -243,7 +242,6 @@ void MqttManager::loop()
         if (WiFi.status() != WL_CONNECTED) {
             setNetworkState(NetworkState::DISCONNECTED);
         } else {
-            // WiFi已连接，检查MQTT状态
             if (_wifiMqttClient && !_wifiMqttClient->connected()) {
                 setNetworkState(NetworkState::CONNECTING);
                 reconnect();
@@ -253,10 +251,9 @@ void MqttManager::loop()
         }
         if (_wifiMqttClient) _wifiMqttClient->loop();
 #else
-        // 4G逻辑 - 同样添加状态跟踪
-        bool currentConnected = (_networkState == NetworkState::CONNECTED);
+        // 4G逻辑优化 - 减少重复查询
+        bool currentConnected = (_networkState == NetworkState::CONNECTED) && isMqttConnected();
         
-        // 只在连接状态发生变化时才触发回调
         if (currentConnected != _lastConnectionState) {
             _lastConnectionState = currentConnected;
             if (_connectCallback) {
@@ -264,43 +261,73 @@ void MqttManager::loop()
             }
         }
         
+        debugPrint("MqttManager loop networkState: " + String((int)_networkState));
         switch (_networkState)
         {
         case NetworkState::CONNECTING:
         {
-            if (ml307.isNetworkReady())
-            {
-                setNetworkState(NetworkState::CONNECTED);
-                debugPrint("Cellular connected, CSQ: " + String(ml307.getCSQ()));
-            }
-            else if (millis() - _connectionStartTime > _connectionTimeout)
-            {
+            // 只在连接超时时检查网络状态，避免频繁查询
+            if (millis() - _connectionStartTime > _connectionTimeout) {
                 setNetworkState(NetworkState::ERROR);
                 debugPrint("Cellular connection timeout");
+            } else {
+                // 减少网络状态检查频率
+                static unsigned long lastNetworkCheck = 0;
+                if (millis() - lastNetworkCheck > 5000) { // 5秒检查一次
+                    lastNetworkCheck = millis();
+                    
+                    if (ml307.isNetworkReady()) {
+                        if (ml307Mqtt.connected()) {
+                            setNetworkState(NetworkState::CONNECTED);
+                            debugPrint("Cellular connected, CSQ: " + String(ml307.getCSQ()));
+                            
+                            if (_connectCallback) {
+                                _connectCallback(true);
+                            }
+                        } else {
+                            debugPrint("网络已就绪，尝试MQTT连接...");
+                            if (connect()) {
+                                setNetworkState(NetworkState::CONNECTED);
+                                debugPrint("MQTT连接成功");
+                            }
+                        }
+                    }
+                }
             }
             break;
         }
 
         case NetworkState::CONNECTED:
         {
-            if (!ml307.isNetworkReady())
-            {
+            // 检查网络和MQTT连接状态
+            if (!ml307.isNetworkReady()) {
                 setNetworkState(NetworkState::DISCONNECTED);
-                debugPrint("Cellular disconnected");
+                debugPrint("Cellular network disconnected");
+            } else if (!ml307Mqtt.connected()) {
+                setNetworkState(NetworkState::DISCONNECTED);
+                debugPrint("Cellular MQTT disconnected");
+            } else {
+                // 连接正常，处理MQTT消息
+                ml307Mqtt.loop();
             }
-            ml307Mqtt.loop();
             break;
         }
 
         case NetworkState::DISCONNECTED:
         {
-            // 尝试重新连接
-            unsigned long now = millis();
-            if (now - _lastReconnectAttempt > RECONNECT_INTERVAL)
-            {
-                _lastReconnectAttempt = now;
+            // 检查网络是否恢复
+            if (ml307.isNetworkReady()) {
+                debugPrint("网络已恢复，开始重新连接...");
                 setNetworkState(NetworkState::CONNECTING);
-                _connectionStartTime = now;
+                _connectionStartTime = millis();
+            } else {
+                // 尝试重新连接
+                unsigned long now = millis();
+                if (now - _lastReconnectAttempt > RECONNECT_INTERVAL) {
+                    _lastReconnectAttempt = now;
+                    debugPrint("尝试重新连接网络...");
+                    // 这里可以添加网络重连逻辑
+                }
             }
             break;
         }
@@ -308,9 +335,9 @@ void MqttManager::loop()
         case NetworkState::ERROR:
         {
             // 错误状态下等待一段时间后重试
-            if (millis() - _lastReconnectAttempt > RECONNECT_INTERVAL * 2)
-            {
+            if (millis() - _lastReconnectAttempt > RECONNECT_INTERVAL * 2) {
                 setNetworkState(NetworkState::DISCONNECTED);
+                debugPrint("从错误状态恢复，重新开始连接");
             }
             break;
         }
@@ -318,24 +345,25 @@ void MqttManager::loop()
 #endif
     }
 
-    if (_networkState != NetworkState::CONNECTED) return;
-
-    // 处理预注册的主题
-    for (auto &topic : _topicConfigs)
-    {
-        if (topic.second.lastPublishTime + topic.second.interval < millis())
+    // 只有在连接状态下才处理数据发布
+    if (_networkState == NetworkState::CONNECTED) {
+        // 处理预注册的主题
+        for (auto &topic : _topicConfigs)
         {
-            if (topic.first == "device_info")
+            if (topic.second.lastPublishTime + topic.second.interval < millis())
             {
-                publishToTopic(topic.first, device_state_to_json(get_device_state()).c_str(), false);
-            }
-            else if (topic.first == "imu")
-            {
-                publishToTopic(topic.first, imu_data_to_json(imu_data).c_str(), false);
-            }
-            else if (topic.first == "gps")
-            {
-                publishToTopic(topic.first, gps_data_to_json(gps_data).c_str(), false);
+                if (topic.first == "device_info")
+                {
+                    publishToTopic(topic.first, device_state_to_json(get_device_state()).c_str(), false);
+                }
+                // else if (topic.first == "imu")
+                // {
+                //     publishToTopic(topic.first, imu_data_to_json(imu_data).c_str(), false);
+                // }
+                else if (topic.first == "gps")
+                {
+                    publishToTopic(topic.first, gps_data_to_json(gps_data).c_str(), false);
+                }
             }
         }
     }
@@ -469,24 +497,28 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
         return false;
     }
 
-    // 检查MQTT连接状态 - 使用setNetworkState而不是直接赋值
+    // 检查网络和MQTT连接状态
 #ifdef ENABLE_WIFI
-    if (!_wifiMqttClient)
+    if (!_wifiMqttClient || !_wifiMqttClient->connected())
     {
-        debugPrint("MqttManager 客户端未初始化");
-        return false;
-    }
-    if (!_wifiMqttClient->connected())
-    {
-        debugPrint("MqttManager 客户端未连接");
-        setNetworkState(NetworkState::DISCONNECTED); // 使用setNetworkState
+        debugPrint("MqttManager WiFi MQTT未连接");
+        setNetworkState(NetworkState::DISCONNECTED);
         return false;
     }
 #else
-    if (!ml307Mqtt.connected())
+    // 4G模式下需要更严格的连接检查
+    if (!ml307.isNetworkReady() || !ml307Mqtt.connected())
     {
-        debugPrint("MqttManager 4G MQTT未连接");
-        setNetworkState(NetworkState::DISCONNECTED); // 使用setNetworkState
+        debugPrint("MqttManager 4G网络或MQTT未连接");
+        setNetworkState(NetworkState::DISCONNECTED);
+        return false;
+    }
+    
+    // 添加MQTT连接状态验证
+    if (!ml307Mqtt.isConnected())
+    {
+        debugPrint("MqttManager 4G MQTT连接验证失败");
+        setNetworkState(NetworkState::DISCONNECTED);
         return false;
     }
 #endif
@@ -505,16 +537,29 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
     }
     else
     {
-        Serial.printf("[MqttManager] 发布失败 - 主题: %s, 网络类型: %s\n",
-                      it->second.topic.c_str(),
+        // 发布失败时，检查是否是MQTT连接问题
+        debugPrint("MqttManager 发布失败，检查连接状态");
 #ifdef ENABLE_WIFI
-                      "WiFi"
+        if (!_wifiMqttClient->connected())
+        {
+            setNetworkState(NetworkState::DISCONNECTED);
+        }
 #else
-                      "4G"
+        // 4G模式下，发布失败通常意味着MQTT连接断开
+        setNetworkState(NetworkState::DISCONNECTED);
 #endif
-        );
     }
     return result;
+}
+
+// 添加MQTT连接状态检查方法
+bool MqttManager::isMqttConnected() const
+{
+#ifdef ENABLE_WIFI
+    return _wifiMqttClient && _wifiMqttClient->connected();
+#else
+    return ml307Mqtt.connected() && ml307Mqtt.isConnected();
+#endif
 }
 
 // 添加新的方法：从WiFi事件处理器直接调用

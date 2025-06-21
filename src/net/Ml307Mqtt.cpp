@@ -109,16 +109,27 @@ bool Ml307Mqtt::connect(const char* broker, uint16_t port,
 
 /**
  * 检查MQTT连接状态
- * 只要不是3（断开）就算连接
+ * 状态1表示已连接，状态2表示连接中（也算连接）
  */
 bool Ml307Mqtt::isConnected() {
     // 查询连接状态
     String resp = _modem.sendATWithResponse("AT+MQTTSTATE=0");
-    // 只要不是3（断开）就算连接
-    if (resp.indexOf("+MQTTSTATE: 0") >= 0 && resp.indexOf(",3") < 0) {
-        return true;
+    int state = -1;
+    int idx = resp.indexOf("+MQTTSTATE: ");
+    if (idx >= 0) {
+        // 提取状态值，格式可能是 +MQTTSTATE: 1 或 +MQTTSTATE: 0,1
+        String stateStr = resp.substring(idx + 12);
+        // 查找第一个数字
+        for (int i = 0; i < stateStr.length(); i++) {
+            if (stateStr[i] >= '0' && stateStr[i] <= '9') {
+                state = stateStr[i] - '0';
+                break;
+            }
+        }
     }
-    return false;
+    
+    // 状态1(已连接)或状态2(连接中)都算连接
+    return (state == 1 || state == 2);
 }
 
 /**
@@ -142,23 +153,14 @@ void Ml307Mqtt::disconnectAndWait() {
  * 发布消息，带mqtt_id，HEX编码
  */
 bool Ml307Mqtt::publish(const char* topic, const char* payload, bool retain) {
-    // String resp = _modem.sendATWithResponse("AT+MQTTSTATE=0");
-    // int state = -1;
-    // int idx = resp.indexOf("+MQTTSTATE: ");
-    // if (idx >= 0) {
-    //     state = resp.substring(idx + 12, idx + 13).toInt();
-    // }
-    // debugPrint("publish前MQTTSTATE: " + String(state));
-    // if (state == 3) {
-    //     debugPrint("MQTT未处于已连接状态，不能发布");
-    //     return false;
-    // }
     int qos = 0; // 可根据需要调整
     int dup = 0;
     int messageId = 0;
     String hexPayload = encodeHex(payload);
     String cmd = "AT+MQTTPUB=0,\"" + String(topic) + "\"," + String(qos) + "," + String(retain ? 1 : 0) + "," + String(dup) + "," + String(strlen(payload)) + "," + hexPayload;
-    return _modem.sendAT(cmd);
+    
+    // 增加超时时间到30秒，避免发布超时
+    return _modem.sendAT(cmd, "OK", 30000);
 }
 
 /**

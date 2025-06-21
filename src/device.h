@@ -30,6 +30,7 @@ typedef struct
     int led_mode; // LED模式 0:关闭 1:常亮 2:单闪 3:双闪 4:慢闪 5:快闪 6:呼吸 7:5秒闪烁
     int battery_voltage;
     int battery_percentage;
+    bool is_charging;          // 新增：充电状态
     bool wifiConnected; // WiFi连接状态
     bool bleConnected; // BLE连接状态
     bool gpsReady; // GPS准备状态

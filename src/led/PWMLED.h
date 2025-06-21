@@ -2,29 +2,10 @@
 #define PWM_LED_H
 
 #include <FastLED.h>
+#include "LEDTypes.h"  // 包含LED类型定义
 
 class PWMLED {
 public:
-    enum Mode {
-        OFF,
-        SOLID,
-        DUAL_BLINK,
-        BLINK_SLOW,
-        BLINK_FAST,
-        BREATH,
-        RAINBOW
-    };
-
-    enum ModuleColor {
-        NONE,
-        WHITE,
-        BLUE,
-        YELLOW,
-        PURPLE,
-        GREEN,
-        RED
-    };
-
     struct RGB {
         uint8_t r, g, b;
     };
@@ -32,8 +13,8 @@ public:
     PWMLED(uint8_t pin);
     void begin();
     void loop();
-    void setMode(Mode mode);
-    void setColor(ModuleColor color);
+    void setMode(LEDMode mode);
+    void setColor(LEDColor color);
     void setBrightness(uint8_t brightness);
     void initRainbow();
 private:
@@ -48,8 +29,8 @@ private:
     static const uint8_t RAINBOW_COLORS[7][3];
 
     uint8_t _pin;
-    Mode _mode;
-    ModuleColor _currentColor;
+    LEDMode _mode;
+    LEDColor _currentColor;
     uint8_t _brightness;
     unsigned long _lastUpdate;
     bool _blinkState;

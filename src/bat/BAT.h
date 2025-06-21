@@ -13,13 +13,16 @@
 class BAT
 {
 public:
-    BAT(int pin);
+    BAT(int adc_pin, int charging_pin);
     void begin();
     void loop();
     void print_voltage();
     
     // 添加调试控制
     void setDebug(bool debug) { _debug = debug; }
+
+    // 新增：获取充电状态
+    bool isCharging();
 
 private:
     // 改为普通的静态常量数组声明
@@ -28,6 +31,9 @@ private:
     static const int LEVEL_COUNT;
     
     const int pin;
+    const int charging_pin; // 新增：充电状态引脚
+    bool _is_charging;      // 新增：充电状态缓存
+
     int min_voltage;
     int max_voltage;
     int voltage;        // 简单平均滤波后的电压

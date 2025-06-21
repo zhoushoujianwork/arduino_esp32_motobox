@@ -83,16 +83,16 @@ void mqttMessageCallback(const String &topic, const String &payload)
     if (cmd)
     {
         Serial.printf("收到命令: %s\n", cmd);
-        if (strcmp(cmd, "enter_config") == 0)
+        if (strcmp(cmd, "enter_ap_mode") == 0)
         {
 #ifdef ENABLE_WIFI
-            wifiManager.enterConfigMode();
+            wifiManager.enterAPMode();
 #endif
         }
-        else if (strcmp(cmd, "exit_config") == 0)
+        else if (strcmp(cmd, "exit_ap_mode") == 0)
         {
 #ifdef ENABLE_WIFI
-            wifiManager.exitConfigMode();
+            wifiManager.exitAPMode();
 #endif
         }
         else if (strcmp(cmd, "reset_wifi") == 0)
@@ -273,7 +273,7 @@ void Device::begin()
                 device_state.gsmReady = true;
                 Serial.println("4G连接成功");
 #endif
-                ledManager.setLEDState(LEDManager::BLINK_DUAL); // 双闪
+                ledManager.setLEDState(LED_BLINK_DUAL); // 双闪
                 break;
             case NetworkState::DISCONNECTED:
 #ifdef ENABLE_WIFI
@@ -283,7 +283,7 @@ void Device::begin()
                 device_state.gsmReady = false;
                 Serial.println("4G连接断开");
 #endif
-                ledManager.setLEDState(LEDManager::OFF); // 关闭
+                ledManager.setLEDState(LED_OFF); // 关闭
                 break;
             case NetworkState::ERROR:
 #ifdef ENABLE_WIFI
@@ -293,7 +293,7 @@ void Device::begin()
                 device_state.gsmReady = false;
                 Serial.println("4G连接错误");
 #endif
-                ledManager.setLEDState(LEDManager::BLINK_5_SECONDS); // 快闪
+                ledManager.setLEDState(LED_BLINK_5_SECONDS); // 快闪
                 break;
         } });
 

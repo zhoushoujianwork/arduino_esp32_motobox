@@ -54,7 +54,7 @@ WiFiConfigManager::WiFiConfigManager()
     Serial.println("WiFi modem sleep已启用");
 }
 
-void WiFiConfigManager::enterConfigMode()
+void WiFiConfigManager::enterAPMode()
 {
     Serial.println("进入配网模式");
     if (isConfigMode) {
@@ -184,7 +184,7 @@ void WiFiConfigManager::setupWebServer()
 
     // 退出配网模式
     server.on("/exit_config", HTTP_POST, [this]() {
-        this->exitConfigMode();
+        this->exitAPMode();
         server.send(200, "application/json", "{\"ok\":1}");
     });
 
@@ -356,7 +356,7 @@ String WiFiConfigManager::getSuccessPage()
     return html;
 }
 
-void WiFiConfigManager::exitConfigMode()
+void WiFiConfigManager::exitAPMode()
 {
     if (!isConfigMode) {
         Serial.println("当前不在配网模式，无需退出");

@@ -38,8 +38,8 @@ public:
     WiFiConfigManager();
     
     // 核心功能
-    void enterConfigMode();  // 进入配网模式
-    void exitConfigMode();   // 退出配网模式
+    void enterAPMode();  // 进入配网模式
+    void exitAPMode();   // 退出配网模式
     void reset();           // 重置所有WiFi配置
     void setConfigMode(bool mode);
 

@@ -109,6 +109,9 @@ public:
     // Add new method after other public methods
     void onWiFiEvent(WiFiEvent_t event);
 
+    // 添加MQTT连接状态检查方法
+    bool isMqttConnected() const;
+
 private:
     MqttManagerConfig _config;
     WiFiClient _wifiClient;

@@ -1,10 +1,12 @@
 #include "BAT.h"
+#include "config.h"
 
-BAT bat(BAT_PIN);
+BAT bat(BAT_PIN, CHARGING_STATUS_PIN);
 
-// 3300, 4200
-BAT::BAT(int pin)
-    : pin(pin),
+BAT::BAT(int adc_pin, int charging_pin)
+    : pin(adc_pin),
+      charging_pin(charging_pin),
+      _is_charging(false),
       min_voltage(2800),
       max_voltage(4200),
       buffer_index(0),
@@ -37,6 +39,8 @@ void BAT::begin()
     setDebug(true);
 
     pinMode(pin, INPUT);
+    pinMode(charging_pin, INPUT_PULLUP); // 初始化充电检测引脚
+
     // 初始化缓冲区
     memset(voltage_buffer, 0, sizeof(voltage_buffer));
     
@@ -112,6 +116,10 @@ void BAT::updateCalibration()
 
 void BAT::loop()
 {
+    // 更新充电状态
+    _is_charging = (digitalRead(charging_pin) == LOW);
+    device_state.is_charging = _is_charging;
+
     static constexpr float VOLTAGE_MULTIPLIER = 2.0f; // 电压倍数常量
     static constexpr int ADC_MAX_VALUE = 4095;        // ADC最大值
     static int last_percentage = -1;                  // 上一次显示的百分比
@@ -191,7 +199,8 @@ void BAT::loop()
         device_state.battery_percentage = percentage;
         last_percentage = percentage;
         
-        String debug_msg = "状态更新 -> 电压: " + String(stable_voltage) + "mV (" + String(percentage) + "%)";
+        String debug_msg = "状态更新 -> 充电: " + String(_is_charging ? "是" : "否");
+        debug_msg += ", 电压: " + String(stable_voltage) + "mV (" + String(percentage) + "%)";
         debug_msg += ", 范围: " + String(min_voltage) + "-" + String(max_voltage) + "mV";
         debug_msg += "\n滤波详情 -> 原始: " + String(current_voltage) + "mV";
         debug_msg += ", 窗口: " + String(voltage) + "mV";
@@ -205,6 +214,7 @@ void BAT::print_voltage()
 {
     String debug_msg = "电压报告 -> " + String(stable_voltage) + "mV";
     debug_msg += " (" + String(device_state.battery_percentage) + "%)";
+    debug_msg += ", 充电: " + String(device_state.is_charging ? "是" : "否");
     Serial.println(debug_msg);
 }
 
@@ -226,4 +236,9 @@ int BAT::calculatePercentage(int voltage) {
         }
     }
     return 0;
+}
+
+// 新增实现
+bool BAT::isCharging() {
+    return _is_charging;
 }
