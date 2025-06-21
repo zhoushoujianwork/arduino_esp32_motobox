@@ -11,7 +11,7 @@ LED::LED(uint8_t pin) : _pin(pin), _mode(LED_OFF), _lastToggle(0), _state(false)
 void LED::begin()
 {
     pinMode(_pin, OUTPUT);
-    digitalWrite(_pin, LOW);
+    digitalWrite(_pin, HIGH); // 初始状态设为HIGH（LED灭）
     Serial.printf("[LED] 引脚: %d\n", _pin);
 }
 
@@ -23,7 +23,7 @@ void LED::setMode(LEDMode mode)
         _lastToggle = 0; // 切换模式时重置计时器
         _blinkCount = 0;
         _state = false;
-        digitalWrite(_pin, LOW);
+        digitalWrite(_pin, HIGH); // 切换模式时设为HIGH（LED灭）
     }
 }
 
@@ -104,15 +104,16 @@ void LED::loop()
         break;
     }
 
-    digitalWrite(_pin, _state ? HIGH : LOW);
+    // 修改LED控制逻辑：低电平触发（共阳极LED）
+    digitalWrite(_pin, _state ? LOW : HIGH);
 }
 
 // 初始化闪烁,最原始的闪烁方式，配合 delay
 void LED::initBlink(uint8_t times) {
     for (int i = 0; i < times; i++) {
-        digitalWrite(_pin, HIGH);
+        digitalWrite(_pin, LOW);  // LED亮
         delay(INIT_BLINK_INTERVAL);
-        digitalWrite(_pin, LOW);
+        digitalWrite(_pin, HIGH); // LED灭
         delay(INIT_BLINK_INTERVAL);
     }
     Serial.println("初始化闪烁完成");
