@@ -14,11 +14,10 @@ void ExternalGPSAdapter::begin() {
 
 void ExternalGPSAdapter::loop() {
     _gps.loop();
-    updateGPSData();
 }
 
 bool ExternalGPSAdapter::isReady() {
-    return gps_data.satellites > 3 && gps_data.valid;
+    return gps_data.satellites > 3;
 }
 
 gps_data_t ExternalGPSAdapter::getData() {
@@ -28,9 +27,3 @@ gps_data_t ExternalGPSAdapter::getData() {
 void ExternalGPSAdapter::setDebug(bool debug) {
     _gps.setDebug(debug);
 }
-
-void ExternalGPSAdapter::updateGPSData() {
-    // 更新全局gps_data结构
-    gps_data.gpsType = "External";
-    gps_data.valid = (gps_data.satellites > 3);
-} 

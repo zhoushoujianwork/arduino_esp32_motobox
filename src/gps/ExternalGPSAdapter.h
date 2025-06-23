@@ -21,7 +21,6 @@ public:
     
 private:
     GPS& _gps;
-    void updateGPSData();
 };
 
 #endif // EXTERNAL_GPS_ADAPTER_H 

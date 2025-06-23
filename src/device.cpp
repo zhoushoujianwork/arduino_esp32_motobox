@@ -149,10 +149,10 @@ void mqttConnectionCallback(bool connected)
         {
             firstConnect = false;
 
-            mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 5000);
+            mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 30000); // 30秒一次上报
 
 #ifdef ENABLE_IMU
-            mqttManager.addTopic("imu", imuTopic.c_str(), 1000);
+            // mqttManager.addTopic("imu", imuTopic.c_str(), 1000);
 #endif
 
             // GPS数据发布 - 使用统一接口

@@ -45,10 +45,7 @@ gps_data_t GSMGNSSAdapter::convertFromGNSSData(const gps_data_t& gnssData) {
     gps_data_t gpsData = {};
     reset_gps_data(gpsData);
     
-    if (gnssData.valid) {
-        gpsData.valid = true;
-        gpsData.gpsType = "GSM_GNSS";
-        
+    if (gnssData.satellites > 3) {
         // 时间信息
         gpsData.year = gnssData.year;
         gpsData.month = gnssData.month;

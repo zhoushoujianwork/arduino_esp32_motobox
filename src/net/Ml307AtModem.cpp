@@ -451,8 +451,6 @@ bool Ml307AtModem::parseGNSSInfo(const String& response) {
         return false; // 未定位
     }
     
-    _gnssData.valid = true;
-    
     // 解析时间 (格式: yyyyMMddHHmmss.sss)
     if (valueIndex > 2 && values[2].length() >= 14) {
         String timeStr = values[2];
@@ -505,7 +503,6 @@ bool Ml307AtModem::parseGNSSInfo(const String& response) {
 
 void Ml307AtModem::resetGNSSData() {
     memset(&_gnssData, 0, sizeof(gps_data_t));
-    _gnssData.valid = false;
 }
 
 bool Ml307AtModem::enableLBS(bool enable) {

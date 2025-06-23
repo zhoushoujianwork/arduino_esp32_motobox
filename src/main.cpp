@@ -231,7 +231,7 @@ void loop()
     // 获取GPS数据用于调试
     if (gpsManager.isReady()) {
       gps_data_t gpsData = gpsManager.getData();
-      if (gpsData.valid) {
+      if (gpsData.satellites > 3) {
         String locationType = gpsManager.getType();
         Serial.printf("[%s] 位置: %.6f, %.6f, 精度: %.1f m\n", 
                      locationType.c_str(),
