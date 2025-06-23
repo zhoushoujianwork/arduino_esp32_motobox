@@ -393,6 +393,28 @@ void update_device_state()
         device_state.gpsReady = currentGpsReady;
     }
 
+    // 检查LBS状态变化
+#ifdef ENABLE_GSM
+    bool currentLbsReady = gpsManager.isLBSReady();
+    if (currentLbsReady != last_state.lbsReady)
+    {
+        notify_state_change("LBS状态",
+                            last_state.lbsReady ? "就绪" : "未就绪",
+                            currentLbsReady ? "就绪" : "未就绪");
+        device_state.lbsReady = currentLbsReady;
+    }
+
+    // 检查GNSS状态变化
+    bool currentGnssReady = gpsManager.isGNSSEnabled() && ml307.isGNSSReady();
+    if (currentGnssReady != last_state.gnssReady)
+    {
+        notify_state_change("GNSS状态",
+                            last_state.gnssReady ? "就绪" : "未就绪",
+                            currentGnssReady ? "就绪" : "未就绪");
+        device_state.gnssReady = currentGnssReady;
+    }
+#endif
+
     // 检查IMU状态变化
     if (device_state.imuReady != last_state.imuReady)
     {

@@ -199,6 +199,8 @@ gps_data_t GPSManager::convertLBSToGPS(const lbs_data_t &lbsData)
 
     if (!lbsData.valid)
     {
+        gpsData.valid = false;
+        gpsData.gpsType = "LBS";
         return gpsData;
     }
 
@@ -206,17 +208,27 @@ gps_data_t GPSManager::convertLBSToGPS(const lbs_data_t &lbsData)
     gpsData.valid = true;
     gpsData.latitude = lbsData.latitude;
     gpsData.longitude = lbsData.longitude;
-    gpsData.altitude = 0;            // LBS通常不提供海拔
-    gpsData.speed = 0;               // LBS通常不提供速度
-    gpsData.heading = 0;             // LBS通常不提供航向
-    gpsData.satellites = 0;          // LBS不使用卫星
-    gpsData.year = 0;                // LBS通常不提供时间
+    gpsData.gpsType = "LBS";
+    // LBS无以下信息，全部置为无效/0
+    gpsData.altitude = 0;
+    gpsData.speed = 0;
+    gpsData.heading = 0;
+    gpsData.satellites = 0;
+    gpsData.satellites_used = 0;
+    gpsData.year = 0;
     gpsData.month = 0;
     gpsData.day = 0;
     gpsData.hour = 0;
     gpsData.minute = 0;
     gpsData.second = 0;
-
+    gpsData.centisecond = 0;
+    gpsData.hdop = 0;
+    gpsData.pdop = 0;
+    gpsData.vdop = 0;
+    gpsData.cn0_max = 0;
+    gpsData.hpa = 0;
+    gpsData.vpa = 0;
+    gpsData.gpsHz = 0;
     return gpsData;
 }
 

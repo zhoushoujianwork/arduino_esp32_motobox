@@ -239,11 +239,11 @@ void loop()
       }
     }
 
-    // 显示LBS基站定位信息
-    if (ml307.getLBSData().valid) {
-      lbs_data_t lbsData = ml307.getLBSData();
+    // 显示LBS基站定位信息 - 通过GPS管理器获取
+    if (gpsManager.isLBSReady()) {
+      lbs_data_t lbsData = gpsManager.getLBSData();
       if (lbsData.valid) {
-        Serial.printf("[LBS] 位置: %.6f, %.6f, 半径: %.1f m\n", 
+        Serial.printf("[LBS] 位置: %.6f, %.6f, 半径: %d m\n", 
                      lbsData.latitude, lbsData.longitude, lbsData.radius);
       }
     }

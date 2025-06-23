@@ -13,8 +13,7 @@
 #include "Ml307Mqtt.h"
 #include "config.h"
 #include "device.h"
-#include "imu/qmi8658.h"
-#include "gps/GPS.h"
+#include "gps/GPSManager.h"
 #include "utils/PreferencesUtils.h"
 
 // MQTT 网络类型

@@ -362,7 +362,8 @@ void MqttManager::loop()
                 // }
                 else if (topic.first == "gps")
                 {
-                    publishToTopic(topic.first, gps_data_to_json(gps_data).c_str(), false);
+                    gps_data_t currentGpsData = gpsManager.getData();
+                    publishToTopic(topic.first, gps_data_to_json(currentGpsData).c_str(), false);
                 }
             }
         }

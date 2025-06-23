@@ -37,6 +37,8 @@ typedef struct
     bool imuReady; // IMU准备状态
     bool compassReady;  // 罗盘准备状态
     bool gsmReady; // GSM准备状态
+    bool lbsReady; // LBS准备状态
+    bool gnssReady; // GNSS准备状态
 } device_state_t;
 
 // 添加状态变化跟踪
