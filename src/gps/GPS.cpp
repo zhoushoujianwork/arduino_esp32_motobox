@@ -42,8 +42,6 @@ const int NUM_BAUD_RATES = 8;
 GPS gps(GPS_RX_PIN, GPS_TX_PIN);
 #endif
 
-gps_data_t gps_data;
-
 GPS::GPS(int rxPin, int txPin) : gpsSerial(rxPin, txPin),
                                  _debug(true),
                                  _foundBaudRate(false),
@@ -199,12 +197,12 @@ void GPS::loop()
                     // 超过 3 个表示GPS准备好了
                     if (gps_data.satellites > 3)
                     {
-                        device_state.gpsReady = true;
+                        Serial.println("[GPS] GPS准备好了");
                         loopAutoAdjustHz();
                     }
                     else
                     {
-                        device_state.gpsReady = false;
+                        Serial.println("[GPS] GPS未准备好");
                     }
                 }
 
@@ -545,7 +543,7 @@ bool GPS::isValidGpsResponse()
  */
 void GPS::loopAutoAdjustHz()
 {
-    if (millis() - lastAutoAdjustHzTime >= 5000 && device_state.gpsReady)
+    if (millis() - lastAutoAdjustHzTime >= 5000 && gps_data.satellites > 3)
     {
         autoAdjustHz(gps_data.satellites);
         lastAutoAdjustHzTime = millis();
@@ -681,29 +679,6 @@ void GPS::loopDistance()
     totalDistanceKm += distanceIncrement;
     // 更新最后计算时间
     lastDistanceTime = currentTime;
-}
-
-String gps_data_to_json(const gps_data_t &data)
-{
-    // 使用ArduinoJson库将gps_data转换为JSON字符串
-    StaticJsonDocument<256> doc;
-    doc["lat"] = gps_data.latitude;
-    doc["lon"] = gps_data.longitude;
-    doc["alt"] = gps_data.altitude;
-    doc["speed"] = gps_data.speed;
-    doc["satellites"] = gps_data.satellites;
-    doc["heading"] = gps_data.heading;
-    doc["year"] = gps_data.year;
-    doc["month"] = gps_data.month;
-    doc["day"] = gps_data.day;
-    doc["hour"] = gps_data.hour;
-    doc["minute"] = gps_data.minute;
-    doc["second"] = gps_data.second;
-    doc["hdop"] = gps_data.hdop;
-
-    String jsonString;
-    serializeJson(doc, jsonString);
-    return jsonString;
 }
 
 void GPS::debugPrint(const String &message)

@@ -1,4 +1,7 @@
 #include "device.h"
+#include "tft/TFT.h"
+#include "gps/GPSManager.h"
+#include "imu/qmi8658.h"
 
 extern const VersionInfo &getVersionInfo();
 
@@ -22,6 +25,7 @@ void print_device_info()
     Serial.printf("Battery Voltage: %d\n", device_state.battery_voltage);
     Serial.printf("Battery Percentage: %d\n", device_state.battery_percentage);
     Serial.printf("GPS Ready: %d\n", device_state.gpsReady);
+    Serial.printf("GPS Type: %s\n", gpsManager.getType().c_str());
     Serial.printf("IMU Ready: %d\n", device_state.imuReady);
     Serial.printf("Compass Ready: %d\n", device_state.compassReady);
     Serial.println("--------------------------------");
@@ -57,6 +61,7 @@ String device_state_to_json(device_state_t *state)
     doc["wifi"] = device_state.wifiConnected;
     doc["ble"] = device_state.bleConnected;
     doc["gps"] = device_state.gpsReady;
+    doc["gps_type"] = gpsManager.getType();
     doc["imu"] = device_state.imuReady;
     doc["compass"] = device_state.compassReady;
     doc["bat_v"] = device_state.battery_voltage;
@@ -114,6 +119,13 @@ void mqttMessageCallback(const String &topic, const String &payload)
                 Serial.println("休眠时间不能小于0");
             }
         }
+        else if (strcmp(cmd, "gps_debug") == 0)
+        {
+            // {"cmd": "gps_debug", "enable": true}
+            bool enable = doc["enable"].as<bool>();
+            gpsManager.setDebug(enable);
+            Serial.printf("GPS调试模式: %s\n", enable ? "开启" : "关闭");
+        }
     }
 }
 
@@ -142,13 +154,16 @@ void mqttConnectionCallback(bool connected)
 #ifdef ENABLE_IMU
             mqttManager.addTopic("imu", imuTopic.c_str(), 1000);
 #endif
-#ifdef ENABLE_GPS
+
+            // GPS数据发布 - 使用统一接口
             mqttManager.addTopic("gps", gpsTopic.c_str(), 1000);
-#endif
+
             // 订阅主题 每次都要
             mqttManager.subscribe(controlTopic.c_str(), 1);
         }
-    }else{
+    }
+    else
+    {
         Serial.println("MQTT连接失败");
     }
 }
@@ -206,10 +221,6 @@ void Device::begin()
     Serial.println("[电源管理] GPS_WAKE_PIN 保持已解除");
 #endif
 
-#ifdef ENABLE_GPS
-    gps.begin();
-#endif
-
 #ifdef BLE_SERVER
     bs.begin();
 #endif
@@ -222,7 +233,6 @@ void Device::begin()
     compass.begin();
 #endif
 
-    // IMU初始化
 #ifdef ENABLE_IMU
     imu.begin();
     // 如果是从深度睡眠唤醒，检查唤醒原因
@@ -306,6 +316,21 @@ void Device::begin()
     }
     Serial.println("完成底层网络配置，wifi/gsm/mqtt 初始化完成");
 
+    // GPS初始化 - 使用统一的GPS管理器
+    gpsManager.init();
+    gpsManager.setDebug(true);
+#ifdef ENABLE_GSM
+// 根据配置启用GNSS和LBS
+#if ENABLE_GNSS_BY_DEFAULT == true
+    gpsManager.setGNSSEnabled(true);
+#endif
+
+#if ENABLE_LBS_BY_DEFAULT == true
+    gpsManager.setLBSEnabled(true);
+#endif
+#endif
+    Serial.println("GPS初始化完成");
+
 #endif
 }
 
@@ -357,13 +382,15 @@ void update_device_state()
         state_changes.ble_changed = true;
     }
 
-    // 检查GPS状态变化
-    if (device_state.gpsReady != last_state.gpsReady)
+    // 检查GPS状态变化 - 使用GPS管理器
+    bool currentGpsReady = gpsManager.isReady();
+    if (currentGpsReady != last_state.gpsReady)
     {
         notify_state_change("GPS状态",
                             last_state.gpsReady ? "就绪" : "未就绪",
-                            device_state.gpsReady ? "就绪" : "未就绪");
+                            currentGpsReady ? "就绪" : "未就绪");
         state_changes.gps_changed = true;
+        device_state.gpsReady = currentGpsReady;
     }
 
     // 检查IMU状态变化
@@ -407,4 +434,9 @@ void update_device_state()
 
     // 重置状态变化标志
     state_changes = {0};
+}
+
+void device_loop()
+{
+    // Implementation of device_loop function
 }

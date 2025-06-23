@@ -14,11 +14,14 @@ Ml307AtModem::Ml307AtModem(HardwareSerial& serial, int rxPin, int txPin)
     : _serial(serial)
     , _rxPin(rxPin)
     , _txPin(txPin)
-    , _debug(false) {
+    , _gnssEnabled(false)
+    , _lbsEnabled(false)
+    , _debug(false)
+{
 }
 
 bool Ml307AtModem::begin(uint32_t baudrate) {
-    Serial.println("开始初始化ml307模块...");
+    Serial.println("开始初始化ml307模块,波特率:" + String(baudrate));
     
     // 使用固定波特率初始化
     _serial.begin(baudrate, SERIAL_8N1, _rxPin, _txPin);
@@ -260,7 +263,23 @@ String Ml307AtModem::sendATWithResponse(const String& cmd, uint32_t timeout) {
 }
 
 bool Ml307AtModem::isReady() {
-    return sendAT("AT");
+    // 发送AT命令并检查响应
+    String response = sendATWithResponse("AT");
+    
+    // 检查多种可能的响应
+    if (response.indexOf("OK") >= 0) {
+        return true;
+    }
+    
+    // 检查是否返回了模块信息（如ml307a等）
+    if (response.indexOf("ml307") >= 0 || 
+        response.indexOf("4G_DTU_TCP") >= 0 ||
+        response.indexOf("PROD:") >= 0) {
+        debugPrint("模块已就绪（返回模块信息）");
+        return true;
+    }
+    
+    return false;
 }
 
 void Ml307AtModem::flushInput() {
@@ -283,7 +302,9 @@ String Ml307AtModem::waitResponse(uint32_t timeout) {
                 response.endsWith("\r\nERROR\r\n") ||
                 response.endsWith("\r\n> ") ||
                 response.endsWith("+MATREADY\r\n") ||  // 处理特殊响应
-                response.endsWith("\"CONNECT\"\r\n")) {
+                response.endsWith("\"CONNECT\"\r\n") ||
+                response.indexOf("ml307") >= 0 ||     // 检查模块信息
+                response.indexOf("4G_DTU_TCP") >= 0) { // 检查产品信息
                 break;
             }
         }
@@ -309,4 +330,348 @@ void Ml307AtModem::debugPrint(const String& msg) {
     if (_debug) {
         Serial.println("[ml307atmodem] [debug] " + msg);
     }
-} 
+}
+
+bool Ml307AtModem::gnssPower(bool on) {
+    String cmd = "AT+CGNSPWR=";
+    cmd += (on ? "1" : "0");
+    return sendAT(cmd);
+}
+
+String Ml307AtModem::getGNSSInfo() {
+    return sendATWithResponse("AT+CGNSINF");
+}
+
+// GNSS定位功能实现
+bool Ml307AtModem::gnssInit() {
+    debugPrint("初始化GNSS模块...");
+    
+    // 检查GNSS是否支持
+    if (!sendATWithRetry("AT+CGNSPWR?", "OK", 3, 2000)) {
+        debugPrint("GNSS模块不支持");
+        return false;
+    }
+    
+    // 开启GNSS电源
+    if (!gnssPower(true)) {
+        debugPrint("开启GNSS电源失败");
+        return false;
+    }
+    
+    // 等待GNSS模块启动
+    delay(3000);
+    
+    // 检查GNSS状态
+    int retry = 0;
+    while (retry < 10) {
+        if (isGNSSReady()) {
+            debugPrint("GNSS模块初始化成功");
+            _gnssEnabled = true;
+            return true;
+        }
+        delay(1000);
+        retry++;
+    }
+    
+    debugPrint("GNSS模块初始化失败");
+    return false;
+}
+
+bool Ml307AtModem::isGNSSReady() {
+    String response = sendATWithResponse("AT+CGNSINF");
+    return response.indexOf("+CGNSINF: ") >= 0 && response.indexOf(",1,") >= 0;
+}
+
+gps_data_t Ml307AtModem::getGNSSData() {
+    if (millis() - _lastGNSSUpdate > 1000) { // 每秒更新一次
+        updateGNSSData();
+    }
+    return _gnssData;
+}
+
+bool Ml307AtModem::updateGNSSData() {
+    if (!_gnssEnabled) {
+        return false;
+    }
+    
+    String response = sendATWithResponse("AT+CGNSINF");
+    if (parseGNSSInfo(response)) {
+        _lastGNSSUpdate = millis();
+        return true;
+    }
+    return false;
+}
+
+bool Ml307AtModem::parseGNSSInfo(const String& response) {
+    // 重置数据
+    resetGNSSData();
+    
+    // 查找CGNSINF响应
+    int start = response.indexOf("+CGNSINF: ");
+    if (start < 0) {
+        return false;
+    }
+    
+    // 跳过"+CGNSINF: "
+    start += 10;
+    int end = response.indexOf("\r\n", start);
+    if (end < 0) {
+        end = response.length();
+    }
+    
+    String data = response.substring(start, end);
+    
+    // 解析CGNSINF数据格式：
+    // +CGNSINF: <GNSS run status>,<fix status>,<UTC date & Time>,<latitude>,<longitude>,<MSL altitude>,<speed over ground>,<course over ground>,<fix mode>,<reserved1>,<HDOP>,<PDOP>,<VDOP>,<reserved2>,<GNSS satellites in View>,<GNSS satellites used>,<reserved3>,<c/n0 max>,<HPA>,<VPA>
+    
+    int commaCount = 0;
+    int lastComma = -1;
+    String values[20];
+    int valueIndex = 0;
+    
+    for (int i = 0; i < data.length() && valueIndex < 20; i++) {
+        if (data.charAt(i) == ',') {
+            if (lastComma >= 0) {
+                values[valueIndex++] = data.substring(lastComma + 1, i);
+            } else {
+                values[valueIndex++] = data.substring(0, i);
+            }
+            lastComma = i;
+            commaCount++;
+        }
+    }
+    
+    // 添加最后一个值
+    if (lastComma >= 0 && valueIndex < 20) {
+        values[valueIndex++] = data.substring(lastComma + 1);
+    }
+    
+    // 检查定位状态
+    if (valueIndex < 2 || values[1] != "1") {
+        return false; // 未定位
+    }
+    
+    _gnssData.valid = true;
+    
+    // 解析时间 (格式: yyyyMMddHHmmss.sss)
+    if (valueIndex > 2 && values[2].length() >= 14) {
+        String timeStr = values[2];
+        _gnssData.year = timeStr.substring(0, 4).toInt();
+        _gnssData.month = timeStr.substring(4, 6).toInt();
+        _gnssData.day = timeStr.substring(6, 8).toInt();
+        _gnssData.hour = timeStr.substring(8, 10).toInt();
+        _gnssData.minute = timeStr.substring(10, 12).toInt();
+        _gnssData.second = timeStr.substring(12, 14).toInt();
+    }
+    
+    // 解析纬度
+    if (valueIndex > 3 && values[3].length() > 0) {
+        _gnssData.latitude = values[3].toDouble();
+    }
+    
+    // 解析经度
+    if (valueIndex > 4 && values[4].length() > 0) {
+        _gnssData.longitude = values[4].toDouble();
+    }
+    
+    // 解析海拔高度
+    if (valueIndex > 5 && values[5].length() > 0) {
+        _gnssData.altitude = values[5].toDouble();
+    }
+    
+    // 解析速度 (m/s转换为km/h)
+    if (valueIndex > 6 && values[6].length() > 0) {
+        _gnssData.speed = values[6].toDouble() * 3.6;
+    }
+    
+    // 解析航向角
+    if (valueIndex > 7 && values[7].length() > 0) {
+        _gnssData.heading = values[7].toDouble();
+    }
+    
+    // 解析HDOP
+    if (valueIndex > 10 && values[10].length() > 0) {
+        _gnssData.hdop = values[10].toDouble();
+    }
+    
+    // 解析可见卫星数量
+    if (valueIndex > 14 && values[14].length() > 0) {
+        _gnssData.satellites = values[14].toInt();
+    }
+    
+    debugPrint("GNSS数据更新成功: " + String(_gnssData.latitude, 6) + ", " + String(_gnssData.longitude, 6));
+    return true;
+}
+
+void Ml307AtModem::resetGNSSData() {
+    memset(&_gnssData, 0, sizeof(gps_data_t));
+    _gnssData.valid = false;
+}
+
+bool Ml307AtModem::enableLBS(bool enable) {
+    debugPrint("配置LBS: " + String(enable ? "启用" : "禁用"));
+    if (enable) {
+        // 配置为OneOs定位服务
+        if (!sendATWithRetry("AT+MLBSCFG=\"method\",40", "OK", 3, 2000)) {
+            debugPrint("配置LBS方法失败");
+            return false;
+        }
+        
+        // 配置使用邻区信息提高精度
+        if (!sendATWithRetry("AT+MLBSCFG=\"nearbtsen\",1", "OK", 3, 2000)) {
+            debugPrint("配置邻区信息失败");
+            return false;
+        }
+
+        // 配置精度为8位
+        if (!sendATWithRetry("AT+MLBSCFG=\"precision\",8", "OK", 3, 2000)) {
+            debugPrint("配置精度失败");
+            return false;
+        }
+
+        _lbsEnabled = true;
+        _lastLBSUpdate = 0;  // 重置更新时间
+        return true;
+    } else {
+        _lbsEnabled = false;
+        return true;
+    }
+}
+
+bool Ml307AtModem::isLBSEnabled() {
+    String response = sendATWithResponse("AT+MLBSCFG=\"method\"");
+    // 检查是否配置了定位平台
+    return response.indexOf("+MLBSCFG: \"method\",") >= 0;
+}
+
+lbs_data_t Ml307AtModem::getLBSData() {
+    // 每秒最多更新一次
+    if (millis() - _lastLBSUpdate > 1000) {
+        updateLBSData();
+    }
+    return _lbsData;
+}
+
+bool Ml307AtModem::updateLBSData() {
+    if (!_lbsEnabled) {
+        return false;
+    }
+    
+    // 控制更新频率
+    if (_lastLBSUpdate > 0 && (millis() - _lastLBSUpdate) < 1000) {
+        return false;
+    }
+    
+    String response = sendATWithResponse("AT+MLBSLOC", 5000);
+    if (parseLBSInfo(response)) {
+        _lastLBSUpdate = millis();
+        return true;
+    }
+    
+    return false;
+}
+
+bool Ml307AtModem::enableGNSS(bool enable) {
+    debugPrint("配置GNSS: " + String(enable ? "启用" : "禁用"));
+    
+    // 先检查GNSS是否支持
+    if (!sendATWithRetry("AT+CGNSPWR?", "OK", 3, 2000)) {
+        debugPrint("GNSS模块不支持");
+        return false;
+    }
+    
+    // 控制GNSS电源
+    if (enable) {
+        // 开启GNSS电源
+        if (!gnssPower(true)) {
+            debugPrint("开启GNSS电源失败");
+            return false;
+        }
+        // 初始化GNSS
+        return gnssInit();
+    } else {
+        // 关闭GNSS电源
+        return gnssPower(false);
+    }
+}
+
+bool Ml307AtModem::isGNSSEnabled() {
+    String response = sendATWithResponse("AT+CGNSPWR?");
+    return response.indexOf("+CGNSPWR: 1") >= 0;
+}
+
+bool Ml307AtModem::parseLBSInfo(const String& response) {
+    // 重置数据有效性
+    resetLBSData();
+    
+    if (response.indexOf("+MLBSLOC:") == -1) {
+        if (response.indexOf("+CME ERROR:") != -1) {
+            int errorStart = response.indexOf("+CME ERROR:") + 11;
+            String errorCode = response.substring(errorStart);
+            errorCode.trim();
+            _lbsData.stat = errorCode.toInt();
+            debugPrint("LBS错误: " + errorCode);
+        } else {
+            debugPrint("LBS响应异常，未找到+MLBSLOC");
+        }
+        return false;
+    }
+
+    // 解析MLBSLOC数据, 格式: +MLBSLOC: <stat>,<longitude>,<latitude>[,<radius>][,<descr>]
+    int startPos = response.indexOf("+MLBSLOC:") + 9;
+    String dataStr = response.substring(startPos);
+    dataStr.trim();
+    
+    int commaPos = 0;
+    int lastCommaPos = -1;
+    int valueIndex = 0;
+    
+    while(valueIndex <= 4) { // 最多解析5个字段
+        commaPos = dataStr.indexOf(',', lastCommaPos + 1);
+
+        String value;
+        if (commaPos != -1) {
+            value = dataStr.substring(lastCommaPos + 1, commaPos);
+        } else {
+            value = dataStr.substring(lastCommaPos + 1);
+        }
+        value.trim();
+
+        if (value.startsWith("\"")) {
+            value = value.substring(1, value.length() - 1);
+        }
+
+        switch (valueIndex) {
+            case 0: _lbsData.stat = value.toInt(); break;
+            case 1: _lbsData.longitude = value.toFloat(); break;
+            case 2: _lbsData.latitude = value.toFloat(); break;
+            case 3: _lbsData.radius = value.toInt(); break;
+            case 4: _lbsData.descr = value; break;
+        }
+
+        if (commaPos == -1) {
+            break;
+        }
+        
+        lastCommaPos = commaPos;
+        valueIndex++;
+    }
+
+    if (_lbsData.stat == 100) {
+        _lbsData.valid = true;
+        debugPrint("LBS解析成功: " + 
+                  String(_lbsData.longitude, 6) + ", " + 
+                  String(_lbsData.latitude, 6) + 
+                  (_lbsData.radius > 0 ? ", r:" + String(_lbsData.radius) : "") +
+                  (!_lbsData.descr.isEmpty() ? ", d:" + _lbsData.descr : ""));
+    } else {
+        debugPrint("LBS状态码错误: " + String(_lbsData.stat));
+    }
+
+    return _lbsData.valid;
+}
+
+void Ml307AtModem::resetLBSData() {
+    memset(&_lbsData, 0, sizeof(lbs_data_t));
+    _lbsData.valid = false;
+}

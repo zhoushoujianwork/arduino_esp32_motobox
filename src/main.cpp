@@ -38,6 +38,9 @@
 
 #ifdef ENABLE_GPS
 #include "gps/GPS.h"
+#ifdef USE_ML307_GPS
+#include "net/Ml307Gps.h"
+#endif
 #endif
 
 #ifdef ENABLE_IMU
@@ -56,16 +59,14 @@
 #ifdef ENABLE_TFT
 #include "tft/TFT.h"
 #endif
+
+#include "gps/GPSManager.h"
+
 //============================= 全局变量 =============================
 
 // RTC内存变量（深度睡眠后保持）
 RTC_DATA_ATTR int bootCount = 0;
 
-// 任务句柄
-TaskHandle_t gpsTaskHandle = NULL;
-
-// 添加WiFi任务句柄
-TaskHandle_t wifiTaskHandle = NULL;
 
 /**
  * 系统监控任务
@@ -117,23 +118,16 @@ void taskDataProcessing(void *parameter)
   Serial.println("[系统] 数据处理任务启动");
   while (true)
   {
-    // static unsigned long lastDebugTime = 0;
-    // if (millis() - lastDebugTime > 5000) {  // 每5秒打印一次调试信息
-    //   lastDebugTime = millis();
-    //   Serial.println("[系统] 数据处理任务运行中...");
-    // }
-
     // IMU数据处理
 #ifdef ENABLE_IMU
     imu.setDebug(false);
     imu.loop();
 #endif
 
-    // GPS
-#ifdef ENABLE_GPS
-    gps.setDebug(false);
-    gps.loop();
-#endif
+    // GPS数据处理 - 使用统一的GPS管理器
+    gpsManager.loop();
+    // 更新GPS状态到设备状态
+    device_state.gpsReady = gpsManager.isReady();
 
 #ifdef BLE_CLIENT
     // 蓝牙客户端处理
@@ -194,11 +188,16 @@ void setup()
   Serial.println("step 3");
   powerManager.printWakeupReason();
 
-  Serial.println("step 3");
+  Serial.println("step 4");
   powerManager.checkWakeupCause();
 
-  Serial.println("step 4");
+  Serial.println("step 5");
   device.begin();
+
+  // 初始化GPS管理器 - 在设备初始化之后
+  Serial.println("step 6");
+  gpsManager.init();
+  Serial.println("[GPS] GPS管理器初始化完成，类型: " + gpsManager.getType());
 
   // 创建任务
   xTaskCreate(taskSystem, "TaskSystem", 1024 * 15, NULL, 1, NULL);
@@ -229,13 +228,25 @@ void loop()
 
     bat.print_voltage();
 
-    // print_device_info();
+    // 获取GPS数据用于调试
+    if (gpsManager.isReady()) {
+      gps_data_t gpsData = gpsManager.getData();
+      if (gpsData.valid) {
+        String locationType = gpsManager.getType();
+        Serial.printf("[%s] 位置: %.6f, %.6f, 精度: %.1f m\n", 
+                     locationType.c_str(),
+                     gpsData.latitude, gpsData.longitude, gpsData.hdop);
+      }
+    }
 
-    // printCompassData();
-
-    // Serial.printf("Compass Heading: %f\n", compass_data.heading);
-
-    // Serial.printf("Compass Heading: %f\n", compass.getDeclination());
+    // 显示LBS基站定位信息
+    if (ml307.getLBSData().valid) {
+      lbs_data_t lbsData = ml307.getLBSData();
+      if (lbsData.valid) {
+        Serial.printf("[LBS] 位置: %.6f, %.6f, 半径: %.1f m\n", 
+                     lbsData.latitude, lbsData.longitude, lbsData.radius);
+      }
+    }
 
     // 发送状态消息
     // String status = String("设备运行时间: ") + (millis() / 1000) + "秒";

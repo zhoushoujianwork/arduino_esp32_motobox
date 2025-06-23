@@ -25,6 +25,7 @@
 #define ENABLE_GPS
 #endif
 
+
 // 罗盘引脚配置检查
 #if defined(GPS_COMPASS_SDA) && defined(GPS_COMPASS_SCL)
 #define ENABLE_COMPASS
@@ -80,5 +81,11 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 #define TFT_VER_RES        320
 #define TFT_ROTATION       1 // 0: 0度, 1: 90度, 2: 180度, 3: 270度
 #define UI_MAX_SPEED       199    /* Maximum speed in km/h */
+
+// GNSS和LBS默认配置
+#ifdef ENABLE_GSM
+#define ENABLE_GNSS_BY_DEFAULT false   // 默认启用GNSS
+#define ENABLE_LBS_BY_DEFAULT true    // 默认启用LBS
+#endif
 
 #endif /* CONFIG_H */
