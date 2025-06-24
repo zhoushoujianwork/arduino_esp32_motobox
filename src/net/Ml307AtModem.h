@@ -10,6 +10,7 @@
 #include "config.h"
 #include "../gps/GPSData.h"
 #include "../gps/LBSData.h"
+#include <mutex>
 
 
 class Ml307AtModem {
@@ -54,6 +55,10 @@ public:
     // 状态检查
     bool isReady();
 
+    // 添加线程安全的AT命令方法
+    bool sendATThreadSafe(const String& cmd, const String& expected = "OK", uint32_t timeout = 1000);
+    String sendATWithResponseThreadSafe(const String& cmd, uint32_t timeout = 1000);
+
 private:
     HardwareSerial& _serial;
     int _rxPin;
@@ -88,6 +93,8 @@ private:
     // LBS 内部方法
     bool parseLBSInfo(const String& response);
     void resetLBSData();
+
+    std::mutex _atMutex;  // AT命令互斥锁
 };
 
 extern Ml307AtModem ml307;

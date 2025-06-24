@@ -672,3 +672,14 @@ void Ml307AtModem::resetLBSData() {
     memset(&_lbsData, 0, sizeof(lbs_data_t));
     _lbsData.valid = false;
 }
+
+// 在实现文件中添加线程安全的AT命令方法
+bool Ml307AtModem::sendATThreadSafe(const String& cmd, const String& expected, uint32_t timeout) {
+    std::lock_guard<std::mutex> lock(_atMutex);
+    return sendAT(cmd, expected, timeout);
+}
+
+String Ml307AtModem::sendATWithResponseThreadSafe(const String& cmd, uint32_t timeout) {
+    std::lock_guard<std::mutex> lock(_atMutex);
+    return sendATWithResponse(cmd, timeout);
+}

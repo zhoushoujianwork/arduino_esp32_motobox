@@ -46,8 +46,8 @@
  */
 
 /* Common Device Configuration */
-#define APP_NAME            "DBLBOX"
-#define BLE_NAME            "DBLBOX"
+#define APP_NAME            "MOTO-BOX"
+#define BLE_NAME            "MOTO-BOX"
 #define SERVICE_UUID        "4FAFC201-1FB5-459E-8FCC-C5C9C331914B"
 #define DEVICE_CHAR_UUID    "BEB5483A-36E1-4688-B7F5-EA07361B26A8"
 #define GPS_CHAR_UUID       "BEB5483E-36E1-4688-B7F5-EA07361B26A8"
@@ -85,7 +85,7 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 // GNSS和LBS默认配置
 #ifdef ENABLE_GSM
 #define ENABLE_GNSS_BY_DEFAULT false   // 默认启用GNSS
-#define ENABLE_LBS_BY_DEFAULT true    // 默认启用LBS
+#define ENABLE_LBS_BY_DEFAULT false    // 默认启用LBS
 #endif
 
 #endif /* CONFIG_H */

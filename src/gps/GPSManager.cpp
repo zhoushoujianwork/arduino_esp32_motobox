@@ -268,11 +268,7 @@ void GPSManager::setLBSEnabled(bool enable)
 
 bool GPSManager::isGNSSEnabled() const
 {
-#ifdef ENABLE_GSM
-    return ml307.isGNSSEnabled();
-#else
     return false;
-#endif
 }
 
 bool GPSManager::isLBSEnabled() const

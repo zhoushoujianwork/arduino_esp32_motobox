@@ -404,15 +404,15 @@ void update_device_state()
         device_state.lbsReady = currentLbsReady;
     }
 
-    // 检查GNSS状态变化
-    bool currentGnssReady = gpsManager.isGNSSEnabled() && ml307.isGNSSReady();
-    if (currentGnssReady != last_state.gnssReady)
-    {
-        notify_state_change("GNSS状态",
-                            last_state.gnssReady ? "就绪" : "未就绪",
-                            currentGnssReady ? "就绪" : "未就绪");
-        device_state.gnssReady = currentGnssReady;
-    }
+    // // 检查GNSS状态变化
+    // bool currentGnssReady = gpsManager.isGNSSEnabled() && ml307.isGNSSReady();
+    // if (currentGnssReady != last_state.gnssReady)
+    // {
+    //     notify_state_change("GNSS状态",
+    //                         last_state.gnssReady ? "就绪" : "未就绪",
+    //                         currentGnssReady ? "就绪" : "未就绪");
+    //     device_state.gnssReady = currentGnssReady;
+    // }
 #endif
 
     // 检查IMU状态变化
