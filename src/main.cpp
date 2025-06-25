@@ -194,11 +194,6 @@ void setup()
   Serial.println("step 5");
   device.begin();
 
-  // 初始化GPS管理器 - 在设备初始化之后
-  Serial.println("step 6");
-  gpsManager.init();
-  Serial.println("[GPS] GPS管理器初始化完成，类型: " + gpsManager.getType());
-
   // 创建任务
   xTaskCreate(taskSystem, "TaskSystem", 1024 * 15, NULL, 1, NULL);
   xTaskCreate(taskDataProcessing, "TaskData", 1024 * 15, NULL, 2, NULL);
@@ -240,13 +235,13 @@ void loop()
     }
 
     // 显示LBS基站定位信息 - 通过GPS管理器获取
-    if (gpsManager.isLBSReady()) {
-      lbs_data_t lbsData = gpsManager.getLBSData();
-      if (lbsData.valid) {
-        Serial.printf("[LBS] 位置: %.6f, %.6f, 半径: %d m\n", 
-                     lbsData.latitude, lbsData.longitude, lbsData.radius);
-      }
-    }
+    // if (gpsManager.isLBSReady()) {
+    //   lbs_data_t lbsData = gpsManager.getLBSData();
+    //   if (lbsData.valid) {
+    //     Serial.printf("[LBS] 位置: %.6f, %.6f, 半径: %d m\n", 
+    //                  lbsData.latitude, lbsData.longitude, lbsData.radius);
+    //   }
+    // }
 
     // 发送状态消息
     // String status = String("设备运行时间: ") + (millis() / 1000) + "秒";

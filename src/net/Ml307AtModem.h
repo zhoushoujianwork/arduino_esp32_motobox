@@ -41,10 +41,10 @@ public:
     String getGNSSInfo();
     bool updateGNSSData();
     
-    // LBS 功能
+    // LBS 功能 - 简化版本
     bool enableLBS(bool enable);
     bool isLBSEnabled();
-    lbs_data_t getLBSData();
+    String getLBSRawData();  // 只返回原始响应字符串
     bool updateLBSData();
     
     // AT 命令
@@ -59,6 +59,9 @@ public:
     bool sendATThreadSafe(const String& cmd, const String& expected = "OK", uint32_t timeout = 1000);
     String sendATWithResponseThreadSafe(const String& cmd, uint32_t timeout = 1000);
 
+    // 在public部分添加
+    void debugLBSConfig();  // LBS配置调试函数
+
 private:
     HardwareSerial& _serial;
     int _rxPin;
@@ -67,10 +70,10 @@ private:
     bool _gnssEnabled;
     bool _lbsEnabled;
     gps_data_t _gnssData;
-    lbs_data_t _lbsData;
     
-    // LBS相关私有成员
+    // LBS相关私有成员 - 简化
     unsigned long _lastLBSUpdate;         // 上次LBS更新时间
+    String _lbsRawResponse;               // 存储原始LBS响应
     
     // 其他私有成员
     unsigned long _lastGNSSUpdate;
@@ -90,13 +93,9 @@ private:
     bool parseGNSSInfo(const String& response);
     void resetGNSSData();
     
-    // LBS 内部方法
-    bool parseLBSInfo(const String& response);
-    void resetLBSData();
-
     std::mutex _atMutex;  // AT命令互斥锁
 };
 
-extern Ml307AtModem ml307;
+extern Ml307AtModem ml307_at;
 
 #endif // ML307_AT_MODEM_H 

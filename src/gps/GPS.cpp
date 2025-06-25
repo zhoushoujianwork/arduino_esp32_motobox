@@ -200,10 +200,6 @@ void GPS::loop()
                         Serial.println("[GPS] GPS准备好了");
                         loopAutoAdjustHz();
                     }
-                    else
-                    {
-                        Serial.println("[GPS] GPS未准备好");
-                    }
                 }
 
                 if (gps.speed.isUpdated())

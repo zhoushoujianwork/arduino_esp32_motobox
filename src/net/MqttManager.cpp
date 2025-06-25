@@ -276,10 +276,10 @@ void MqttManager::loop()
                 if (millis() - lastNetworkCheck > 5000) { // 5秒检查一次
                     lastNetworkCheck = millis();
                     
-                    if (ml307.isNetworkReady()) {
+                    if (ml307_at.isNetworkReady()) {
                         if (ml307Mqtt.connected()) {
                             setNetworkState(NetworkState::CONNECTED);
-                            debugPrint("Cellular connected, CSQ: " + String(ml307.getCSQ()));
+                            debugPrint("Cellular connected, CSQ: " + String(ml307_at.getCSQ()));
                             
                             if (_connectCallback) {
                                 _connectCallback(true);
@@ -300,7 +300,7 @@ void MqttManager::loop()
         case NetworkState::CONNECTED:
         {
             // 检查网络和MQTT连接状态
-            if (!ml307.isNetworkReady()) {
+            if (!ml307_at.isNetworkReady()) {
                 setNetworkState(NetworkState::DISCONNECTED);
                 debugPrint("Cellular network disconnected");
             } else if (!ml307Mqtt.connected()) {
@@ -316,7 +316,7 @@ void MqttManager::loop()
         case NetworkState::DISCONNECTED:
         {
             // 检查网络是否恢复
-            if (ml307.isNetworkReady()) {
+            if (ml307_at.isNetworkReady()) {
                 debugPrint("网络已恢复，开始重新连接...");
                 setNetworkState(NetworkState::CONNECTING);
                 _connectionStartTime = millis();
@@ -363,7 +363,10 @@ void MqttManager::loop()
                 else if (topic.first == "gps")
                 {
                     gps_data_t currentGpsData = gpsManager.getData();
-                    publishToTopic(topic.first, gps_data_to_json(currentGpsData).c_str(), false);
+                    if (currentGpsData.satellites > 3)
+                    {
+                        publishToTopic(topic.first, gps_data_to_json(currentGpsData).c_str(), false);
+                    }
                 }
             }
         }
@@ -446,8 +449,8 @@ String MqttManager::getNetworkInfo() const
     info += ", IP: " + WiFi.localIP().toString();
     info += ", RSSI: " + String(WiFi.RSSI());
 #else
-    info = "Cellular CSQ: " + String(ml307.getCSQ());
-    info += ", IP: " + ml307.getLocalIP();
+    info = "Cellular CSQ: " + String(ml307_at.getCSQ());
+    info += ", IP: " + ml307_at.getLocalIP();
 #endif
     return info;
 }
@@ -508,7 +511,7 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
     }
 #else
     // 4G模式下需要更严格的连接检查
-    if (!ml307.isNetworkReady() || !ml307Mqtt.connected())
+    if (!ml307_at.isNetworkReady() || !ml307Mqtt.connected())
     {
         debugPrint("MqttManager 4G网络或MQTT未连接");
         setNetworkState(NetworkState::DISCONNECTED);

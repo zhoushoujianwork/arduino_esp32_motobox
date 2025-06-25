@@ -4,7 +4,7 @@
 
 #include "Ml307Mqtt.h"
 
-Ml307Mqtt ml307Mqtt(ml307);
+Ml307Mqtt ml307Mqtt(ml307_at);
 
 Ml307Mqtt::Ml307Mqtt(Ml307AtModem& modem)
     : _modem(modem)

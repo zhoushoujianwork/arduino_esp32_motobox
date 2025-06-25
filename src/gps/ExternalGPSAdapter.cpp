@@ -9,6 +9,7 @@ ExternalGPSAdapter::ExternalGPSAdapter(GPS& gps) : _gps(gps) {
 }
 
 void ExternalGPSAdapter::begin() {
+    Serial.println("[ExternalGPSAdapter] 开始初始化");
     _gps.begin();
 }
 

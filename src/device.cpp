@@ -265,9 +265,9 @@ void Device::begin()
     config.cleanSession = true; // 是否清除会话，true: 清除，false: 保留
 
 #ifdef ENABLE_GSM
-    ml307.setDebug(true);
-    ml307Mqtt.setDebug(true);
-    ml307.begin(921600);
+    ml307_at.setDebug(true);
+    // ml307Mqtt.setDebug(true);
+    ml307_at.begin(921600);
 #endif
     // 设置回调在开始之前
     mqttManager.onMessage(mqttMessageCallback);
@@ -318,18 +318,18 @@ void Device::begin()
 
     // GPS初始化 - 使用统一的GPS管理器
     gpsManager.init();
-    gpsManager.setDebug(true);
+    Serial.println("GPS初始化完成");
+
 #ifdef ENABLE_GSM
 // 根据配置启用GNSS和LBS
-#if ENABLE_GNSS_BY_DEFAULT == true
+#ifdef ENABLE_GNSS
     gpsManager.setGNSSEnabled(true);
 #endif
 
-#if ENABLE_LBS_BY_DEFAULT == true
+#ifdef ENABLE_LBS
     gpsManager.setLBSEnabled(true);
 #endif
 #endif
-    Serial.println("GPS初始化完成");
 
 #endif
 }
@@ -395,14 +395,14 @@ void update_device_state()
 
     // 检查LBS状态变化
 #ifdef ENABLE_GSM
-    bool currentLbsReady = gpsManager.isLBSReady();
-    if (currentLbsReady != last_state.lbsReady)
-    {
-        notify_state_change("LBS状态",
-                            last_state.lbsReady ? "就绪" : "未就绪",
-                            currentLbsReady ? "就绪" : "未就绪");
-        device_state.lbsReady = currentLbsReady;
-    }
+    // bool currentLbsReady = gpsManager.isLBSReady();
+    // if (currentLbsReady != last_state.lbsReady)
+    // {
+    //     notify_state_change("LBS状态",
+    //                         last_state.lbsReady ? "就绪" : "未就绪",
+    //                         currentLbsReady ? "就绪" : "未就绪");
+    //     device_state.lbsReady = currentLbsReady;
+    // }
 
     // // 检查GNSS状态变化
     // bool currentGnssReady = gpsManager.isGNSSEnabled() && ml307.isGNSSReady();

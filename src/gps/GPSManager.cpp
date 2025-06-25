@@ -7,7 +7,7 @@
 #ifdef ENABLE_GSM
 #include "GSMGNSSAdapter.h"
 #include "../net/Ml307AtModem.h"
-extern Ml307AtModem ml307;
+extern Ml307AtModem ml307_at;
 #elif defined(ENABLE_GPS)
 #include "ExternalGPSAdapter.h"
 #include "GPS.h"
@@ -22,22 +22,21 @@ GPSManager &GPSManager::getInstance()
 
 void GPSManager::init()
 {
-    if (_initialized)
-        return;
-
-#ifdef ENABLE_GSM
-    _gpsInterface = new GSMGNSSAdapter(ml307);
-    _lbsEnabled = true; // ML307A支持LBS
-#elif defined(ENABLE_GPS)
+    _debug = true;
+    Serial.println("[GPSManager] 开始初始化");
+#ifdef ENABLE_GPS
+    // 外部GPS模式
+    Serial.println("[GPSManager] 外部GPS模式");
     _gpsInterface = new ExternalGPSAdapter(gps);
-    _lbsEnabled = false; // 外部GPS不支持LBS
 #else
-    _gpsInterface = nullptr;
-    _lbsEnabled = false;
+    // GSM模式：使用ML307模块 GPS和GNSS 2 选一的模块
+    _gpsInterface = nullptr; // 暂时不创建GPS接口
+    _lbsEnabled = true;      // ML307A支持LBS
 #endif
 
     if (_gpsInterface)
     {
+        Serial.println("[GPSManager] 开始初始化GPS");
         _gpsInterface->begin();
         _initialized = true;
     }
@@ -52,17 +51,15 @@ void GPSManager::loop()
     if (_gpsInterface)
     {
         _gpsInterface->loop();
-        
+
         // 获取GPS数据
         gps_data_t gpsData = _gpsInterface->getData();
-        
-        // GPS信号弱时处理LBS
-        if (gpsData.satellites <= 3) {
+
+        // GPS信号弱时处理LBS - 简化版本
+        if (gpsData.satellites <= 3)
+        {
             handleLBSUpdate();
         }
-    } else if (_lbsEnabled) {
-        // 没有GPS时只处理LBS
-        handleLBSUpdate();
     }
 }
 
@@ -70,121 +67,32 @@ bool GPSManager::isReady()
 {
     // 检查GPS信号质量
     bool gpsReady = false;
-    if (_gpsInterface && _gpsInterface->isReady()) {
+    if (_gpsInterface && _gpsInterface->isReady())
+    {
         gps_data_t data = _gpsInterface->getData();
         // GPS信号强度足够（卫星数大于3）时使用GPS
         gpsReady = data.satellites > 3;
     }
-    
+
     // 当GPS信号弱或不可用时，检查LBS是否可用
     bool lbsReady = false;
-    if (!gpsReady && _lbsEnabled) {
-        lbsReady = isLBSReady();
-    }
-    
+
     return gpsReady || lbsReady;
 }
 
 gps_data_t GPSManager::getData()
 {
-    if (_gpsInterface) {
-        gps_data_t gpsData = _gpsInterface->getData();
-        
-        // 检查GPS信号质量
-        if (gpsData.satellites > 3) {
-            return gpsData;
-        }
-        
-        // GPS信号弱，尝试使用LBS
-        if (_lbsEnabled && isLBSReady()) {
-            lbs_data_t lbsData = getLBSData();
-            if (lbsData.valid) {
-                gps_data_t convertedData = convertLBSToGPS(lbsData);
-                return convertedData;
-            }       
-        }
-        
-        // 如果都不可用，返回无效数据
-        gpsData.satellites = 0;
-        return gpsData;
-    }
-    
-    // 如果没有GPS接口，直接尝试LBS
-    if (_lbsEnabled && isLBSReady()) {
-        lbs_data_t lbsData = getLBSData();
-        if (lbsData.valid) {
-            gps_data_t convertedData = convertLBSToGPS(lbsData);
-            return convertedData;
-        }
-    }
-    
     // 都不可用时返回无效数据
     gps_data_t emptyData;
     memset(&emptyData, 0, sizeof(gps_data_t));
     return emptyData;
 }
 
-bool GPSManager::isLBSReady() const
-{
-    if (!_lbsEnabled)
-    {
-        return false;
-    }
-#ifdef ENABLE_GSM
-    return ml307.getLBSData().valid;
-#else
-    return false;
-#endif
-}
-
-lbs_data_t GPSManager::getLBSData()
-{
-    if (!_lbsEnabled)
-    {
-        lbs_data_t empty;
-        empty.valid = false;
-        return empty;
-    }
-
-#ifdef ENABLE_GSM
-    // 获取简化的LBS数据并转换为lbs_data_t格式
-    lbs_data_t simpleLBS = ml307.getLBSData();
-    lbs_data_t lbsData;
-    lbsData.valid = simpleLBS.valid;
-    lbsData.latitude = simpleLBS.latitude;
-    lbsData.longitude = simpleLBS.longitude;
-    lbsData.timestamp = simpleLBS.timestamp;
-    return lbsData;
-#else
-    lbs_data_t empty;
-    empty.valid = false;
-    return empty;
-#endif
-}
-
-bool GPSManager::hasLBSBackup()
-{
-    return _lbsEnabled && isLBSReady();
-}
-
 void GPSManager::updateLBSData()
 {
-    if (!_lbsEnabled)
-    {
-        return;
-    }
-
 #ifdef ENABLE_GSM
+    debugPrint("TODO:更新LBS数据");
     // 获取最新的LBS数据
-    lbs_data_t simpleLBS = ml307.getLBSData();
-    if (simpleLBS.valid)
-    {
-        _lbsData.valid = simpleLBS.valid;
-        _lbsData.latitude = simpleLBS.latitude;
-        _lbsData.longitude = simpleLBS.longitude;
-        _lbsData.timestamp = simpleLBS.timestamp;
-        _lastLBSUpdate = millis();
-    }
 #endif
 }
 
@@ -233,11 +141,6 @@ String GPSManager::getType() const
         return _gpsInterface->getType();
     }
 
-    if (isLBSReady())
-    {
-        return "LBS";
-    }
-
     return "None";
 }
 
@@ -246,7 +149,7 @@ void GPSManager::setGNSSEnabled(bool enable)
 #ifdef ENABLE_GSM
     if (_gpsInterface)
     {
-        ml307.enableGNSS(enable);
+        ml307_at.enableGNSS(enable);
     }
 #endif
 }
@@ -254,14 +157,10 @@ void GPSManager::setGNSSEnabled(bool enable)
 void GPSManager::setLBSEnabled(bool enable)
 {
 #ifdef ENABLE_GSM
-    if (_gpsInterface)
+    while (!ml307_at.enableLBS(enable))
     {
-        _lbsEnabled = enable;
-        while (!ml307.enableLBS(enable))
-        {
-            Serial.println("重试启用LBS...");
-            delay(1000);
-        }
+        Serial.println("重试启用LBS...");
+        delay(1000);
     }
 #endif
 }
@@ -271,27 +170,27 @@ bool GPSManager::isGNSSEnabled() const
     return false;
 }
 
-bool GPSManager::isLBSEnabled() const
-{
-#ifdef ENABLE_GSM
-    return _lbsEnabled && ml307.isLBSEnabled();
-#else
-    return false;
-#endif
-}
-
 // 全局GPS管理器实例
 GPSManager &gpsManager = GPSManager::getInstance();
 
-void GPSManager::handleLBSUpdate() {
-    if (!_lbsEnabled) {
-        return;
-    }
+void GPSManager::handleLBSUpdate()
+{
 #ifdef ENABLE_GSM
-    if (millis() - _lastLBSRequest >= LBS_UPDATE_INTERVAL) {
-        ml307.updateLBSData();
-        _lbsData = ml307.getLBSData();
+    if (millis() - _lastLBSRequest >= LBS_UPDATE_INTERVAL)
+    {
+        debugPrint("更新LBS数据");
+        ml307_at.updateLBSData();
+        String lbsResponse = ml307_at.getLBSRawData();
+        debugPrint("LBS原始数据: " + lbsResponse);
         _lastLBSRequest = millis();
     }
 #endif
+}
+
+void GPSManager::debugPrint(const String &message)
+{
+    if (_debug)
+    {
+        Serial.println("[GPSManager] [debug] " + message);
+    }
 }

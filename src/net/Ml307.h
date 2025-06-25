@@ -9,7 +9,7 @@
 #include "Ml307Mqtt.h"
 
 // 全局实例已在各自的 cpp 文件中定义
-extern Ml307AtModem ml307;
+extern Ml307AtModem ml307_at;
 extern Ml307Mqtt Ml307Mqtt;
 
 #endif // ml307_H 

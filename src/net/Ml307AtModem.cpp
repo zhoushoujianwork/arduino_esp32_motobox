@@ -5,9 +5,9 @@
 #include "Ml307AtModem.h"
 
 #ifdef ENABLE_GSM
-Ml307AtModem ml307(Serial1, GSM_RX_PIN, GSM_TX_PIN);
+Ml307AtModem ml307_at(Serial1, GSM_RX_PIN, GSM_TX_PIN);
 #else
-Ml307AtModem ml307(Serial1, 16, 17);
+Ml307AtModem ml307_at(Serial1, 16, 17);
 #endif
 
 Ml307AtModem::Ml307AtModem(HardwareSerial& serial, int rxPin, int txPin)
@@ -297,27 +297,18 @@ String Ml307AtModem::waitResponse(uint32_t timeout) {
             char c = _serial.read();
             response += c;
             
-            // 检查是否收到完整响应，增加更多可能的结束标记
+            // 检查是否收到完整响应
             if (response.endsWith("\r\nOK\r\n") || 
                 response.endsWith("\r\nERROR\r\n") ||
                 response.endsWith("\r\n> ") ||
-                response.endsWith("+MATREADY\r\n") ||  // 处理特殊响应
                 response.endsWith("\"CONNECT\"\r\n") ||
-                response.indexOf("ml307") >= 0 ||     // 检查模块信息
-                response.indexOf("4G_DTU_TCP") >= 0) { // 检查产品信息
+                response.indexOf("+MLBSLOC:") >= 0) {  // 特别检查LBS响应
                 break;
             }
         }
     }
     
-    if (_debug) {
-        if (response.length() == 0) {
-            debugPrint("AT响应超时");
-        } else {
-            debugPrint("AT响应: " + response);
-        }
-    }
-    
+    debugPrint("完整AT响应: [" + response + "]");
     return response;
 }
 
@@ -344,6 +335,7 @@ String Ml307AtModem::getGNSSInfo() {
 
 // GNSS定位功能实现
 bool Ml307AtModem::gnssInit() {
+    return false;
     debugPrint("初始化GNSS模块...");
     
     // 检查GNSS是否支持
@@ -508,26 +500,40 @@ void Ml307AtModem::resetGNSSData() {
 bool Ml307AtModem::enableLBS(bool enable) {
     debugPrint("配置LBS: " + String(enable ? "启用" : "禁用"));
     if (enable) {
-        // 配置为OneOs定位服务
+        debugPrint("=== OneOs定位流程（ML307R-DL专用）===");
+        
+        // 1. 设置平台为OneOs（唯一支持的平台）
         if (!sendATWithRetry("AT+MLBSCFG=\"method\",40", "OK", 3, 2000)) {
-            debugPrint("配置LBS方法失败");
+            debugPrint("OneOs定位平台配置失败");
             return false;
         }
+        debugPrint("OneOs定位平台配置成功");
         
-        // 配置使用邻区信息提高精度
+        // 2. 设置PID（可选）
+        if (!sendATWithRetry("AT+MLBSCFG=\"pid\",\"Motobox_V1.0\"", "OK", 3, 2000)) {
+            debugPrint("OneOs PID配置失败（可选参数）");
+            // PID是可选的，失败不影响定位
+        } else {
+            debugPrint("OneOs PID配置成功");
+        }
+        
+        // 3. 启用邻区定位
         if (!sendATWithRetry("AT+MLBSCFG=\"nearbtsen\",1", "OK", 3, 2000)) {
             debugPrint("配置邻区信息失败");
             return false;
         }
+        debugPrint("邻区定位配置成功");
 
-        // 配置精度为8位
+        // 4. 配置精度
         if (!sendATWithRetry("AT+MLBSCFG=\"precision\",8", "OK", 3, 2000)) {
             debugPrint("配置精度失败");
             return false;
         }
+        debugPrint("精度配置成功");
 
         _lbsEnabled = true;
-        _lastLBSUpdate = 0;  // 重置更新时间
+        _lastLBSUpdate = 0;
+        debugPrint("LBS配置完成，可以开始定位");
         return true;
     } else {
         _lbsEnabled = false;
@@ -541,16 +547,18 @@ bool Ml307AtModem::isLBSEnabled() {
     return response.indexOf("+MLBSCFG: \"method\",") >= 0;
 }
 
-lbs_data_t Ml307AtModem::getLBSData() {
+// 简化的LBS数据获取 - 只返回原始响应
+String Ml307AtModem::getLBSRawData() {
     // 每秒最多更新一次
     if (millis() - _lastLBSUpdate > 1000) {
         updateLBSData();
     }
-    return _lbsData;
+    return _lbsRawResponse;
 }
 
 bool Ml307AtModem::updateLBSData() {
     if (!_lbsEnabled) {
+        debugPrint("LBS未启用");
         return false;
     }
     
@@ -559,12 +567,76 @@ bool Ml307AtModem::updateLBSData() {
         return false;
     }
     
-    String response = sendATWithResponse("AT+MLBSLOC", 5000);
-    if (parseLBSInfo(response)) {
-        _lastLBSUpdate = millis();
-        return true;
+    // 检查网络状态
+    if (!isNetworkReady()) {
+        debugPrint("网络未就绪，无法进行LBS定位");
+        return false;
     }
     
+    // 检查信号强度
+    int csq = getCSQ();
+    if (csq < 5) {
+        debugPrint("信号太弱，CSQ: " + String(csq));
+        return false;
+    }
+    
+    debugPrint("=== 开始LBS定位请求 ===");
+    debugPrint("发送命令: AT+MLBSLOC");
+    
+    String response = sendATWithResponse("AT+MLBSLOC", 15000);
+    debugPrint("LBS原始响应: " + response);
+    
+    _lbsRawResponse = response;
+    _lastLBSUpdate = millis();
+    
+    // 检查是否包含位置信息
+    if (response.indexOf("+MLBSLOC:") >= 0) {
+        debugPrint("LBS响应包含位置信息");
+        
+        // 解析状态码
+        int statStart = response.indexOf("+MLBSLOC: ") + 10;
+        int statEnd = response.indexOf(",", statStart);
+        if (statEnd > statStart) {
+            String statStr = response.substring(statStart, statEnd);
+            int stat = statStr.toInt();
+            debugPrint("LBS定位状态码: " + String(stat));
+            
+            // 根据状态码判断结果
+            switch(stat) {
+                case 100:
+                    debugPrint("✅ LBS定位成功");
+                    break;
+                case 120:
+                    debugPrint("❌ LBS请求超时");
+                    break;
+                case 121:
+                    debugPrint("❌ API Key非法或过期");
+                    break;
+                case 122:
+                    debugPrint("❌ 请求参数非法");
+                    break;
+                case 123:
+                    debugPrint("❌ 请求超出日配额");
+                    break;
+                case 124:
+                    debugPrint("❌ QPS超出限制");
+                    break;
+                case 125:
+                    debugPrint("❌ 请求超出总配额");
+                    break;
+                case 126:
+                    debugPrint("❌ 未知错误");
+                    break;
+                default:
+                    debugPrint("❓ 未知状态码: " + String(stat));
+                    break;
+            }
+            
+            return stat == 100; // 只有状态码100表示成功
+        }
+    }
+    
+    debugPrint("❌ LBS响应异常或无位置信息");
     return false;
 }
 
@@ -597,82 +669,6 @@ bool Ml307AtModem::isGNSSEnabled() {
     return response.indexOf("+CGNSPWR: 1") >= 0;
 }
 
-bool Ml307AtModem::parseLBSInfo(const String& response) {
-    // 重置数据有效性
-    resetLBSData();
-    
-    if (response.indexOf("+MLBSLOC:") == -1) {
-        if (response.indexOf("+CME ERROR:") != -1) {
-            int errorStart = response.indexOf("+CME ERROR:") + 11;
-            String errorCode = response.substring(errorStart);
-            errorCode.trim();
-            _lbsData.stat = errorCode.toInt();
-            debugPrint("LBS错误: " + errorCode);
-        } else {
-            debugPrint("LBS响应异常，未找到+MLBSLOC");
-        }
-        return false;
-    }
-
-    // 解析MLBSLOC数据, 格式: +MLBSLOC: <stat>,<longitude>,<latitude>[,<radius>][,<descr>]
-    int startPos = response.indexOf("+MLBSLOC:") + 9;
-    String dataStr = response.substring(startPos);
-    dataStr.trim();
-    
-    int commaPos = 0;
-    int lastCommaPos = -1;
-    int valueIndex = 0;
-    
-    while(valueIndex <= 4) { // 最多解析5个字段
-        commaPos = dataStr.indexOf(',', lastCommaPos + 1);
-
-        String value;
-        if (commaPos != -1) {
-            value = dataStr.substring(lastCommaPos + 1, commaPos);
-        } else {
-            value = dataStr.substring(lastCommaPos + 1);
-        }
-        value.trim();
-
-        if (value.startsWith("\"")) {
-            value = value.substring(1, value.length() - 1);
-        }
-
-        switch (valueIndex) {
-            case 0: _lbsData.stat = value.toInt(); break;
-            case 1: _lbsData.longitude = value.toFloat(); break;
-            case 2: _lbsData.latitude = value.toFloat(); break;
-            case 3: _lbsData.radius = value.toInt(); break;
-            case 4: _lbsData.descr = value; break;
-        }
-
-        if (commaPos == -1) {
-            break;
-        }
-        
-        lastCommaPos = commaPos;
-        valueIndex++;
-    }
-
-    if (_lbsData.stat == 100) {
-        _lbsData.valid = true;
-        debugPrint("LBS解析成功: " + 
-                  String(_lbsData.longitude, 6) + ", " + 
-                  String(_lbsData.latitude, 6) + 
-                  (_lbsData.radius > 0 ? ", r:" + String(_lbsData.radius) : "") +
-                  (!_lbsData.descr.isEmpty() ? ", d:" + _lbsData.descr : ""));
-    } else {
-        debugPrint("LBS状态码错误: " + String(_lbsData.stat));
-    }
-
-    return _lbsData.valid;
-}
-
-void Ml307AtModem::resetLBSData() {
-    memset(&_lbsData, 0, sizeof(lbs_data_t));
-    _lbsData.valid = false;
-}
-
 // 在实现文件中添加线程安全的AT命令方法
 bool Ml307AtModem::sendATThreadSafe(const String& cmd, const String& expected, uint32_t timeout) {
     std::lock_guard<std::mutex> lock(_atMutex);
@@ -682,4 +678,35 @@ bool Ml307AtModem::sendATThreadSafe(const String& cmd, const String& expected, u
 String Ml307AtModem::sendATWithResponseThreadSafe(const String& cmd, uint32_t timeout) {
     std::lock_guard<std::mutex> lock(_atMutex);
     return sendATWithResponse(cmd, timeout);
+}
+
+void Ml307AtModem::debugLBSConfig() {
+    debugPrint("=== LBS配置状态检查 ===");
+    
+    // 检查当前配置的定位平台
+    String methodResponse = sendATWithResponse("AT+MLBSCFG=\"method\"");
+    debugPrint("定位平台配置: " + methodResponse);
+    
+    // 检查API Key配置（仅高德需要）
+    String apiKeyResponse = sendATWithResponse("AT+MLBSCFG=\"apikey\"");
+    debugPrint("API Key配置: " + apiKeyResponse);
+    
+    // 检查签名配置（仅高德需要）
+    String signKeyResponse = sendATWithResponse("AT+MLBSCFG=\"signkey\"");
+    debugPrint("签名密钥配置: " + signKeyResponse);
+    
+    String signEnResponse = sendATWithResponse("AT+MLBSCFG=\"signen\"");
+    debugPrint("签名启用配置: " + signEnResponse);
+    
+    // 检查PID配置（仅OneOs需要）
+    String pidResponse = sendATWithResponse("AT+MLBSCFG=\"pid\"");
+    debugPrint("PID配置: " + pidResponse);
+    
+    // 检查邻区信息配置
+    String nearbtsResponse = sendATWithResponse("AT+MLBSCFG=\"nearbtsen\"");
+    debugPrint("邻区信息配置: " + nearbtsResponse);
+    
+    // 检查精度配置
+    String precisionResponse = sendATWithResponse("AT+MLBSCFG=\"precision\"");
+    debugPrint("精度配置: " + precisionResponse);
 }

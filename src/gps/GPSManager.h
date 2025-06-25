@@ -6,6 +6,7 @@
 #define GPS_MANAGER_H
 
 #include "GPSInterface.h"
+#include "ExternalGPSAdapter.h"
 #include "GPSData.h"
 #include "LBSData.h"
 #include "config.h"
@@ -20,9 +21,6 @@ public:
     gps_data_t getData();
     void updateLBSData();
     // LBS功能
-    bool isLBSReady() const;
-    lbs_data_t getLBSData();
-    bool hasLBSBackup();
     gps_data_t convertLBSToGPS(const lbs_data_t& lbsData);
     
     void setDebug(bool debug);
@@ -41,14 +39,14 @@ public:
 private:
     GPSManager() = default;
     ~GPSManager() = default;
+    bool _debug = false;
     
     GPSInterface* _gpsInterface;
     bool _initialized;
-    bool _lbsEnabled;
     lbs_data_t _lbsData;
     unsigned long _lastLBSUpdate;
     unsigned long _lastLBSRequest;
-    static const unsigned long LBS_UPDATE_INTERVAL = 30000; // 30秒
+    static const unsigned long LBS_UPDATE_INTERVAL = 10000; // 1秒
     static const unsigned long LBS_REQUEST_INTERVAL = 1000; // 1秒
     void handleLBSUpdate();
     void debugPrint(const String &message);
