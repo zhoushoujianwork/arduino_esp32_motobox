@@ -71,6 +71,7 @@ String device_state_to_json(device_state_t *state)
 
 void mqttMessageCallback(const String &topic, const String &payload)
 {
+#ifndef DISABLE_MQTT
     Serial.printf("收到消息 [%s]: %s\n", topic.c_str(), payload.c_str());
 
     // 解析JSON
@@ -127,10 +128,12 @@ void mqttMessageCallback(const String &topic, const String &payload)
             Serial.printf("GPS调试模式: %s\n", enable ? "开启" : "关闭");
         }
     }
+#endif
 }
 
 void mqttConnectionCallback(bool connected)
 {
+#ifndef DISABLE_MQTT
     if (connected)
     {
         Serial.println("MQTT连接成功，订阅主题");
@@ -166,6 +169,7 @@ void mqttConnectionCallback(bool connected)
     {
         Serial.println("MQTT连接失败");
     }
+#endif
 }
 
 Device device;
@@ -252,7 +256,21 @@ void Device::begin()
     }
 #endif
 
-#if defined(ENABLE_WIFI) || defined(ENABLE_GSM)
+#ifdef ENABLE_GSM
+    ml307_at.setDebug(true);
+    // ml307Mqtt.setDebug(true);
+    ml307_at.begin(115200);
+
+#ifdef ENABLE_GNSS
+    gpsManager.setGNSSEnabled(true);
+#endif
+
+#ifdef ENABLE_LBS
+    gpsManager.setLBSEnabled(true);
+#endif
+#endif
+
+#if (defined(ENABLE_WIFI) || defined(ENABLE_GSM)) && !defined(DISABLE_MQTT)
     // 创建 MQTT 配置
     MqttManagerConfig config;
     // 通用 MQTT 配置
@@ -264,46 +282,40 @@ void Device::begin()
     config.keepAlive = MQTT_KEEP_ALIVE;
     config.cleanSession = true; // 是否清除会话，true: 清除，false: 保留
 
-#ifdef ENABLE_GSM
-    ml307_at.setDebug(true);
-    // ml307Mqtt.setDebug(true);
-    ml307_at.begin(921600);
-#endif
     // 设置回调在开始之前
     mqttManager.onMessage(mqttMessageCallback);
     mqttManager.onConnect(mqttConnectionCallback);
-    mqttManager.onNetworkState([](NetworkState state)
-                               {
+    mqttManager.onMqttState([](MqttState state)
+                            {
         switch (state) {
-            case NetworkState::CONNECTED:
+            case MqttState::CONNECTED:
 #ifdef ENABLE_WIFI
+                // WiFi模式下可以同时更新WiFi状态
                 device_state.wifiConnected = true;
-                Serial.println("WiFi连接成功");
+                Serial.println("MQTT连接成功");
 #else
-                device_state.gsmReady = true;
-                Serial.println("4G连接成功");
+                // GSM模式下只更新MQTT状态
+                Serial.println("MQTT连接成功");
 #endif
-                ledManager.setLEDState(LED_BLINK_DUAL); // 双闪
+                ledManager.setLEDState(LED_BLINK_DUAL);
                 break;
-            case NetworkState::DISCONNECTED:
+            case MqttState::DISCONNECTED:
 #ifdef ENABLE_WIFI
                 device_state.wifiConnected = false;
-                Serial.println("WiFi连接断开");
+                Serial.println("MQTT连接断开");
 #else
-                device_state.gsmReady = false;
-                Serial.println("4G连接断开");
+                Serial.println("MQTT连接断开");
 #endif
-                ledManager.setLEDState(LED_OFF); // 关闭
+                ledManager.setLEDState(LED_OFF);
                 break;
-            case NetworkState::ERROR:
+            case MqttState::ERROR:
 #ifdef ENABLE_WIFI
                 device_state.wifiConnected = false;
-                Serial.println("WiFi连接错误");
+                Serial.println("MQTT连接错误");
 #else
-                device_state.gsmReady = false;
-                Serial.println("4G连接错误");
+                Serial.println("MQTT连接错误");
 #endif
-                ledManager.setLEDState(LED_BLINK_5_SECONDS); // 快闪
+                ledManager.setLEDState(LED_BLINK_5_SECONDS);
                 break;
         } });
 
@@ -316,21 +328,10 @@ void Device::begin()
     }
     Serial.println("完成底层网络配置，wifi/gsm/mqtt 初始化完成");
 
-    // GPS初始化 - 使用统一的GPS管理器
+#else
+    // 当禁用MQTT时，仍然需要初始化GPS
     gpsManager.init();
-    Serial.println("GPS初始化完成");
-
-#ifdef ENABLE_GSM
-// 根据配置启用GNSS和LBS
-#ifdef ENABLE_GNSS
-    gpsManager.setGNSSEnabled(true);
-#endif
-
-#ifdef ENABLE_LBS
-    gpsManager.setLBSEnabled(true);
-#endif
-#endif
-
+Serial.println("GPS初始化完成!");
 #endif
 }
 

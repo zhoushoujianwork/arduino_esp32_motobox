@@ -23,11 +23,11 @@ enum class MqttNetworkType {
     NONE
 };
 
-// 添加连接状态枚举
-enum class NetworkState {
+// 将 MqttState 改为 MqttState
+enum class MqttState {
+    CONNECTED,
     DISCONNECTED,
     CONNECTING,
-    CONNECTED,
     ERROR
 };
 
@@ -60,6 +60,7 @@ struct TopicConfig {
     unsigned long lastPublishTime;
 };
 
+
 class MqttManager {
 public:
     // 构造函数
@@ -91,10 +92,10 @@ public:
     String getNetworkInfo() const;
     
     // 添加网络状态回调设置
-    void onNetworkState(std::function<void(NetworkState)> callback);
+    void onMqttState(std::function<void(MqttState)> callback);
     
     // 获取当前网络状态
-    NetworkState getNetworkState() const { return _networkState; }
+    MqttState getMqttState() const { return _MqttState; }
     
     // 添加主题配置
     void addTopic(const String& name, const String& topic, unsigned long interval);
@@ -147,12 +148,12 @@ private:
     void debugPrint(const String& msg);
     bool _debug;
     
-    NetworkState _networkState;
+    MqttState _MqttState;
     unsigned long _connectionStartTime;
     uint32_t _connectionTimeout;
     
     // 网络状态回调
-    std::function<void(NetworkState)> _networkStateCallback;
+    std::function<void(MqttState)> _MqttStateCallback;
     
     // 主题配置映射
     std::map<String, TopicConfig> _topicConfigs;
@@ -160,7 +161,7 @@ private:
     // 添加连接状态跟踪
     bool _lastConnectionState;
 
-    void setNetworkState(NetworkState newState);
+    void setMqttState(MqttState newState);
 };
 
 // 全局实例

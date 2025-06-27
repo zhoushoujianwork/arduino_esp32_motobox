@@ -31,7 +31,6 @@ void GPSManager::init()
 #else
     // GSM模式：使用ML307模块 GPS和GNSS 2 选一的模块
     _gpsInterface = nullptr; // 暂时不创建GPS接口
-    _lbsEnabled = true;      // ML307A支持LBS
 #endif
 
     if (_gpsInterface)
@@ -46,6 +45,10 @@ void GPSManager::init()
     _lastLBSUpdate = 0;
 }
 
+/*
+GPS和GNSS 是 2 选一的情况
+LBS 是都会请求执行参考，让信号很差的时候用
+*/
 void GPSManager::loop()
 {
     if (_gpsInterface)
@@ -55,12 +58,14 @@ void GPSManager::loop()
         // 获取GPS数据
         gps_data_t gpsData = _gpsInterface->getData();
 
-        // GPS信号弱时处理LBS - 简化版本
+        // GPS信号弱时处理GNSS- 简化版本
         if (gpsData.satellites <= 3)
         {
-            handleLBSUpdate();
+            debugPrint("GPS信号弱，开始GNSS定位");
         }
     }
+    // LBS 都查询
+    handleLBSUpdate();
 }
 
 bool GPSManager::isReady()
@@ -176,13 +181,10 @@ GPSManager &gpsManager = GPSManager::getInstance();
 void GPSManager::handleLBSUpdate()
 {
 #ifdef ENABLE_GSM
-    if (millis() - _lastLBSRequest >= LBS_UPDATE_INTERVAL)
+    if (ml307_at.updateLBSData())
     {
-        debugPrint("更新LBS数据");
-        ml307_at.updateLBSData();
         String lbsResponse = ml307_at.getLBSRawData();
         debugPrint("LBS原始数据: " + lbsResponse);
-        _lastLBSRequest = millis();
     }
 #endif
 }

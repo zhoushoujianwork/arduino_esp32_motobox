@@ -16,7 +16,8 @@
 #include "led/LEDManager.h"
 #include "device.h"
 
-#if defined(ENABLE_GSM) || defined(ENABLE_WIFI)
+// 条件包含 MQTT 管理器头文件
+#if (defined(ENABLE_GSM) || defined(ENABLE_WIFI)) && !defined(DISABLE_MQTT)
 #include "net/MqttManager.h"
 #endif
 
@@ -148,8 +149,10 @@ void taskDataProcessing(void *parameter)
     compass.loop();
 #endif
 
-    // MQTT 消息处理
+    // MQTT 消息处理 - 条件编译
+#ifndef DISABLE_MQTT
     mqttManager.loop();
+#endif
 
     delay(5);
   }
@@ -243,9 +246,11 @@ void loop()
     //   }
     // }
 
-    // 发送状态消息
+    // 发送状态消息 - 条件编译
+#ifndef DISABLE_MQTT
     // String status = String("设备运行时间: ") + (millis() / 1000) + "秒";
     // mqttManager.publish("test/status", status.c_str());
     // mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
+#endif
   }
 }

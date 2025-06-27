@@ -26,7 +26,7 @@ bool Ml307Mqtt::connect(const char* broker, uint16_t port,
 
     debugPrint("MQTT连接开始");
 
-    _modem.sendAT("AT+MQTTDISC=0");
+    _modem.sendATThreadSafe("AT+MQTTDISC=0");
     delay(1000); // 等待断开完成
 
     // 1. 检查是否已连接，已连接则结束
@@ -35,7 +35,7 @@ bool Ml307Mqtt::connect(const char* broker, uint16_t port,
     } else {
         // 如果未连接，也要确保状态为未连接
         for (int i = 0; i < 10; ++i) {
-            String resp = _modem.sendATWithResponse("AT+MQTTSTATE=0");
+            String resp = _modem.sendATWithResponseThreadSafe("AT+MQTTSTATE=0");
             int s = -1;
             int idx2 = resp.indexOf("+MQTTSTATE: ");
             if (idx2 >= 0) s = resp.substring(idx2 + 12, idx2 + 13).toInt();
@@ -46,31 +46,31 @@ bool Ml307Mqtt::connect(const char* broker, uint16_t port,
 
     // 2. 配置SSL
     if (port == 8883) {
-        if (!_modem.sendATWithRetry("AT+MQTTCFG=\"ssl\",0,1")) {
+        if (!_modem.sendATWithRetryThreadSafe("AT+MQTTCFG=\"ssl\",0,1")) {
             debugPrint("设置SSL失败");
             return false;
         }
     }
 
     // 3. 配置clean session
-    String resp = _modem.sendATWithResponse("AT+MQTTSTATE=0");
+    String resp = _modem.sendATWithResponseThreadSafe("AT+MQTTSTATE=0");
     if (resp.indexOf("+MQTTSTATE: 3") < 0) {
-        _modem.sendAT("AT+MQTTDISC=0");
+        _modem.sendATThreadSafe("AT+MQTTDISC=0");
         delay(1000);
     }
-    if (!_modem.sendATWithRetry("AT+MQTTCFG=\"clean\",0,1")) {
+    if (!_modem.sendATWithRetryThreadSafe("AT+MQTTCFG=\"clean\",0,1")) {
         debugPrint("设置clean session失败");
         return false;
     }
 
     // 4. 配置keep alive
-    if (!_modem.sendATWithRetry("AT+MQTTCFG=\"pingreq\",0,60")) {
+    if (!_modem.sendATWithRetryThreadSafe("AT+MQTTCFG=\"pingreq\",0,60")) {
         debugPrint("设置keep alive失败");
         return false;
     }
 
     // 5. 配置HEX编码
-    if (!_modem.sendATWithRetry("AT+MQTTCFG=\"encoding\",0,1,1")) {
+    if (!_modem.sendATWithRetryThreadSafe("AT+MQTTCFG=\"encoding\",0,1,1")) {
         debugPrint("设置HEX编码失败");
         return false;
     }
@@ -78,7 +78,7 @@ bool Ml307Mqtt::connect(const char* broker, uint16_t port,
     // 6. 创建MQTT连接
     String cmd = String("AT+MQTTCONN=0,\"") + broker + "\"," + String(port) +
                  ",\"" + _clientId + "\",\"" + _username + "\",\"" + _password + "\"";
-    if (!_modem.sendATWithRetry(cmd, "OK", 5, 10000)) {
+    if (!_modem.sendATWithRetryThreadSafe(cmd, "OK", 5, 10000)) {
         debugPrint("MQTT连接指令失败");
         return false;
     }
@@ -86,7 +86,7 @@ bool Ml307Mqtt::connect(const char* broker, uint16_t port,
     // 7. 等待连接完成（最多10秒，每500ms检查一次）
     bool connected = false;
     for (int i = 0; i < 20; ++i) {
-        String resp = _modem.sendATWithResponse("AT+MQTTSTATE=0");
+        String resp = _modem.sendATWithResponseThreadSafe("AT+MQTTSTATE=0");
         int s = -1;
         int idx2 = resp.indexOf("+MQTTSTATE: ");
         if (idx2 >= 0) s = resp.substring(idx2 + 12, idx2 + 13).toInt();
@@ -113,7 +113,7 @@ bool Ml307Mqtt::connect(const char* broker, uint16_t port,
  */
 bool Ml307Mqtt::isConnected() {
     // 查询连接状态
-    String resp = _modem.sendATWithResponse("AT+MQTTSTATE=0");
+    String resp = _modem.sendATWithResponseThreadSafe("AT+MQTTSTATE=0");
     int state = -1;
     int idx = resp.indexOf("+MQTTSTATE: ");
     if (idx >= 0) {
@@ -136,11 +136,11 @@ bool Ml307Mqtt::isConnected() {
  * 断开MQTT连接并等待状态变为未连接
  */
 void Ml307Mqtt::disconnectAndWait() {
-    _modem.sendAT("AT+MQTTDISC=0");
+    _modem.sendATThreadSafe("AT+MQTTDISC=0");
     // 最多等待5秒，每500ms检查一次
     for (int i = 0; i < 10; ++i) {
         delay(500);
-        String resp = _modem.sendATWithResponse("AT+MQTTSTATE=0");
+        String resp = _modem.sendATWithResponseThreadSafe("AT+MQTTSTATE=0");
         if (resp.indexOf("+MQTTSTATE: 3") >= 0) {
             debugPrint("MQTT已断开");
             break;
@@ -160,7 +160,7 @@ bool Ml307Mqtt::publish(const char* topic, const char* payload, bool retain) {
     String cmd = "AT+MQTTPUB=0,\"" + String(topic) + "\"," + String(qos) + "," + String(retain ? 1 : 0) + "," + String(dup) + "," + String(strlen(payload)) + "," + hexPayload;
     
     // 增加超时时间到30秒，避免发布超时
-    return _modem.sendAT(cmd, "OK", 30000);
+    return _modem.sendATThreadSafe(cmd, "OK", 30000);
 }
 
 /**
@@ -169,7 +169,7 @@ bool Ml307Mqtt::publish(const char* topic, const char* payload, bool retain) {
 bool Ml307Mqtt::subscribe(const char* topic, uint8_t qos) {
     if (!isConnected()) return false;
     String cmd = "AT+MQTTSUB=0,\"" + String(topic) + "\"," + String(qos);
-    return _modem.sendAT(cmd);
+    return _modem.sendATThreadSafe(cmd);
 }
 
 /**
@@ -178,7 +178,7 @@ bool Ml307Mqtt::subscribe(const char* topic, uint8_t qos) {
 bool Ml307Mqtt::unsubscribe(const char* topic) {
     if (!isConnected()) return false;
     String cmd = "AT+MQTTUNSUB=0,\"" + String(topic) + "\"";
-    return _modem.sendAT(cmd);
+    return _modem.sendATThreadSafe(cmd);
 }
 
 /**
@@ -204,10 +204,13 @@ bool Ml307Mqtt::connected() {
 
 // 4G 网络连接状态检查,
 void Ml307Mqtt::loop() {
+    // 如果在获取lbs数据，则不进行mqtt的读取
+    if (ml307_at.isLBSLoading()) return;
+
     if (!_connected) return;
 
     // 检查是否有新消息
-    String response = _modem.sendATWithResponse("AT+MQTTREAD?");
+    String response = _modem.sendATWithResponseThreadSafe("AT+MQTTREAD?");
     if (response.indexOf("+MQTTREAD:") >= 0) {
         parseMessageData(response);
         Serial.println("MQTT读取到消息 " + response);
@@ -220,7 +223,7 @@ bool Ml307Mqtt::configureConnection() {
     cmd += _clientId;
     cmd += "\"";
     
-    return _modem.sendAT(cmd);
+    return _modem.sendATThreadSafe(cmd);
 }
 
 bool Ml307Mqtt::parseMessageData(const String& data) {

@@ -10,7 +10,7 @@ MqttMessageCallback MqttManager::_messageCallback = nullptr;
 MqttManager::MqttManager()
     : _wifiMqttClient(nullptr), _isInitialized(false), _lastReconnectAttempt(0),
       _debug(false),
-      _connectCallback(nullptr), _networkState(NetworkState::DISCONNECTED),
+      _connectCallback(nullptr), _MqttState(MqttState::DISCONNECTED),
       _connectionStartTime(0), _connectionTimeout(30000),
       _lastConnectionState(false)
 {
@@ -74,7 +74,7 @@ bool MqttManager::initWifi()
 bool MqttManager::initCellular()
 {
     debugPrint("MqttManager initCellular");
-    _networkState = NetworkState::CONNECTING;
+    _MqttState = MqttState::CONNECTING;
     _connectionStartTime = millis();
 
     return true;
@@ -100,11 +100,11 @@ bool MqttManager::connectWifi()
     
     // 设置连接超时时间
     _connectionStartTime = millis();
-    _networkState = NetworkState::CONNECTING;
+    _MqttState = MqttState::CONNECTING;
     
-    if (_networkStateCallback)
+    if (_MqttStateCallback)
     {
-        _networkStateCallback(_networkState);
+        _MqttStateCallback(_MqttState);
     }
     
     // 立即返回，让 loop() 函数处理连接状态检查
@@ -137,7 +137,7 @@ bool MqttManager::connect()
         if (!connectWifi())
         {
             debugPrint("WiFi connection failed");
-            setNetworkState(NetworkState::ERROR);
+            setMqttState(MqttState::ERROR);
             return false;
         }
     }
@@ -159,7 +159,7 @@ bool MqttManager::connect()
         debugPrint("MQTT port: " + String(_config.port));
         debugPrint("MQTT clientId: " + String(_config.clientId));
         debugPrint("MQTT username: " + String(_config.username));
-        setNetworkState(NetworkState::ERROR);
+        setMqttState(MqttState::ERROR);
     }
 #else
     debugPrint("MqttManager connect 4G");
@@ -179,7 +179,7 @@ bool MqttManager::connect()
     debugPrint("MqttManager connect callback success");
     if (success)
     {
-        setNetworkState(NetworkState::CONNECTED);
+        setMqttState(MqttState::CONNECTED);
         // 添加MQTT连接回调
         if (_connectCallback)
         {
@@ -202,22 +202,27 @@ bool MqttManager::reconnect()
 }
 
 // bool MqttManager::isConnected() {
-//     return _networkState == NetworkState::CONNECTED;
+//     return _MqttState == MqttState::CONNECTED;
 // }
 
-void MqttManager::setNetworkState(NetworkState newState) {
-    if (_networkState != newState) {
-        NetworkState oldState = _networkState;
-        _networkState = newState;
+void MqttManager::setMqttState(MqttState newState) {
+    if (_MqttState != newState) {
+        MqttState oldState = _MqttState;
+        _MqttState = newState;
         debugPrint("网络状态变化: " + String((int)oldState) + " -> " + String((int)newState));
-        if (_networkStateCallback) {
-            _networkStateCallback(_networkState);
+        if (_MqttStateCallback) {
+            _MqttStateCallback(_MqttState);
         }
     }
 }
 
 void MqttManager::loop()
 {
+    ml307_at.isNetworkReadyCheck();
+
+    // 如果在获取lbs数据，则不进行mqtt的读取
+    if (ml307_at.isLBSLoading()) return;
+
 #ifdef ENABLE_WIFI
     if (wifiManager.getConfigMode()) return;
 #endif
@@ -240,19 +245,19 @@ void MqttManager::loop()
         }
         
         if (WiFi.status() != WL_CONNECTED) {
-            setNetworkState(NetworkState::DISCONNECTED);
+            setMqttState(MqttState::DISCONNECTED);
         } else {
             if (_wifiMqttClient && !_wifiMqttClient->connected()) {
-                setNetworkState(NetworkState::CONNECTING);
+                setMqttState(MqttState::CONNECTING);
                 reconnect();
             } else if (_wifiMqttClient && _wifiMqttClient->connected()) {
-                setNetworkState(NetworkState::CONNECTED);
+                setMqttState(MqttState::CONNECTED);
             }
         }
         if (_wifiMqttClient) _wifiMqttClient->loop();
 #else
         // 4G逻辑优化 - 减少重复查询
-        bool currentConnected = (_networkState == NetworkState::CONNECTED) && isMqttConnected();
+        bool currentConnected = (_MqttState == MqttState::CONNECTED) && isMqttConnected();
         
         if (currentConnected != _lastConnectionState) {
             _lastConnectionState = currentConnected;
@@ -261,14 +266,14 @@ void MqttManager::loop()
             }
         }
         
-        debugPrint("MqttManager loop networkState: " + String((int)_networkState));
-        switch (_networkState)
+        debugPrint("MqttManager loop MqttState: " + String((int)_MqttState));
+        switch (_MqttState)
         {
-        case NetworkState::CONNECTING:
+        case MqttState::CONNECTING:
         {
             // 只在连接超时时检查网络状态，避免频繁查询
             if (millis() - _connectionStartTime > _connectionTimeout) {
-                setNetworkState(NetworkState::ERROR);
+                setMqttState(MqttState::ERROR);
                 debugPrint("Cellular connection timeout");
             } else {
                 // 减少网络状态检查频率
@@ -278,7 +283,7 @@ void MqttManager::loop()
                     
                     if (ml307_at.isNetworkReady()) {
                         if (ml307Mqtt.connected()) {
-                            setNetworkState(NetworkState::CONNECTED);
+                            setMqttState(MqttState::CONNECTED);
                             debugPrint("Cellular connected, CSQ: " + String(ml307_at.getCSQ()));
                             
                             if (_connectCallback) {
@@ -287,7 +292,7 @@ void MqttManager::loop()
                         } else {
                             debugPrint("网络已就绪，尝试MQTT连接...");
                             if (connect()) {
-                                setNetworkState(NetworkState::CONNECTED);
+                                setMqttState(MqttState::CONNECTED);
                                 debugPrint("MQTT连接成功");
                             }
                         }
@@ -297,14 +302,14 @@ void MqttManager::loop()
             break;
         }
 
-        case NetworkState::CONNECTED:
+        case MqttState::CONNECTED:
         {
             // 检查网络和MQTT连接状态
             if (!ml307_at.isNetworkReady()) {
-                setNetworkState(NetworkState::DISCONNECTED);
+                setMqttState(MqttState::DISCONNECTED);
                 debugPrint("Cellular network disconnected");
             } else if (!ml307Mqtt.connected()) {
-                setNetworkState(NetworkState::DISCONNECTED);
+                setMqttState(MqttState::DISCONNECTED);
                 debugPrint("Cellular MQTT disconnected");
             } else {
                 // 连接正常，处理MQTT消息
@@ -313,12 +318,12 @@ void MqttManager::loop()
             break;
         }
 
-        case NetworkState::DISCONNECTED:
+        case MqttState::DISCONNECTED:
         {
             // 检查网络是否恢复
             if (ml307_at.isNetworkReady()) {
                 debugPrint("网络已恢复，开始重新连接...");
-                setNetworkState(NetworkState::CONNECTING);
+                setMqttState(MqttState::CONNECTING);
                 _connectionStartTime = millis();
             } else {
                 // 尝试重新连接
@@ -332,11 +337,11 @@ void MqttManager::loop()
             break;
         }
 
-        case NetworkState::ERROR:
+        case MqttState::ERROR:
         {
             // 错误状态下等待一段时间后重试
             if (millis() - _lastReconnectAttempt > RECONNECT_INTERVAL * 2) {
-                setNetworkState(NetworkState::DISCONNECTED);
+                setMqttState(MqttState::DISCONNECTED);
                 debugPrint("从错误状态恢复，重新开始连接");
             }
             break;
@@ -346,7 +351,7 @@ void MqttManager::loop()
     }
 
     // 只有在连接状态下才处理数据发布
-    if (_networkState == NetworkState::CONNECTED) {
+    if (_MqttState == MqttState::CONNECTED) {
         // 处理预注册的主题
         for (auto &topic : _topicConfigs)
         {
@@ -477,9 +482,9 @@ void MqttManager::wifiMqttCallback(char *topic, byte *payload, unsigned int leng
     }
 }
 
-void MqttManager::onNetworkState(std::function<void(NetworkState)> callback)
+void MqttManager::onMqttState(std::function<void(MqttState)> callback)
 {
-    _networkStateCallback = callback;
+    _MqttStateCallback = callback;
 }
 
 void MqttManager::addTopic(const String &name, const String &topic, unsigned long interval)
@@ -506,7 +511,7 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
     if (!_wifiMqttClient || !_wifiMqttClient->connected())
     {
         debugPrint("MqttManager WiFi MQTT未连接");
-        setNetworkState(NetworkState::DISCONNECTED);
+        setMqttState(MqttState::DISCONNECTED);
         return false;
     }
 #else
@@ -514,7 +519,7 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
     if (!ml307_at.isNetworkReady() || !ml307Mqtt.connected())
     {
         debugPrint("MqttManager 4G网络或MQTT未连接");
-        setNetworkState(NetworkState::DISCONNECTED);
+        setMqttState(MqttState::DISCONNECTED);
         return false;
     }
     
@@ -522,7 +527,7 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
     if (!ml307Mqtt.isConnected())
     {
         debugPrint("MqttManager 4G MQTT连接验证失败");
-        setNetworkState(NetworkState::DISCONNECTED);
+        setMqttState(MqttState::DISCONNECTED);
         return false;
     }
 #endif
@@ -546,11 +551,11 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
 #ifdef ENABLE_WIFI
         if (!_wifiMqttClient->connected())
         {
-            setNetworkState(NetworkState::DISCONNECTED);
+            setMqttState(MqttState::DISCONNECTED);
         }
 #else
         // 4G模式下，发布失败通常意味着MQTT连接断开
-        setNetworkState(NetworkState::DISCONNECTED);
+        setMqttState(MqttState::DISCONNECTED);
 #endif
     }
     return result;
@@ -575,15 +580,15 @@ void MqttManager::onWiFiEvent(WiFiEvent_t event)
     {
     case SYSTEM_EVENT_STA_CONNECTED:
         debugPrint("WiFi事件: 已连接到WiFi网络");
-        setNetworkState(NetworkState::CONNECTING); // 先设为CONNECTING，等获取IP后再设为CONNECTED
+        setMqttState(MqttState::CONNECTING); // 先设为CONNECTING，等获取IP后再设为CONNECTED
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
         debugPrint("WiFi事件: 获取到IP地址: " + WiFi.localIP().toString());
-        setNetworkState(NetworkState::CONNECTED);
+        setMqttState(MqttState::CONNECTED);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         debugPrint("WiFi事件: WiFi连接已断开");
-        setNetworkState(NetworkState::DISCONNECTED);
+        setMqttState(MqttState::DISCONNECTED);
         break;
     default:
         break;

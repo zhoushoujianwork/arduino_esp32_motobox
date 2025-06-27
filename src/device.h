@@ -16,7 +16,11 @@
 #include "compass/Compass.h"
 #include "gps/GPS.h"
 #include "bat/BAT.h"
+#include "net/Ml307AtModem.h"
+// 条件包含 MQTT 管理器头文件
+#ifndef DISABLE_MQTT
 #include "net/MqttManager.h"
+#endif
 #include "led/LEDManager.h"
 
 

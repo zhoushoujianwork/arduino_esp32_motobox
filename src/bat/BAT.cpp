@@ -36,7 +36,7 @@ void BAT::debugPrint(const String& message) {
 
 void BAT::begin()
 {
-    setDebug(true);
+    // setDebug(true);
 
     pinMode(pin, INPUT);
     pinMode(charging_pin, INPUT_PULLUP); // 初始化充电检测引脚
@@ -215,7 +215,7 @@ void BAT::print_voltage()
     String debug_msg = "电压报告 -> " + String(stable_voltage) + "mV";
     debug_msg += " (" + String(device_state.battery_percentage) + "%)";
     debug_msg += ", 充电: " + String(device_state.is_charging ? "是" : "否");
-    Serial.println(debug_msg);
+    debugPrint(debug_msg);
 }
 
 const int BAT::VOLTAGE_LEVELS[] = {4200, 4000, 3800, 3600, 3400, 3200, 3000, 2800};

@@ -20,7 +20,9 @@ public:
     // 基础功能
     bool begin(uint32_t baudrate = 921600);
     void setDebug(bool debug);
-    bool isNetworkReady();
+    bool isNetworkReady() { return _isNetworkReady; }
+    bool isNetworkReadyCheck();
+
     bool reset();
     
     // 网络信息
@@ -46,6 +48,7 @@ public:
     bool isLBSEnabled();
     String getLBSRawData();  // 只返回原始响应字符串
     bool updateLBSData();
+    bool isLBSLoading() { return _isLBSLoading; }
     
     // AT 命令
     bool sendAT(const String& cmd, const String& expected = "OK", uint32_t timeout = 1000);
@@ -58,6 +61,7 @@ public:
     // 添加线程安全的AT命令方法
     bool sendATThreadSafe(const String& cmd, const String& expected = "OK", uint32_t timeout = 1000);
     String sendATWithResponseThreadSafe(const String& cmd, uint32_t timeout = 1000);
+    bool sendATWithRetryThreadSafe(const String &cmd, const String &expected = "OK", int maxRetry = 3, uint32_t timeout = 2000);
 
     // 在public部分添加
     void debugLBSConfig();  // LBS配置调试函数
@@ -70,9 +74,13 @@ private:
     bool _gnssEnabled;
     bool _lbsEnabled;
     gps_data_t _gnssData;
+
+    bool _isNetworkReady;
+    unsigned long _lastNetworkReadyCheckTime;
     
     // LBS相关私有成员 - 简化
     unsigned long _lastLBSUpdate;         // 上次LBS更新时间
+    bool _isLBSLoading;
     String _lbsRawResponse;               // 存储原始LBS响应
     
     // 其他私有成员
@@ -83,15 +91,19 @@ private:
     // 私有方法
     void flushInput();
     String waitResponse(uint32_t timeout = 1000);
+    String _lastLBSLocation;
     bool expectResponse(const String& expected, uint32_t timeout = 1000);
     void debugPrint(const String& msg);
 
     bool initModem();
     bool tryBaudrate(uint32_t baudrate);
+    void processURC(const String& urc);
+
     
     // GNSS 内部方法
     bool parseGNSSInfo(const String& response);
     void resetGNSSData();
+
     
     std::mutex _atMutex;  // AT命令互斥锁
 };

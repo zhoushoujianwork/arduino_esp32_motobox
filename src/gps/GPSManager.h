@@ -45,7 +45,6 @@ private:
     bool _initialized;
     lbs_data_t _lbsData;
     unsigned long _lastLBSUpdate;
-    unsigned long _lastLBSRequest;
     static const unsigned long LBS_UPDATE_INTERVAL = 10000; // 1秒
     static const unsigned long LBS_REQUEST_INTERVAL = 1000; // 1秒
     void handleLBSUpdate();
