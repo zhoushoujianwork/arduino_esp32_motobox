@@ -54,81 +54,28 @@ void GPSManager::loop()
     if (_gpsInterface)
     {
         _gpsInterface->loop();
+    }
 
-        // 获取GPS数据
-        gps_data_t gpsData = _gpsInterface->getData();
-
-        // GPS信号弱时处理GNSS- 简化版本
-        if (gpsData.satellites <= 3)
+    // GPS信号弱时处理LBS- 简化版本
+    if (gps_data.altitude <= 3)
+    {
+        // LBS 都查询
+        handleLBSUpdate();
+        // 如果LBS有数据，则使用LBS数据
+        if (lbs_data.valid)
         {
-            debugPrint("GPS信号弱，开始GNSS定位");
+            // 使用通用的转换函数
+            gps_data = convert_lbs_to_gps(lbs_data);
+        }else{
+            debugPrint("LBS定位失败，继续等待GPS定位");
         }
     }
-    // LBS 都查询
-    handleLBSUpdate();
+   
 }
 
 bool GPSManager::isReady()
 {
-    // 检查GPS信号质量
-    bool gpsReady = false;
-    if (_gpsInterface && _gpsInterface->isReady())
-    {
-        gps_data_t data = _gpsInterface->getData();
-        // GPS信号强度足够（卫星数大于3）时使用GPS
-        gpsReady = data.satellites > 3;
-    }
-
-    // 当GPS信号弱或不可用时，检查LBS是否可用
-    bool lbsReady = false;
-
-    return gpsReady || lbsReady;
-}
-
-gps_data_t GPSManager::getData()
-{
-    // 都不可用时返回无效数据
-    gps_data_t emptyData;
-    memset(&emptyData, 0, sizeof(gps_data_t));
-    return emptyData;
-}
-
-void GPSManager::updateLBSData()
-{
-#ifdef ENABLE_GSM
-    debugPrint("TODO:更新LBS数据");
-    // 获取最新的LBS数据
-#endif
-}
-
-gps_data_t GPSManager::convertLBSToGPS(const lbs_data_t &lbsData)
-{
-    gps_data_t gpsData;
-    memset(&gpsData, 0, sizeof(gps_data_t));
-
-    if (!lbsData.valid)
-    {
-        return gpsData;
-    }
-
-    // 转换LBS数据到GPS格式
-    gpsData.latitude = lbsData.latitude;
-    gpsData.longitude = lbsData.longitude;
-    // LBS无以下信息，全部置为无效/0
-    gpsData.altitude = 0;
-    gpsData.speed = 0;
-    gpsData.heading = 0;
-    gpsData.satellites = 0;
-    gpsData.year = 0;
-    gpsData.month = 0;
-    gpsData.day = 0;
-    gpsData.hour = 0;
-    gpsData.minute = 0;
-    gpsData.second = 0;
-    gpsData.centisecond = 0;
-    gpsData.hdop = 0;
-    gpsData.gpsHz = 0;
-    return gpsData;
+    return gps_data.altitude>3 || lbs_data.valid;
 }
 
 void GPSManager::setDebug(bool debug)
@@ -154,7 +101,7 @@ void GPSManager::setGNSSEnabled(bool enable)
 #ifdef ENABLE_GSM
     if (_gpsInterface)
     {
-        ml307_at.enableGNSS(enable);
+        // ml307_at.enableGNSS(enable);
     }
 #endif
 }
@@ -181,10 +128,51 @@ GPSManager &gpsManager = GPSManager::getInstance();
 void GPSManager::handleLBSUpdate()
 {
 #ifdef ENABLE_GSM
+    // 检查是否需要更新LBS数据
+    unsigned long now = millis();
+    
+    // 统一使用10秒间隔
+    if (now - _lastLBSUpdate < 10000) // 10秒间隔
+    {
+        return;
+    }
+    
+    // 检查网络状态
+    if (!ml307_at.isNetworkReady())
+    {
+        debugPrint("网络未就绪，跳过LBS更新");
+        return;
+    }
+    
+    // 检查LBS是否正在加载
+    if (ml307_at.isLBSLoading())
+    {
+        debugPrint("LBS正在加载中，跳过本次更新");
+        return;
+    }
+    
+    // 更新LBS数据 - 直接调用Ml307AtModem的方法
     if (ml307_at.updateLBSData())
     {
-        String lbsResponse = ml307_at.getLBSRawData();
-        debugPrint("LBS原始数据: " + lbsResponse);
+        _lastLBSUpdate = now;
+        
+        // 获取解析后的LBS数据
+        lbs_data_t lbsData = ml307_at.getLBSData();
+        if (ml307_at.isLBSDataValid()) {
+            // 更新内部LBS数据
+            _lbsData = lbsData;
+            debugPrint("LBS数据更新成功: " + String(lbsData.longitude, 6) + 
+                      ", " + String(lbsData.latitude, 6));
+        } else {
+            debugPrint("LBS数据无效");
+        }
+    } else {
+        // 减少失败日志频率，避免刷屏
+        static unsigned long lastFailureLog = 0;
+        if (now - lastFailureLog > 30000) { // 30秒才打印一次失败日志
+            debugPrint("LBS更新失败");
+            lastFailureLog = now;
+        }
     }
 #endif
 }

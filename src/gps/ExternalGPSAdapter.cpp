@@ -21,9 +21,6 @@ bool ExternalGPSAdapter::isReady() {
     return gps_data.satellites > 3;
 }
 
-gps_data_t ExternalGPSAdapter::getData() {
-    return gps_data;
-}
 
 void ExternalGPSAdapter::setDebug(bool debug) {
     _gps.setDebug(debug);

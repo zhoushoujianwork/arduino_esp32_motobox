@@ -45,5 +45,6 @@ extern gps_data_t gps_data;
 String gps_data_to_json(const gps_data_t& data);
 void reset_gps_data(gps_data_t& data);
 bool is_gps_data_valid(const gps_data_t& data);
+void print_gps_data(const gps_data_t& data);
 
 #endif // GPS_DATA_H 

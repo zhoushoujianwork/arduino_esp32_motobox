@@ -117,6 +117,7 @@ void taskSystem(void *parameter)
 void taskDataProcessing(void *parameter)
 {
   Serial.println("[系统] 数据处理任务启动");
+  
   while (true)
   {
     // IMU数据处理
@@ -154,7 +155,7 @@ void taskDataProcessing(void *parameter)
     mqttManager.loop();
 #endif
 
-    delay(5);
+    delay(10); // 增加延时，减少CPU占用
   }
 }
 
@@ -177,8 +178,7 @@ void setup()
 {
   Serial.begin(115200);
   delay(100);
- // 在setup()函数开始处添加
-
+  
   PreferencesUtils::init();
 
   Serial.println("step 1");
@@ -201,14 +201,10 @@ void setup()
   xTaskCreate(taskSystem, "TaskSystem", 1024 * 15, NULL, 1, NULL);
   xTaskCreate(taskDataProcessing, "TaskData", 1024 * 15, NULL, 2, NULL);
   #ifdef ENABLE_WIFI
-  xTaskCreate(taskWiFi, "TaskWiFi", 1024 * 15, NULL, 3, NULL);  // 最高优先级处理WiFi
+  xTaskCreate(taskWiFi, "TaskWiFi", 1024 * 15, NULL, 3, NULL);
   #endif
 
   Serial.println("[系统] 初始化完成");
-  Serial.println();
-  Serial.println();
-  Serial.println();
-  Serial.println();
 }
 
 void loop()
@@ -228,13 +224,8 @@ void loop()
 
     // 获取GPS数据用于调试
     if (gpsManager.isReady()) {
-      gps_data_t gpsData = gpsManager.getData();
-      if (gpsData.satellites > 3) {
-        String locationType = gpsManager.getType();
-        Serial.printf("[%s] 位置: %.6f, %.6f, 精度: %.1f m\n", 
-                     locationType.c_str(),
-                     gpsData.latitude, gpsData.longitude, gpsData.hdop);
-      }
+      print_lbs_data(lbs_data);
+      print_gps_data(gps_data);
     }
 
     // 显示LBS基站定位信息 - 通过GPS管理器获取

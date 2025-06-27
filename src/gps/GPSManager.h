@@ -19,9 +19,6 @@ public:
     void loop();
     bool isReady();
     gps_data_t getData();
-    void updateLBSData();
-    // LBS功能
-    gps_data_t convertLBSToGPS(const lbs_data_t& lbsData);
     
     void setDebug(bool debug);
     String getType() const;
@@ -30,7 +27,6 @@ public:
     void setGNSSEnabled(bool enable);
     void setLBSEnabled(bool enable);
     bool isGNSSEnabled() const;
-    bool isLBSEnabled() const;
     
     // 禁止拷贝和赋值
     GPSManager(const GPSManager&) = delete;

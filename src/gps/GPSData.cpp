@@ -39,3 +39,12 @@ String gps_data_to_json(const gps_data_t& data) {
     serializeJson(doc, jsonString);
     return jsonString;
 } 
+
+void print_gps_data(const gps_data_t& data) {
+    if (data.altitude > 3) {
+        Serial.printf("[GPS] 位置: %.6f, %.6f, 速度: %.1f km/h, 精度: %.1f m, 海拔: %.1f m\n", 
+                     data.latitude, data.longitude, data.speed, data.hdop, data.altitude);
+    }else{
+        Serial.println("[GPS] 定位中...");
+    }
+}

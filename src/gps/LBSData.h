@@ -2,6 +2,7 @@
 #define LBS_DATA_H
 
 #include <Arduino.h>
+#include "GPSData.h"
 
 // LBS请求状态
 enum class LBSState {
@@ -25,5 +26,13 @@ struct lbs_data_t {
     String operator_name;
     unsigned long timestamp;
 };
+
+extern lbs_data_t lbs_data;
+
+// 辅助函数
+void reset_lbs_data(lbs_data_t& data);
+bool is_lbs_data_valid(const lbs_data_t& data);
+void print_lbs_data(const lbs_data_t& data);
+gps_data_t convert_lbs_to_gps(const lbs_data_t& lbsData);
 
 #endif // LBS_DATA_H 
