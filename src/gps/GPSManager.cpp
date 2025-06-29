@@ -67,7 +67,7 @@ void GPSManager::loop()
             // 使用通用的转换函数
             gps_data = convert_lbs_to_gps(lbs_data);
         }else{
-            debugPrint("LBS定位失败，继续等待GPS定位");
+            // debugPrint("LBS定位失败，继续等待GPS定位");
         }
     }
    

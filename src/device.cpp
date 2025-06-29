@@ -137,6 +137,8 @@ void mqttConnectionCallback(bool connected)
     if (connected)
     {
         Serial.println("MQTT连接成功，订阅主题");
+
+        
         static bool firstConnect = true; // 添加静态变量标记首次连接
                                          // 配置主题
         String baseTopic = String("vehicle/v1/") + device_state.device_id;
@@ -146,23 +148,21 @@ void mqttConnectionCallback(bool connected)
         String deviceInfoTopic = telemetryTopic + "device";
         String gpsTopic = telemetryTopic + "location";
         String imuTopic = telemetryTopic + "motion";
-        String controlTopic = baseTopic + "/control/#"; // control: 控制命令
+        String controlTopic = baseTopic + "/ctrl/#"; // ctrl: 控制命令
 
         if (firstConnect)
         {
             firstConnect = false;
 
-            mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 30000); // 30秒一次上报
+            mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 30000);
 
 #ifdef ENABLE_IMU
             // mqttManager.addTopic("imu", imuTopic.c_str(), 1000);
 #endif
 
-            // GPS数据发布 - 使用统一接口
             mqttManager.addTopic("gps", gpsTopic.c_str(), 1000);
-
-            // 订阅主题 每次都要
-            mqttManager.subscribe(controlTopic.c_str(), 1);
+            // 订阅主题 - 使用QoS=0
+            mqttManager.subscribe(controlTopic.c_str(), 0);
         }
     }
     else
@@ -258,7 +258,6 @@ void Device::begin()
 
 #ifdef ENABLE_GSM
     ml307_at.setDebug(true);
-    // ml307Mqtt.setDebug(true);
     ml307_at.begin(115200);
 
 #ifdef ENABLE_GNSS
@@ -281,6 +280,15 @@ void Device::begin()
     config.password = MQTT_PASSWORD;
     config.keepAlive = MQTT_KEEP_ALIVE;
     config.cleanSession = true; // 是否清除会话，true: 清除，false: 保留
+
+    // 初始化 MQTT 管理器
+    mqttManager.setDebug(true);
+    ml307Mqtt.setDebug(true);
+    if (!mqttManager.begin(config))
+    {
+        Serial.println("MQTT 初始化失败，将在运行时重试");
+        return;
+    }
 
     // 设置回调在开始之前
     mqttManager.onMessage(mqttMessageCallback);
@@ -319,20 +327,12 @@ void Device::begin()
                 break;
         } });
 
-    // mqttManager.setDebug(true);
-    // 初始化 MQTT 管理器
-    if (!mqttManager.begin(config))
-    {
-        Serial.println("MQTT 初始化失败，将在运行时重试");
-        return;
-    }
     Serial.println("完成底层网络配置，wifi/gsm/mqtt 初始化完成");
 
-#else
-    // 当禁用MQTT时，仍然需要初始化GPS
-    gpsManager.init();
-Serial.println("GPS初始化完成!");
 #endif
+
+    gpsManager.init();
+    Serial.println("GPS初始化完成!");
 }
 
 // 通知特定状态变化

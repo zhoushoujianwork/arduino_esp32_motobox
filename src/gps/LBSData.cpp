@@ -39,20 +39,20 @@ gps_data_t convert_lbs_to_gps(const lbs_data_t& lbsData) {
     if (is_lbs_data_valid(lbsData)) {
         gpsData.latitude = lbsData.latitude;
         gpsData.longitude = lbsData.longitude;
-        // LBS无以下信息，全部置为无效/0
-        gpsData.altitude = 0;
-        gpsData.speed = 0;
-        gpsData.heading = 0;
-        gpsData.satellites = 0;
-        gpsData.year = 0;
-        gpsData.month = 0;
-        gpsData.day = 0;
-        gpsData.hour = 0;
-        gpsData.minute = 0;
-        gpsData.second = 0;
-        gpsData.centisecond = 0;
-        gpsData.hdop = 0;
-        gpsData.gpsHz = 0;
+        // LBS无以下信息，其他不动。
+        // gpsData.altitude = 0;
+        // gpsData.speed = 0;
+        // gpsData.heading = 0;
+        // gpsData.satellites = 0;
+        // gpsData.year = 0;
+        // gpsData.month = 0;
+        // gpsData.day = 0;
+        // gpsData.hour = 0;
+        // gpsData.minute = 0;
+        // gpsData.second = 0;
+        // gpsData.centisecond = 0;
+        // gpsData.hdop = 0;
+        // gpsData.gpsHz = 0;
     }
     
     return gpsData;

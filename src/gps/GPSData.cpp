@@ -45,6 +45,6 @@ void print_gps_data(const gps_data_t& data) {
         Serial.printf("[GPS] 位置: %.6f, %.6f, 速度: %.1f km/h, 精度: %.1f m, 海拔: %.1f m\n", 
                      data.latitude, data.longitude, data.speed, data.hdop, data.altitude);
     }else{
-        Serial.println("[GPS] 定位中...");
+        Serial.printf("[GPS] 定位中... 可能来自LBS的定位 位置: %.8f, %.8f\n", data.latitude, data.longitude);
     }
 }

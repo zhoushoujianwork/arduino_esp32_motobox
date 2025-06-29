@@ -16,7 +16,6 @@ public:
     virtual void begin() = 0;
     virtual void loop() = 0;
     virtual bool isReady() = 0;
-    virtual gps_data_t getData() = 0;
     virtual void setDebug(bool debug) = 0;
     virtual String getType() const = 0; // 返回GPS类型标识
 };

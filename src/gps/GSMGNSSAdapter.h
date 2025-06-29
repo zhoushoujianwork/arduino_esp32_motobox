@@ -15,7 +15,6 @@ public:
     void begin() override;
     void loop() override;
     bool isReady() override;
-    gps_data_t getData() override;
     void setDebug(bool debug) override;
     String getType() const override { return "GSM_GNSS"; }
     

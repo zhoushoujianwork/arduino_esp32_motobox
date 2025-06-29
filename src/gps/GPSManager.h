@@ -18,7 +18,6 @@ public:
     void init();
     void loop();
     bool isReady();
-    gps_data_t getData();
     
     void setDebug(bool debug);
     String getType() const;

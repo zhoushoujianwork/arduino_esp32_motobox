@@ -88,4 +88,14 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 #define ENABLE_LBS     // 启用LBS
 #endif
 
+#ifdef ENABLE_SDCARD
+#define SDCARD_D0_IO 18
+#define SDCARD_D1_IO 19
+#define SDCARD_D2_IO 4
+#define SDCARD_D3_IO 16
+#define SDCARD_CMD_IO 17
+#define SDCARD_CLK_IO 5
+#endif
+
+
 #endif /* CONFIG_H */
