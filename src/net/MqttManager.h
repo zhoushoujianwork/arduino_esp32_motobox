@@ -72,6 +72,7 @@ public:
     
     // 连接操作
     bool connect();
+    bool forceReconnect(); // 强制重新连接
     // void disconnect();
     // bool isConnected();
     
