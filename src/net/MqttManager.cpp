@@ -189,6 +189,34 @@ bool MqttManager::connect()
     return success;
 }
 
+bool MqttManager::forceReconnect()
+{
+    debugPrint("MqttManager 强制重新连接");
+
+    // 先断开现有连接
+#ifdef ENABLE_WIFI
+    if (_wifiMqttClient && _wifiMqttClient->connected())
+    {
+        _wifiMqttClient->disconnect();
+        delay(100); // 等待断开完成
+    }
+#else
+    if (ml307Mqtt.connected())
+    {
+        ml307Mqtt.disconnect();
+        delay(500); // 4G模块需要更长时间断开
+    }
+#endif
+
+    // 重置连接状态
+    setMqttState(MqttState::CONNECTING);
+    _lastReconnectAttempt = millis();
+    _connectionStartTime = millis();
+
+    // 尝试重新连接
+    return connect();
+}
+
 bool MqttManager::reconnect()
 {
     unsigned long now = millis();
@@ -304,28 +332,7 @@ void MqttManager::loop()
         {
             // 连接正常，处理MQTT消息
             ml307Mqtt.loop();
-            // 处理预注册的主题
-            for (auto &topic : _topicConfigs)
-            {
-                if (topic.second.lastPublishTime + topic.second.interval < millis())
-                {
-                    if (topic.first == "device_info")
-                    {
-                        publishToTopic(topic.first, device_state_to_json(get_device_state()).c_str(), false);
-                    }
-                    // else if (topic.first == "imu")
-                    // {
-                    //     publishToTopic(topic.first, imu_data_to_json(imu_data).c_str(), false);
-                    // }
-                    else if (topic.first == "gps")
-                    {
-                        if (gps_data.satellites > 3 || lbs_data.valid)
-                        {
-                            publishToTopic(topic.first, gps_data_to_json(gps_data).c_str(), false);
-                        }
-                    }
-                }
-            }
+
             break;
         }
 
@@ -366,12 +373,10 @@ void MqttManager::loop()
 
 #else
         // WiFi逻辑
-
         if (wifiManager.getConfigMode())
             return;
 
-        bool currentConnected = (WiFi.status() == WL_CONNECTED) &&
-                                (_wifiMqttClient && _wifiMqttClient->connected());
+        bool currentConnected = isNetworkConnected() && isMqttConnected();
 
         if (currentConnected != _lastConnectionState)
         {
@@ -382,31 +387,75 @@ void MqttManager::loop()
             }
         }
 
-        if (WiFi.status() != WL_CONNECTED)
+        // 根据网络和MQTT连接状态设置相应的状态
+        if (!isNetworkConnected())
         {
             setMqttState(MqttState::DISCONNECTED);
         }
+        else if (!isMqttConnected())
+        {
+            setMqttState(MqttState::CONNECTING);
+            reconnect();
+        }
         else
         {
-            if (_wifiMqttClient && !_wifiMqttClient->connected())
-            {
-                setMqttState(MqttState::CONNECTING);
-                reconnect();
-            }
-            else if (_wifiMqttClient && _wifiMqttClient->connected())
-            {
-                setMqttState(MqttState::CONNECTED);
-            }
+            setMqttState(MqttState::CONNECTED);
         }
+
         if (_wifiMqttClient)
             _wifiMqttClient->loop();
 #endif
+
+        // 处理预注册的主题
+        for (auto &topic : _topicConfigs)
+        {
+            if (topic.second.lastPublishTime + topic.second.interval < millis())
+            {
+                if (topic.first == "device_info")
+                {
+                    publishToTopic(topic.first, device_state_to_json(get_device_state()).c_str(), false);
+                }
+                // else if (topic.first == "imu")
+                // {
+                //     publishToTopic(topic.first, imu_data_to_json(imu_data).c_str(), false);
+                // }
+                else if (topic.first == "gps")
+                {
+                    if (gps_data.satellites > 3 || lbs_data.valid)
+                    {
+                        publishToTopic(topic.first, gps_data_to_json(gps_data).c_str(), false);
+                    }
+                }
+            }
+        }
     }
 }
 
 bool MqttManager::publish(const char *topic, const char *payload, bool retain)
 {
-    debugPrint("MqttManager publish topic: " + String(topic) + ", payload: " + String(payload) + ", retain: " + String(retain));
+    if (!topic || !payload)
+    {
+        debugPrint("MQTT publish 参数无效 - topic或payload为空");
+        return false;
+    }
+
+    debugPrint("MqttManager publish topic: " + String(topic) + ", payload长度: " + String(strlen(payload)) + ", retain: " + String(retain));
+
+    // 发布前再次检查连接状态
+    if (!isNetworkConnected())
+    {
+        debugPrint("MQTT publish 失败 - 网络未连接");
+        setMqttState(MqttState::DISCONNECTED);
+        return false;
+    }
+
+    if (!isMqttConnected())
+    {
+        debugPrint("MQTT publish 失败 - MQTT未连接");
+        setMqttState(MqttState::CONNECTING);
+        return false;
+    }
+
 #ifdef ENABLE_WIFI
     if (!_wifiMqttClient)
     {
@@ -416,14 +465,14 @@ bool MqttManager::publish(const char *topic, const char *payload, bool retain)
     bool result = _wifiMqttClient->publish(topic, payload, retain);
     if (!result)
     {
-        debugPrint("WiFi MQTT publish failed - Topic: " + String(topic));
+        debugPrint("WiFi MQTT publish 失败 - Topic: " + String(topic) + ", 客户端状态: " + String(_wifiMqttClient->state()));
     }
     return result;
 #else
     bool result = ml307Mqtt.publish(topic, payload, retain);
     if (!result)
     {
-        debugPrint("Cellular MQTT publish failed - Topic: " + String(topic));
+        debugPrint("Cellular MQTT publish 失败 - Topic: " + String(topic));
     }
     return result;
 #endif
@@ -467,9 +516,8 @@ bool MqttManager::isNetworkConnected() const
 #ifdef ENABLE_WIFI
     return WiFi.status() == WL_CONNECTED;
 #else
-    return ml307Mqtt.canPublish();
+    return ml307_at.isNetworkReady();
 #endif
-    return false;
 }
 
 String MqttManager::getNetworkInfo() const
@@ -532,57 +580,54 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
         return false;
     }
 
-    // 检查网络和MQTT连接状态
-#ifdef ENABLE_WIFI
-    if (!_wifiMqttClient || !_wifiMqttClient->connected())
+    // 统一的连接状态检查
+    if (!isNetworkConnected() || !isMqttConnected())
     {
-        debugPrint("MqttManager WiFi MQTT未连接");
-        setMqttState(MqttState::DISCONNECTED);
-        return false;
-    }
-#else
-    // 4G模式下需要更严格的连接检查
-    if (!ml307_at.isNetworkReady() || !ml307Mqtt.connected())
-    {
-        debugPrint("MqttManager 4G网络或MQTT未连接");
+        debugPrint("MqttManager 网络或MQTT未连接 - 网络状态: " + String(isNetworkConnected()) + ", MQTT状态: " + String(isMqttConnected()));
         setMqttState(MqttState::DISCONNECTED);
         return false;
     }
 
-    // 添加MQTT连接状态验证
-    if (!ml307Mqtt.canPublish())
-    {
-        debugPrint("MqttManager 4G MQTT连接验证失败");
-        setMqttState(MqttState::DISCONNECTED);
-        return false;
-    }
-#endif
-
+    // 检查发布间隔
     unsigned long now = millis();
     if (now - it->second.lastPublishTime < it->second.interval)
     {
         return true; // 未到发布时间，跳过
     }
 
+    // 执行发布操作
     bool result = publish(it->second.topic.c_str(), payload, retain);
     if (result)
     {
         it->second.lastPublishTime = now;
-        debugPrint("MqttManager 发布成功 - 主题: " + it->second.topic);
+        debugPrint("MqttManager 发布成功 - 主题: " + it->second.topic + ", 负载长度: " + String(strlen(payload)));
     }
     else
     {
-        // 发布失败时，检查是否是MQTT连接问题
-        debugPrint("MqttManager 发布失败，检查连接状态");
-#ifdef ENABLE_WIFI
-        if (!_wifiMqttClient->connected())
+        // 发布失败时，重新检查连接状态并设置相应的状态
+        debugPrint("MqttManager 发布失败 - 主题: " + it->second.topic);
+
+        // 重新验证连接状态
+        if (!isNetworkConnected())
         {
+            debugPrint("MqttManager 网络连接已断开");
             setMqttState(MqttState::DISCONNECTED);
         }
-#else
-        // 4G模式下，发布失败通常意味着MQTT连接断开
-        setMqttState(MqttState::DISCONNECTED);
-#endif
+        else if (!isMqttConnected())
+        {
+            debugPrint("MqttManager MQTT连接已断开，尝试强制重连");
+            setMqttState(MqttState::CONNECTING);
+            // 对于重要的主题，尝试强制重连
+            if (name == "device_info" || name == "gps")
+            {
+                forceReconnect();
+            }
+        }
+        else
+        {
+            debugPrint("MqttManager 发布失败但连接正常，可能是临时网络问题");
+            setMqttState(MqttState::ERROR);
+        }
     }
     return result;
 }
