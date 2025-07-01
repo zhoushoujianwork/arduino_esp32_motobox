@@ -91,6 +91,31 @@ void PowerManager::handleWakeup()
 
     // 重置运动检测时间
     lastMotionTime = millis();
+    
+    // 恢复SD卡
+#ifdef ENABLE_SDCARD
+    extern SDManager sdManager;
+    if (!sdManager.isInitialized()) {
+        Serial.println("[电源管理] 从睡眠恢复，重新初始化SD卡");
+        sdManager.restoreFromSleep();
+        if (sdManager.isInitialized()) {
+            // 记录唤醒日志
+            String wakeupLog = "设备从深度睡眠唤醒，原因: ";
+            switch (wakeup_reason) {
+                case ESP_SLEEP_WAKEUP_EXT0:
+                    wakeupLog += "运动检测";
+                    break;
+                case ESP_SLEEP_WAKEUP_TIMER:
+                    wakeupLog += "定时器";
+                    break;
+                default:
+                    wakeupLog += "其他";
+                    break;
+            }
+            sdManager.writeLog(wakeupLog);
+        }
+    }
+#endif
 }
 
 void PowerManager::configurePowerDomains()
@@ -274,6 +299,24 @@ void PowerManager::disablePeripherals()
 #endif
 
     Serial.println("[电源管理] I2C设备已配置为低功耗模式");
+    Serial.flush();
+    delay(50);
+#endif
+
+    // ===== SD卡睡眠准备 =====
+#ifdef ENABLE_SDCARD
+    Serial.println("[电源管理] 开始SD卡睡眠准备...");
+    Serial.flush();
+    delay(50);
+    
+    extern SDManager sdManager;
+    if (sdManager.isInitialized()) {
+        // 记录进入睡眠的日志
+        sdManager.writeLog("设备进入深度睡眠模式");
+        // 准备SD卡进入睡眠
+        sdManager.prepareForSleep();
+        Serial.println("[电源管理] SD卡已准备进入睡眠");
+    }
     Serial.flush();
     delay(50);
 #endif

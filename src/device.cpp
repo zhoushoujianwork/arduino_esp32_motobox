@@ -127,6 +127,31 @@ void mqttMessageCallback(const String &topic, const String &payload)
             gpsManager.setDebug(enable);
             Serial.printf("GPS调试模式: %s\n", enable ? "开启" : "关闭");
         }
+        // reboot
+        else if (strcmp(cmd, "reboot") == 0)
+        {
+            Serial.println("重启设备");
+            ESP.restart();
+        }
+#ifdef ENABLE_SDCARD
+        // 格式化存储卡
+        else if (strcmp(cmd, "format_sdcard") == 0)
+        {
+            Serial.println("格式化存储卡");
+            if (!sdManager.handleSerialCommand("yes_format"))
+            {
+                Serial.println("格式化存储卡失败");
+            }
+            // if (!sdManager.handleSerialCommand("sd_repair"))
+            // {
+            //     Serial.println("修复存储卡失败");
+            // }
+            // if (!sdManager.handleSerialCommand("sd_format"))
+            // {
+            //     Serial.println("格式化存储卡失败");
+            // }
+        }
+#endif
     }
 #endif
 }
