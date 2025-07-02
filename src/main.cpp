@@ -52,6 +52,10 @@
 #include "imu/qmi8658.h"
 #endif
 
+#ifdef ENABLE_SDCARD
+#include "SD/SDManager.h"
+#endif
+
 #include "version.h"
 #ifdef BLE_CLIENT
 #include "ble/ble_client.h"
@@ -67,11 +71,13 @@
 
 #include "gps/GPSManager.h"
 
+#include <SD.h> // SD卡库
+#include <FS.h>
+
 //============================= 全局变量 =============================
 
 // RTC内存变量（深度睡眠后保持）
 RTC_DATA_ATTR int bootCount = 0;
-
 
 /**
  * 系统监控任务
@@ -126,7 +132,7 @@ void taskSystem(void *parameter)
 void taskDataProcessing(void *parameter)
 {
   Serial.println("[系统] 数据处理任务启动");
-  
+
   while (true)
   {
     // IMU数据处理
@@ -172,14 +178,15 @@ void taskDataProcessing(void *parameter)
 // WiFi处理任务
 void taskWiFi(void *parameter)
 {
-    Serial.println("[系统] WiFi任务启动");
-    while (true)
+  Serial.println("[系统] WiFi任务启动");
+  while (true)
+  {
+    if (wifiManager.getConfigMode())
     {
-        if (wifiManager.getConfigMode()) {
-            wifiManager.loop();
-        }
-        delay(1);  // 更短的延迟，提高响应性
+      wifiManager.loop();
     }
+    delay(1); // 更短的延迟，提高响应性
+  }
 }
 #endif
 
@@ -187,7 +194,7 @@ void setup()
 {
   Serial.begin(115200);
   delay(100);
-  
+
   PreferencesUtils::init();
 
   Serial.println("step 1");
@@ -206,12 +213,40 @@ void setup()
   Serial.println("step 5");
   device.begin();
 
+  //================ SD卡初始化开始 ================
+#ifdef ENABLE_SDCARD
+  Serial.println("step 6");
+  sdManager.setDebug(true);
+  if (sdManager.begin()) {
+    Serial.println("[SD] SD卡初始化成功");
+    
+    // 检查是否有固件更新
+    if (sdManager.hasFirmwareUpdate()) {
+      Serial.println("[SD] 发现固件更新文件，开始升级...");
+      sdManager.performFirmwareUpdate();
+    }
+    
+    // 尝试从SD卡加载WiFi配置
+    String ssid, password;
+    if (sdManager.loadWiFiConfig(ssid, password)) {
+      Serial.println("[SD] 从SD卡加载WiFi配置成功");
+      // 这里可以设置WiFi配置到系统中
+    }
+    
+    // 记录启动日志
+    sdManager.writeLog("系统启动，启动次数: " + String(bootCount));
+  } else {
+    Serial.println("[SD] SD卡初始化失败");
+  }
+#endif
+  //================ SD卡初始化结束 ================
+
   // 创建任务
   xTaskCreate(taskSystem, "TaskSystem", 1024 * 15, NULL, 1, NULL);
   xTaskCreate(taskDataProcessing, "TaskData", 1024 * 15, NULL, 2, NULL);
-  #ifdef ENABLE_WIFI
+#ifdef ENABLE_WIFI
   xTaskCreate(taskWiFi, "TaskWiFi", 1024 * 15, NULL, 3, NULL);
-  #endif
+#endif
 
   Serial.println("[系统] 初始化完成");
 }
@@ -227,12 +262,16 @@ void loop()
   {
     lastMsg = millis();
 
+    // 打印设备 ID
+    Serial.println("设备 ID: " + String(device.get_device_id()));
+
     update_device_state();
 
     bat.print_voltage();
 
     // 获取GPS数据用于调试
-    if (gpsManager.isReady()) {
+    if (gpsManager.isReady())
+    {
       print_lbs_data(lbs_data);
       print_gps_data(gps_data);
     }
@@ -241,7 +280,7 @@ void loop()
     // if (gpsManager.isLBSReady()) {
     //   lbs_data_t lbsData = gpsManager.getLBSData();
     //   if (lbsData.valid) {
-    //     Serial.printf("[LBS] 位置: %.6f, %.6f, 半径: %d m\n", 
+    //     Serial.printf("[LBS] 位置: %.6f, %.6f, 半径: %d m\n",
     //                  lbsData.latitude, lbsData.longitude, lbsData.radius);
     //   }
     // }

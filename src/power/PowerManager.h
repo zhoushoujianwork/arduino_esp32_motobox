@@ -11,6 +11,10 @@
 #include "utils/PreferencesUtils.h"
 #include "config.h"
 
+#ifdef ENABLE_SDCARD
+#include "SD/SDManager.h"
+#endif
+
 // 低功耗模式状态枚举
 enum PowerState {
     POWER_STATE_NORMAL,           // 正常工作状态

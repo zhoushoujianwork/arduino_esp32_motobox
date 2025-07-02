@@ -26,6 +26,10 @@
 #endif
 #include "led/LEDManager.h"
 
+#ifdef ENABLE_SDCARD
+#include "SD/SDManager.h"
+#endif
+
 
 
 typedef struct
