@@ -51,6 +51,9 @@ typedef struct
     bool gsmReady; // GSM准备状态
     bool lbsReady; // LBS准备状态
     bool gnssReady; // GNSS准备状态
+    bool sdCardReady; // SD卡准备状态
+    uint64_t sdCardSizeMB; // SD卡大小(MB)
+    uint64_t sdCardFreeMB; // SD卡剩余空间(MB)
 } device_state_t;
 
 // 添加状态变化跟踪
@@ -65,6 +68,7 @@ typedef struct {
         bool gsm_changed;          // GSM状态变化
         bool sleep_time_changed;   // 休眠时间变化
         bool led_mode_changed;     // LED模式变化
+        bool sdcard_changed;       // SD卡状态变化
 } state_changes_t;
 
 void update_device_state();

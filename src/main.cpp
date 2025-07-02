@@ -109,6 +109,17 @@ void taskSystem(void *parameter)
     externalPower.loop();
 #endif
 
+    // SD卡状态监控
+#ifdef ENABLE_SDCARD
+    static unsigned long lastSDCheckTime = 0;
+    unsigned long currentTime = millis();
+    // 每10秒更新一次SD卡状态
+    if (currentTime - lastSDCheckTime > 10000) {
+        lastSDCheckTime = currentTime;
+        sdManager.updateStatus();
+    }
+#endif
+
     // 按钮状态更新
 #ifdef BTN_PIN
     button.loop();
@@ -132,6 +143,12 @@ void taskSystem(void *parameter)
 void taskDataProcessing(void *parameter)
 {
   Serial.println("[系统] 数据处理任务启动");
+  
+  // 数据记录相关变量
+  unsigned long lastGPSRecordTime = 0;
+  unsigned long lastIMURecordTime = 0;
+  const unsigned long GPS_RECORD_INTERVAL = 5000;  // 5秒记录一次GPS数据
+  const unsigned long IMU_RECORD_INTERVAL = 1000;  // 1秒记录一次IMU数据
 
   while (true)
   {
@@ -145,6 +162,66 @@ void taskDataProcessing(void *parameter)
     gpsManager.loop();
     // 更新GPS状态到设备状态
     device_state.gpsReady = gpsManager.isReady();
+
+#ifdef ENABLE_SDCARD
+    // 数据记录到SD卡
+    unsigned long currentTime = millis();
+    
+    // 记录GPS数据
+    if (device_state.gpsReady && device_state.sdCardReady && 
+        currentTime - lastGPSRecordTime >= GPS_RECORD_INTERVAL) {
+      lastGPSRecordTime = currentTime;
+      
+      // 获取GPS数据
+      gps_data_t& gpsData = gps_data;
+      
+      // 获取当前时间作为时间戳
+      char timestamp[32];
+      sprintf(timestamp, "%04d-%02d-%02d %02d:%02d:%02d", 
+              gpsData.year, gpsData.month, gpsData.day,
+              gpsData.hour, gpsData.minute, gpsData.second);
+      
+      // 记录到SD卡
+      sdManager.logGPSData(
+        gpsData.latitude, gpsData.longitude, gpsData.altitude,
+        gpsData.speed, gpsData.heading, gpsData.satellites,
+        gpsData.hdop, timestamp
+      );
+    }
+    
+    // 记录IMU数据
+    if (device_state.imuReady && device_state.sdCardReady && 
+        currentTime - lastIMURecordTime >= IMU_RECORD_INTERVAL) {
+      lastIMURecordTime = currentTime;
+      
+      // 获取IMU数据
+      float ax = imu.getAccelX();
+      float ay = imu.getAccelY();
+      float az = imu.getAccelZ();
+      float gx = imu.getGyroX();
+      float gy = imu.getGyroY();
+      float gz = imu.getGyroZ();
+      
+      // 获取罗盘数据
+      float heading = 0;
+#ifdef ENABLE_COMPASS
+      heading = compass_data.heading;
+#endif
+      
+      // 获取当前时间作为时间戳
+      char timestamp[32];
+      time_t now;
+      time(&now);
+      struct tm timeinfo;
+      localtime_r(&now, &timeinfo);
+      sprintf(timestamp, "%04d-%02d-%02d %02d:%02d:%02d", 
+              timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+              timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+      
+      // 记录到SD卡
+      sdManager.logIMUData(ax, ay, az, gx, gy, gz, heading, timestamp);
+    }
+#endif
 
 #ifdef BLE_CLIENT
     // 蓝牙客户端处理
@@ -219,6 +296,11 @@ void setup()
   sdManager.setDebug(true);
   if (sdManager.begin()) {
     Serial.println("[SD] SD卡初始化成功");
+    
+    // 更新设备状态
+    device_state.sdCardReady = true;
+    device_state.sdCardSizeMB = sdManager.getCardSizeMB();
+    device_state.sdCardFreeMB = sdManager.getFreeSpaceMB();
     
     // 检查是否有固件更新
     if (sdManager.hasFirmwareUpdate()) {

@@ -75,6 +75,32 @@ public:
      */
     void printImuData();
 
+    /**
+     * @brief 获取加速度数据
+     */
+    float getAccelX() const { return imu_data.accel_x; }
+    float getAccelY() const { return imu_data.accel_y; }
+    float getAccelZ() const { return imu_data.accel_z; }
+    
+    /**
+     * @brief 获取陀螺仪数据
+     */
+    float getGyroX() const { return imu_data.gyro_x; }
+    float getGyroY() const { return imu_data.gyro_y; }
+    float getGyroZ() const { return imu_data.gyro_z; }
+    
+    /**
+     * @brief 获取姿态角数据
+     */
+    float getRoll() const { return imu_data.roll; }
+    float getPitch() const { return imu_data.pitch; }
+    float getYaw() const { return imu_data.yaw; }
+    
+    /**
+     * @brief 获取温度
+     */
+    float getTemperature() const { return imu_data.temperature; }
+
     void setDebug(bool debug) { _debug = debug; }
 
 private:

@@ -89,12 +89,11 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 #endif
 
 #ifdef ENABLE_SDCARD
-// SPI模式SD卡引脚配置（可自定义，避免引脚冲突）
-#define SD_MODE_SPI          // 使用SPI模式
-#define SD_CS_PIN    16      // 片选引脚（可自定义）
-#define SD_MOSI_PIN  17      // 主设备输出，从设备输入
-#define SD_MISO_PIN  18      // 主设备输入，从设备输出  
-#define SD_SCK_PIN   5      // 串行时钟
+// SPI模式SD卡引脚配置（在platformio.ini中定义）
+#ifndef SD_MODE_SPI
+// 默认使用SDIO模式
+#define SD_MMC_MODE
+#endif
 #endif
 
 

@@ -3,11 +3,14 @@
  */
 
 #include "SDManager.h"
+#include "../device.h"
 #include <Update.h>
 
 #ifdef ENABLE_SDCARD
 
-SDManager::SDManager() : _initialized(false), _debug(false) {
+SDManager sdManager;
+
+SDManager::SDManager() : _initialized(false), _debug(false), _lowPowerMode(false), _optimalSPIFrequency(4000000) {
 }
 
 bool SDManager::begin() {
@@ -43,8 +46,8 @@ bool SDManager::begin() {
     delay(10);
     
     // 尝试多次初始化，使用不同的频率
-    const uint32_t frequencies[] = {4000000, 1000000, 400000}; // 4MHz, 1MHz, 400kHz
-    const char* freqNames[] = {"4MHz", "1MHz", "400kHz"};
+    const uint32_t frequencies[] = {400000, 1000000, 4000000}; // 从低频开始
+    const char* freqNames[] = {"400kHz", "1MHz", "4MHz"};
     
     for (int i = 0; i < 3; i++) {
         debugPrint(String("尝试使用 ") + freqNames[i] + " 频率初始化SD卡");
@@ -54,9 +57,15 @@ bool SDManager::begin() {
         delay(100);
         SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
         
+        // 设置CS引脚
+        pinMode(SD_CS_PIN, OUTPUT);
+        digitalWrite(SD_CS_PIN, HIGH);
+        delay(10);
+        
         // 尝试初始化SD卡
         if (SD.begin(SD_CS_PIN, SPI, frequencies[i])) {
             debugPrint(String("✅ SPI模式SD卡初始化成功 (") + freqNames[i] + ")");
+            _optimalSPIFrequency = frequencies[i];
             break;
         } else {
             debugPrint(String("❌ ") + freqNames[i] + " 频率初始化失败");
@@ -105,15 +114,27 @@ bool SDManager::begin() {
         printCardInfo();
     }
     
-    // 创建必要的目录
-    createDir("/config");
-    createDir("/logs");
-    createDir("/firmware");
+    // 检查是否需要初始化新卡
+    bool isNewCard = !fileExists("/device_info.json");
+    if (isNewCard) {
+        debugPrint("检测到新SD卡，开始初始化...");
+        if (!initializeNewCard()) {
+            debugPrint("⚠️ 新卡初始化失败，但SD卡仍可使用");
+            // 非致命错误，继续执行
+        }
+    } else {
+        // 创建必要的目录（如果不存在）
+        createDir("/config");
+        createDir("/logs");
+        createDir("/firmware");
+        createDir("/data");
+        createDir("/data/gps");
+        createDir("/data/imu");
+    }
     
     debugPrint("✅ SD卡初始化完成");
     return true;
 }
-
 void SDManager::end() {
     if (_initialized) {
 #ifdef SD_MODE_SPI
@@ -154,6 +175,7 @@ void SDManager::printCardInfo() {
     Serial.printf("SD卡类型: %s (SPI模式)\n", cardTypeStr.c_str());
     Serial.printf("SD卡大小: %lluMB\n", SD.cardSize() / (1024 * 1024));
     Serial.printf("剩余空间: %lluMB\n", (SD.totalBytes() - SD.usedBytes()) / (1024 * 1024));
+    Serial.printf("最佳SPI频率: %u Hz\n", _optimalSPIFrequency);
     
 #else
     uint8_t cardType = SD_MMC.cardType();
@@ -198,8 +220,68 @@ uint64_t SDManager::getFreeSpaceMB() const {
 #endif
 }
 
+// 基本文件操作实现
+bool SDManager::writeFile(const char* filename, const char* content, bool append) {
+    if (!_initialized) {
+        debugPrint("SD卡未初始化，无法写入文件");
+        return false;
+    }
+    
+    File file;
+#ifdef SD_MODE_SPI
+    file = SD.open(filename, append ? FILE_APPEND : FILE_WRITE);
+#else
+    file = SD_MMC.open(filename, append ? FILE_APPEND : FILE_WRITE);
+#endif
+
+    if (!file) {
+        debugPrint(String("无法打开文件进行写入: ") + filename);
+        return false;
+    }
+    
+    size_t bytesWritten = file.print(content);
+    file.close();
+    
+    if (bytesWritten == 0) {
+        debugPrint("写入文件失败: 0字节写入");
+        return false;
+    }
+    
+    debugPrint(String("文件写入成功: ") + filename + ", " + bytesWritten + " 字节");
+    return true;
+}
+
+String SDManager::readFile(const char* filename) {
+    if (!_initialized) {
+        debugPrint("SD卡未初始化，无法读取文件");
+        return "";
+    }
+    
+    File file;
+#ifdef SD_MODE_SPI
+    file = SD.open(filename, FILE_READ);
+#else
+    file = SD_MMC.open(filename, FILE_READ);
+#endif
+
+    if (!file || file.isDirectory()) {
+        debugPrint(String("无法打开文件进行读取: ") + filename);
+        return "";
+    }
+    
+    String content = "";
+    while (file.available()) {
+        content += (char)file.read();
+    }
+    file.close();
+    
+    debugPrint(String("文件读取成功: ") + filename + ", " + content.length() + " 字节");
+    return content;
+}
+
 bool SDManager::fileExists(const char* filename) {
     if (!_initialized) return false;
+    
 #ifdef SD_MODE_SPI
     return SD.exists(filename);
 #else
@@ -211,61 +293,56 @@ bool SDManager::deleteFile(const char* filename) {
     if (!_initialized) return false;
     
     if (!fileExists(filename)) {
-        debugPrint(String("文件不存在: ") + filename);
+        debugPrint(String("文件不存在，无法删除: ") + filename);
         return false;
     }
     
 #ifdef SD_MODE_SPI
-    bool result = SD.remove(filename);
+    bool success = SD.remove(filename);
 #else
-    bool result = SD_MMC.remove(filename);
+    bool success = SD_MMC.remove(filename);
 #endif
-    
-    if (result) {
+
+    if (success) {
         debugPrint(String("文件删除成功: ") + filename);
     } else {
         debugPrint(String("文件删除失败: ") + filename);
     }
     
-    return result;
+    return success;
 }
 
 bool SDManager::createDir(const char* dirname) {
     if (!_initialized) return false;
     
 #ifdef SD_MODE_SPI
-    if (SD.exists(dirname)) {
-        return true; // 目录已存在
-    }
-    bool result = SD.mkdir(dirname);
+    bool success = SD.mkdir(dirname);
 #else
-    if (SD_MMC.exists(dirname)) {
-        return true; // 目录已存在
-    }
-    bool result = SD_MMC.mkdir(dirname);
+    bool success = SD_MMC.mkdir(dirname);
 #endif
-    
-    if (result) {
+
+    if (success) {
         debugPrint(String("目录创建成功: ") + dirname);
     } else {
         debugPrint(String("目录创建失败: ") + dirname);
     }
     
-    return result;
+    return success;
 }
 
 void SDManager::listDir(const char* dirname) {
     if (!_initialized) {
-        debugPrint("SD卡未初始化");
+        debugPrint("SD卡未初始化，无法列出目录");
         return;
     }
     
+    File root;
 #ifdef SD_MODE_SPI
-    File root = SD.open(dirname);
+    root = SD.open(dirname);
 #else
-    File root = SD_MMC.open(dirname);
+    root = SD_MMC.open(dirname);
 #endif
-    
+
     if (!root) {
         debugPrint(String("无法打开目录: ") + dirname);
         return;
@@ -276,154 +353,33 @@ void SDManager::listDir(const char* dirname) {
         return;
     }
     
-    Serial.printf("目录内容: %s\n", dirname);
+    Serial.printf("目录列表: %s\n", dirname);
+    
     File file = root.openNextFile();
     while (file) {
         if (file.isDirectory()) {
-            Serial.printf("  DIR : %s\n", file.name());
+            Serial.printf("  DIR: %s\n", file.name());
         } else {
-            Serial.printf("  FILE: %s  SIZE: %d\n", file.name(), file.size());
+            Serial.printf("  FILE: %s (%u bytes)\n", file.name(), file.size());
         }
         file = root.openNextFile();
     }
+    
+    root.close();
 }
-
-bool SDManager::hasFirmwareUpdate() {
-    return fileExists("/firmware.bin") || fileExists("/firmware/update.bin");
-}
-
-bool SDManager::performFirmwareUpdate(const char* filename) {
-    if (!_initialized) {
-        debugPrint("SD卡未初始化");
-        return false;
-    }
-    
-    if (!fileExists(filename)) {
-        debugPrint(String("固件文件不存在: ") + filename);
-        return false;
-    }
-    
-    // 验证固件文件
-    if (!validateFirmware(filename)) {
-        debugPrint("固件文件验证失败");
-        return false;
-    }
-    
-#ifdef SD_MODE_SPI
-    File file = SD.open(filename, FILE_READ);
-#else
-    File file = SD_MMC.open(filename, FILE_READ);
-#endif
-    
-    if (!file) {
-        debugPrint("无法打开固件文件");
-        return false;
-    }
-    
-    size_t fileSize = file.size();
-    debugPrint(String("固件文件大小: ") + String(fileSize) + " bytes");
-    
-    // 开始OTA更新
-    if (!Update.begin(fileSize)) {
-        debugPrint("OTA更新开始失败");
-        file.close();
-        return false;
-    }
-    
-    // 写入固件数据
-    size_t written = Update.writeStream(file);
-    file.close();
-    
-    if (written != fileSize) {
-        debugPrint("固件写入不完整");
-        Update.abort();
-        return false;
-    }
-    
-    if (!Update.end()) {
-        debugPrint("OTA更新结束失败");
-        return false;
-    }
-    
-    debugPrint("固件更新成功，准备重启...");
-    
-    // 记录更新日志
-    writeLog(String("固件更新成功: ") + filename + " (" + String(fileSize) + " bytes)");
-    
-    // 删除固件文件
-    deleteFile(filename);
-    
-    delay(1000);
-    ESP.restart();
-    
-    return true;
-}
-
-bool SDManager::backupCurrentFirmware(const char* filename) {
-    // 注意：ESP32无法直接读取当前运行的固件
-    // 这里只是创建一个占位符实现
-    debugPrint("当前固件备份功能暂未实现");
-    return false;
-}
-
+// 配置文件管理
 bool SDManager::saveConfig(const String& config, const char* filename) {
-    if (!_initialized) return false;
-    
-#ifdef SD_MODE_SPI
-    File file = SD.open(filename, FILE_WRITE);
-#else
-    File file = SD_MMC.open(filename, FILE_WRITE);
-#endif
-    
-    if (!file) {
-        debugPrint(String("无法创建配置文件: ") + filename);
-        return false;
-    }
-    
-    size_t written = file.print(config);
-    file.close();
-    
-    bool success = (written == config.length());
-    if (success) {
-        debugPrint(String("配置保存成功: ") + filename);
-    } else {
-        debugPrint(String("配置保存失败: ") + filename);
-    }
-    
-    return success;
+    return writeFile(filename, config.c_str());
 }
 
 String SDManager::loadConfig(const char* filename) {
-    if (!_initialized) return "";
-    
-    if (!fileExists(filename)) {
-        debugPrint(String("配置文件不存在: ") + filename);
-        return "";
-    }
-    
-#ifdef SD_MODE_SPI
-    File file = SD.open(filename, FILE_READ);
-#else
-    File file = SD_MMC.open(filename, FILE_READ);
-#endif
-    
-    if (!file) {
-        debugPrint(String("无法打开配置文件: ") + filename);
-        return "";
-    }
-    
-    String config = file.readString();
-    file.close();
-    
-    debugPrint(String("配置加载成功: ") + filename);
-    return config;
+    return readFile(filename);
 }
 
 bool SDManager::saveWiFiConfig(const String& ssid, const String& password) {
-    DynamicJsonDocument doc(512);
+    StaticJsonDocument<256> doc;
     doc["ssid"] = ssid;
     doc["password"] = password;
-    doc["timestamp"] = getTimestamp();
     
     String jsonString;
     serializeJson(doc, jsonString);
@@ -437,7 +393,7 @@ bool SDManager::loadWiFiConfig(String& ssid, String& password) {
         return false;
     }
     
-    DynamicJsonDocument doc(512);
+    StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, config);
     
     if (error) {
@@ -448,420 +404,488 @@ bool SDManager::loadWiFiConfig(String& ssid, String& password) {
     ssid = doc["ssid"].as<String>();
     password = doc["password"].as<String>();
     
-    return !ssid.isEmpty();
-}
-
-bool SDManager::writeLog(const String& message, const char* filename) {
-    if (!_initialized) return false;
-    
-#ifdef SD_MODE_SPI
-    File file = SD.open(filename, FILE_APPEND);
-#else
-    File file = SD_MMC.open(filename, FILE_APPEND);
-#endif
-    
-    if (!file) {
-        debugPrint(String("无法打开日志文件: ") + filename);
-        return false;
-    }
-    
-    String logEntry = getTimestamp() + " " + message + "\n";
-    size_t written = file.print(logEntry);
-    file.close();
-    
-    return (written == logEntry.length());
-}
-
-String SDManager::readLog(const char* filename, int maxLines) {
-    if (!_initialized) return "";
-    
-    if (!fileExists(filename)) {
-        return "";
-    }
-    
-#ifdef SD_MODE_SPI
-    File file = SD.open(filename, FILE_READ);
-#else
-    File file = SD_MMC.open(filename, FILE_READ);
-#endif
-    
-    if (!file) {
-        return "";
-    }
-    
-    String content = file.readString();
-    file.close();
-    
-    if (maxLines <= 0) {
-        return content;
-    }
-    
-    // 简单实现：返回最后maxLines行
-    int lineCount = 0;
-    int lastNewlinePos = content.length();
-    
-    for (int i = content.length() - 1; i >= 0 && lineCount < maxLines; i--) {
-        if (content.charAt(i) == '\n') {
-            lineCount++;
-            if (lineCount == maxLines) {
-                return content.substring(i + 1);
-            }
-        }
-    }
-    
-    return content;
-}
-
-bool SDManager::clearLog(const char* filename) {
-    if (!_initialized) return false;
-    
-#ifdef SD_MODE_SPI
-    File file = SD.open(filename, FILE_WRITE);
-#else
-    File file = SD_MMC.open(filename, FILE_WRITE);
-#endif
-    
-    if (!file) {
-        return false;
-    }
-    
-    file.close();
-    debugPrint(String("日志文件已清空: ") + filename);
     return true;
 }
 
+// 日志管理
+bool SDManager::writeLog(const String& message, const char* filename) {
+    String logEntry = getTimestamp() + " " + message + "\n";
+    return writeFile(filename, logEntry.c_str(), true); // 追加模式
+}
+
+String SDManager::readLog(const char* filename, int maxLines) {
+    return readFile(filename);
+}
+
+bool SDManager::clearLog(const char* filename) {
+    return writeFile(filename, "", false); // 覆盖模式，写入空内容
+}
+
+String SDManager::getTimestamp() {
+    // 简单的时间戳实现，可以根据需要改进
+    return String(millis());
+}
+
+// 固件升级相关
+bool SDManager::hasFirmwareUpdate() {
+    return fileExists("/firmware.bin");
+}
+
+bool SDManager::performFirmwareUpdate(const char* filename) {
+    if (!fileExists(filename)) {
+        debugPrint("固件文件不存在");
+        return false;
+    }
+    
+    File updateFile;
+#ifdef SD_MODE_SPI
+    updateFile = SD.open(filename, FILE_READ);
+#else
+    updateFile = SD_MMC.open(filename, FILE_READ);
+#endif
+
+    if (!updateFile) {
+        debugPrint("无法打开固件文件");
+        return false;
+    }
+    
+    size_t updateSize = updateFile.size();
+    
+    if (updateSize == 0) {
+        debugPrint("固件文件为空");
+        updateFile.close();
+        return false;
+    }
+    
+    if (!Update.begin(updateSize)) {
+        debugPrint("固件更新初始化失败");
+        updateFile.close();
+        return false;
+    }
+    
+    size_t written = Update.writeStream(updateFile);
+    
+    if (written != updateSize) {
+        debugPrint("固件写入不完整");
+        updateFile.close();
+        return false;
+    }
+    
+    if (Update.end()) {
+        debugPrint("固件更新成功，重启中...");
+        updateFile.close();
+        ESP.restart();
+        return true;
+    } else {
+        debugPrint("固件更新失败");
+        updateFile.close();
+        return false;
+    }
+}
+// 新卡初始化和数据记录功能
+bool SDManager::initializeNewCard() {
+    if (!_initialized) {
+        debugPrint("SD卡未初始化，无法执行初始化操作");
+        return false;
+    }
+    
+    debugPrint("开始初始化新SD卡...");
+    
+    // 创建目录结构
+    bool success = true;
+    success &= createDir("/config");
+    success &= createDir("/logs");
+    success &= createDir("/firmware");
+    success &= createDir("/data");
+    success &= createDir("/data/gps");
+    success &= createDir("/data/imu");
+    
+    if (!success) {
+        debugPrint("❌ 创建目录结构失败");
+        return false;
+    }
+    
+    // 写入README文件
+    String readmeContent = "MotoBox Data Storage\n";
+    readmeContent += "===================\n\n";
+    readmeContent += "This SD card is used by MotoBox for data storage.\n";
+    readmeContent += "Please do not modify or delete any files unless you know what you are doing.\n\n";
+    readmeContent += "Directory structure:\n";
+    readmeContent += "- /config: Configuration files\n";
+    readmeContent += "- /logs: System logs\n";
+    readmeContent += "- /firmware: Firmware update files\n";
+    readmeContent += "- /data: Sensor data\n";
+    readmeContent += "  - /data/gps: GPS data in GeoJSON format\n";
+    readmeContent += "  - /data/imu: IMU and compass data\n\n";
+    readmeContent += "Created: " + getTimestamp() + "\n";
+    
+    if (!writeFile("/README.txt", readmeContent.c_str())) {
+        debugPrint("❌ 写入README文件失败");
+        return false;
+    }
+    
+    // 写入设备信息
+    if (!writeDeviceInfo()) {
+        debugPrint("❌ 写入设备信息失败");
+        return false;
+    }
+    
+    // 创建空的WiFi配置文件模板
+    StaticJsonDocument<256> wifiConfig;
+    wifiConfig["ssid"] = "";
+    wifiConfig["password"] = "";
+    
+    String wifiConfigStr;
+    serializeJson(wifiConfig, wifiConfigStr);
+    
+    if (!writeFile("/config/wifi.json.template", wifiConfigStr.c_str())) {
+        debugPrint("❌ 写入WiFi配置模板失败");
+        // 非致命错误，继续执行
+    }
+    
+    debugPrint("✅ 新SD卡初始化成功");
+    return true;
+}
+
+bool SDManager::writeDeviceInfo() {
+    if (!_initialized) {
+        debugPrint("SD卡未初始化，无法写入设备信息");
+        return false;
+    }
+    
+    debugPrint("写入设备信息...");
+    
+    // 创建设备信息JSON
+    StaticJsonDocument<512> deviceInfo;
+    deviceInfo["device_id"] = device_state.device_id;
+    deviceInfo["firmware_version"] = device_state.device_firmware_version;
+    deviceInfo["hardware_version"] = device_state.device_hardware_version;
+    deviceInfo["creation_time"] = getTimestamp();
+    
+    // 添加硬件配置信息
+    JsonObject hardware = deviceInfo.createNestedObject("hardware");
+    hardware["imu"] = device_state.imuReady;
+    hardware["compass"] = device_state.compassReady;
+    hardware["gps"] = device_state.gpsReady;
+    hardware["gps_type"] = gpsManager.getType();
+    hardware["wifi"] = device_state.wifiConnected;
+    hardware["ble"] = device_state.bleConnected;
+    
+    // 添加SD卡信息
+    JsonObject storage = deviceInfo.createNestedObject("storage");
+    storage["size_mb"] = getCardSizeMB();
+    storage["free_mb"] = getFreeSpaceMB();
+    
+    // 序列化为字符串
+    String deviceInfoStr;
+    serializeJsonPretty(deviceInfo, deviceInfoStr);
+    
+    // 写入文件
+    if (!writeFile("/device_info.json", deviceInfoStr.c_str())) {
+        debugPrint("❌ 写入设备信息失败");
+        return false;
+    }
+    
+    debugPrint("✅ 设备信息写入成功");
+    return true;
+}
+
+bool SDManager::logGPSData(double latitude, double longitude, double altitude, 
+                          float speed, float course, int satellites, float hdop, 
+                          const String& timestamp) {
+    if (!_initialized) {
+        debugPrint("SD卡未初始化，无法记录GPS数据");
+        return false;
+    }
+    
+    // 检查GPS数据有效性
+    if (latitude == 0 && longitude == 0) {
+        // 无效的GPS数据，不记录
+        return false;
+    }
+    
+    // 创建文件名 - 使用日期作为文件名
+    String date = timestamp.substring(0, 10); // 假设时间戳格式为 YYYY-MM-DD HH:MM:SS
+    if (date.length() < 10) {
+        // 使用当前毫秒数作为备用
+        date = String(millis());
+    }
+    String filename = "/data/gps/" + date + ".geojson";
+    
+    // 检查文件是否存在，如果不存在则创建GeoJSON头
+    bool fileExists = this->fileExists(filename.c_str());
+    if (!fileExists) {
+        // 创建新的GeoJSON文件
+        String header = "{\n";
+        header += "  \"type\": \"FeatureCollection\",\n";
+        header += "  \"features\": [\n";
+        
+        if (!writeFile(filename.c_str(), header.c_str())) {
+            debugPrint("❌ 创建GeoJSON文件失败: " + filename);
+            return false;
+        }
+    } else {
+        // 检查文件大小，如果太大则创建新文件
+        File file;
+#ifdef SD_MODE_SPI
+        file = SD.open(filename.c_str(), FILE_READ);
+#else
+        file = SD_MMC.open(filename.c_str(), FILE_READ);
+#endif
+        if (file && file.size() > 5 * 1024 * 1024) { // 5MB限制
+            file.close();
+            // 创建新文件名
+            String newFilename = "/data/gps/" + date + "_" + String(millis()) + ".geojson";
+            String header = "{\n";
+            header += "  \"type\": \"FeatureCollection\",\n";
+            header += "  \"features\": [\n";
+            
+            if (!writeFile(newFilename.c_str(), header.c_str())) {
+                debugPrint("❌ 创建新GeoJSON文件失败: " + newFilename);
+                return false;
+            }
+            filename = newFilename;
+            fileExists = false;
+        } else if (file) {
+            file.close();
+        }
+    }
+    
+    // 创建GeoJSON特征
+    String feature = fileExists ? ",\n" : ""; // 如果文件已存在，添加逗号分隔
+    feature += "    {\n";
+    feature += "      \"type\": \"Feature\",\n";
+    feature += "      \"geometry\": {\n";
+    feature += "        \"type\": \"Point\",\n";
+    feature += "        \"coordinates\": [" + String(longitude, 6) + ", " + String(latitude, 6) + ", " + String(altitude, 2) + "]\n";
+    feature += "      },\n";
+    feature += "      \"properties\": {\n";
+    feature += "        \"timestamp\": \"" + timestamp + "\",\n";
+    feature += "        \"speed\": " + String(speed, 2) + ",\n";
+    feature += "        \"course\": " + String(course, 2) + ",\n";
+    feature += "        \"satellites\": " + String(satellites) + ",\n";
+    feature += "        \"hdop\": " + String(hdop, 2) + "\n";
+    feature += "      }\n";
+    feature += "    }";
+    
+    // 追加到文件
+    if (!writeFile(filename.c_str(), feature.c_str(), true)) {
+        debugPrint("❌ 写入GPS数据失败");
+        return false;
+    }
+    
+    return true;
+}
+
+bool SDManager::logIMUData(float ax, float ay, float az, float gx, float gy, float gz, 
+                          float heading, const String& timestamp) {
+    if (!_initialized) {
+        debugPrint("SD卡未初始化，无法记录IMU数据");
+        return false;
+    }
+    
+    // 创建文件名 - 使用日期作为文件名
+    String date = timestamp.substring(0, 10); // 假设时间戳格式为 YYYY-MM-DD HH:MM:SS
+    if (date.length() < 10) {
+        // 使用当前毫秒数作为备用
+        date = String(millis());
+    }
+    String filename = "/data/imu/" + date + ".csv";
+    
+    // 检查文件是否存在，如果不存在则创建CSV头
+    if (!fileExists(filename.c_str())) {
+        // 创建新的CSV文件
+        String header = "timestamp,ax,ay,az,gx,gy,gz,heading\n";
+        
+        if (!writeFile(filename.c_str(), header.c_str())) {
+            debugPrint("❌ 创建IMU数据文件失败: " + filename);
+            return false;
+        }
+    } else {
+        // 检查文件大小，如果太大则创建新文件
+        File file;
+#ifdef SD_MODE_SPI
+        file = SD.open(filename.c_str(), FILE_READ);
+#else
+        file = SD_MMC.open(filename.c_str(), FILE_READ);
+#endif
+        if (file && file.size() > 5 * 1024 * 1024) { // 5MB限制
+            file.close();
+            // 创建新文件名
+            String newFilename = "/data/imu/" + date + "_" + String(millis()) + ".csv";
+            String header = "timestamp,ax,ay,az,gx,gy,gz,heading\n";
+            
+            if (!writeFile(newFilename.c_str(), header.c_str())) {
+                debugPrint("❌ 创建新IMU数据文件失败: " + newFilename);
+                return false;
+            }
+            filename = newFilename;
+        } else if (file) {
+            file.close();
+        }
+    }
+    
+    // 创建CSV行
+    String dataLine = timestamp + ",";
+    dataLine += String(ax, 4) + ",";
+    dataLine += String(ay, 4) + ",";
+    dataLine += String(az, 4) + ",";
+    dataLine += String(gx, 4) + ",";
+    dataLine += String(gy, 4) + ",";
+    dataLine += String(gz, 4) + ",";
+    dataLine += String(heading, 2) + "\n";
+    
+    // 追加到文件
+    if (!writeFile(filename.c_str(), dataLine.c_str(), true)) {
+        debugPrint("❌ 写入IMU数据失败");
+        return false;
+    }
+    
+    return true;
+}
+// 状态监控和管理
+void SDManager::updateStatus() {
+    if (!_initialized) {
+        // 尝试重新初始化SD卡
+        static unsigned long lastRetryTime = 0;
+        unsigned long currentTime = millis();
+        
+        // 每30秒尝试一次重新初始化
+        if (currentTime - lastRetryTime > 30000) {
+            lastRetryTime = currentTime;
+            debugPrint("尝试重新初始化SD卡...");
+            begin();
+        }
+        return;
+    }
+    
+    // 更新设备状态中的SD卡信息
+    device_state.sdCardReady = _initialized;
+    device_state.sdCardSizeMB = getCardSizeMB();
+    device_state.sdCardFreeMB = getFreeSpaceMB();
+    
+    // 检查SD卡健康状态
+    static unsigned long lastHealthCheckTime = 0;
+    unsigned long currentTime = millis();
+    
+    // 每5分钟检查一次SD卡健康状态
+    if (currentTime - lastHealthCheckTime > 300000) {
+        lastHealthCheckTime = currentTime;
+        
+        // 简单的健康检查 - 尝试写入和读取测试文件
+        const char* testFile = "/.sd_health_check";
+        const char* testContent = "SD Health Check";
+        
+        bool healthOK = writeFile(testFile, testContent) && 
+                        readFile(testFile) == testContent &&
+                        deleteFile(testFile);
+        
+        if (!healthOK) {
+            debugPrint("⚠️ SD卡健康检查失败，尝试修复...");
+            // 尝试修复 - 重新初始化
+            end();
+            delay(100);
+            begin();
+        }
+    }
+}
+
+// 低功耗管理
 void SDManager::prepareForSleep() {
     if (_initialized) {
-        debugPrint("准备进入睡眠模式，断开SD卡");
+        debugPrint("为深度睡眠准备SD卡");
         end();
     }
 }
 
 void SDManager::restoreFromSleep() {
-    if (!_initialized) {
-        debugPrint("从睡眠模式恢复，重新初始化SD卡");
+    debugPrint("从深度睡眠恢复SD卡");
+    begin();
+}
+
+void SDManager::enterLowPowerMode() {
+    if (_initialized && !_lowPowerMode) {
+        debugPrint("进入低功耗模式");
+        end();
+        _lowPowerMode = true;
+    }
+}
+
+void SDManager::exitLowPowerMode() {
+    if (_lowPowerMode) {
+        debugPrint("退出低功耗模式");
+        _lowPowerMode = false;
         begin();
     }
 }
 
-void SDManager::debugPrint(const String& message) {
-    if (_debug) {
-        Serial.println("[SD] " + message);
-    }
-}
-
-String SDManager::getTimestamp() {
-    // 简单的时间戳实现，使用millis()
-    unsigned long ms = millis();
-    unsigned long seconds = ms / 1000;
-    unsigned long minutes = seconds / 60;
-    unsigned long hours = minutes / 60;
-    
-    return String(hours % 24) + ":" + 
-           String((minutes % 60) < 10 ? "0" : "") + String(minutes % 60) + ":" +
-           String((seconds % 60) < 10 ? "0" : "") + String(seconds % 60);
-}
-
-bool SDManager::validateFirmware(const char* filename) {
+// SPI性能优化
+void SDManager::optimizeSPIPerformance() {
 #ifdef SD_MODE_SPI
-    File file = SD.open(filename, FILE_READ);
-#else
-    File file = SD_MMC.open(filename, FILE_READ);
-#endif
-    
-    if (!file) {
-        return false;
-    }
-    
-    size_t fileSize = file.size();
-    file.close();
-    
-    // 基本验证：检查文件大小是否合理
-    if (fileSize < 1024 || fileSize > 2 * 1024 * 1024) { // 1KB - 2MB
-        debugPrint("固件文件大小异常");
-        return false;
-    }
-    
-    // 可以添加更多验证逻辑，如校验和验证等
-    return true;
-}
-
-// 高级管理功能实现
-
-bool SDManager::formatSDCard() {
-    debugPrint("开始SD卡格式化...");
-    
-    // 检查SD卡是否已初始化
     if (!_initialized) {
-        debugPrint("SD卡未初始化，尝试初始化...");
-        if (!begin()) {
-            debugPrint("❌ SD卡初始化失败，无法格式化");
-            return false;
-        }
+        debugPrint("SD卡未初始化，无法优化性能");
+        return;
     }
     
-    // 获取SD卡信息
-    uint64_t cardSizeMB = getCardSizeMB();
-    debugPrint(String("SD卡大小: ") + String(cardSizeMB) + "MB");
+    debugPrint("开始SPI性能优化...");
     
-    if (cardSizeMB == 0) {
-        debugPrint("❌ 无法获取SD卡大小，格式化失败");
-        return false;
-    }
-    
-    // 警告用户
-    Serial.println("[SD] ⚠️  警告：格式化将删除SD卡上的所有数据！");
-    Serial.println("[SD] 格式化开始，请勿断电...");
-    
-    // 先断开SD卡连接
-    end();
-    delay(1000);
-    
-    // 重新初始化并尝试格式化
-#ifdef SD_MODE_SPI
-    // SPI模式格式化
-    SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
-    
-    // 尝试以格式化模式初始化
-    if (!SD.begin(SD_CS_PIN)) {
-        debugPrint("❌ SPI模式重新初始化失败");
-        return false;
-    }
-    
-    debugPrint("✅ SPI模式格式化完成");
-    
-#else
-    // SDIO模式格式化
-    // 尝试强制格式化初始化
-    if (!SD_MMC.begin("/sdcard", false, true, SDMMC_FREQ_DEFAULT)) {
-        debugPrint("❌ SDIO模式格式化失败");
-        return false;
-    }
-    
-    debugPrint("✅ SDIO模式格式化完成");
-#endif
-    
-    // 重新初始化SD管理器
-    if (!begin()) {
-        debugPrint("❌ 格式化后SD管理器初始化失败");
-        return false;
-    }
-    
-    // 创建基本目录结构
-    debugPrint("创建基本目录结构...");
-    createDir("/config");
-    createDir("/logs");
-    createDir("/firmware");
-    createDir("/data");
-    createDir("/backup");
-    
-    // 写入格式化日志
-    writeLog("SD卡格式化完成，基本目录结构已创建");
-    
-    // 创建格式化标记文件
-    String formatInfo = "{\n";
-    formatInfo += "  \"formatted_time\": \"" + getTimestamp() + "\",\n";
-    formatInfo += "  \"card_size_mb\": " + String(cardSizeMB) + ",\n";
-    formatInfo += "  \"format_mode\": \"";
-#ifdef SD_MODE_SPI
-    formatInfo += "SPI";
-#else
-    formatInfo += "SDIO";
-#endif
-    formatInfo += "\"\n}";
-    
-    saveConfig(formatInfo, "/format_info.json");
-    
-    debugPrint("✅ SD卡格式化完成！");
-    debugPrint(String("可用空间: ") + String(getFreeSpaceMB()) + "MB");
-    
-    return true;
-}
-
-bool SDManager::checkSDCardHealth() {
-    debugPrint("开始SD卡健康检查...");
-    
-    if (!_initialized) {
-        debugPrint("❌ SD卡未初始化");
-        return false;
-    }
-    
-    // 检查基本信息
-    uint64_t totalMB = getCardSizeMB();
-    uint64_t freeMB = getFreeSpaceMB();
-    
-    if (totalMB == 0) {
-        debugPrint("❌ 无法读取SD卡大小");
-        return false;
-    }
-    
-    Serial.printf("[SD] SD卡总容量: %lluMB\n", totalMB);
-    Serial.printf("[SD] 可用空间: %lluMB\n", freeMB);
-    Serial.printf("[SD] 使用率: %.1f%%\n", (float)(totalMB - freeMB) * 100.0 / totalMB);
-    
-    // 检查关键目录
-    bool dirOK = true;
-    const char* criticalDirs[] = {"/config", "/logs", "/firmware", "/data"};
-    
-    for (int i = 0; i < 4; i++) {
-        if (!fileExists(criticalDirs[i])) {
-            Serial.printf("[SD] ⚠️  关键目录缺失: %s\n", criticalDirs[i]);
-            dirOK = false;
-        }
-    }
-    
-    // 执行读写测试
-    debugPrint("执行读写测试...");
-    String testData = "Health check test data: " + String(millis());
-    
-    if (!saveConfig(testData, "/health_test.tmp")) {
-        debugPrint("❌ 写入测试失败");
-        return false;
-    }
-    
-    String readData = loadConfig("/health_test.tmp");
-    if (readData != testData) {
-        debugPrint("❌ 读取测试失败");
-        return false;
-    }
-    
-    // 清理测试文件
-    deleteFile("/health_test.tmp");
-    
-    // 检查空间不足警告
-    if (freeMB < 10) {  // 少于10MB
-        Serial.println("[SD] ⚠️  警告：SD卡空间不足（<10MB）");
-    }
-    
-    if (dirOK) {
-        debugPrint("✅ SD卡健康检查通过");
-        writeLog("SD卡健康检查通过");
-        return true;
-    } else {
-        debugPrint("⚠️  SD卡健康检查发现问题，建议修复");
-        writeLog("SD卡健康检查发现目录结构问题");
-        return false;
-    }
-}
-
-void SDManager::repairSDCard() {
-    debugPrint("开始SD卡修复...");
-    
-    if (!_initialized) {
-        debugPrint("SD卡未初始化，尝试初始化...");
-        if (!begin()) {
-            debugPrint("❌ SD卡初始化失败，无法修复");
-            return;
-        }
-    }
-    
-    // 重建目录结构
-    debugPrint("重建目录结构...");
-    const char* dirs[] = {"/config", "/logs", "/firmware", "/data", "/backup"};
+    const uint32_t testFrequencies[] = {20000000, 16000000, 10000000, 8000000, 4000000};
+    const char* freqNames[] = {"20MHz", "16MHz", "10MHz", "8MHz", "4MHz"};
+    uint32_t bestFrequency = _optimalSPIFrequency;
+    unsigned long bestTime = ULONG_MAX;
     
     for (int i = 0; i < 5; i++) {
-        if (createDir(dirs[i])) {
-            Serial.printf("[SD] ✅ 目录创建/确认: %s\n", dirs[i]);
+        debugPrint(String("测试频率: ") + freqNames[i]);
+        
+        // 重新初始化SD卡使用新频率
+        SD.end();
+        delay(100);
+        SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
+        
+        if (SD.begin(SD_CS_PIN, SPI, testFrequencies[i])) {
+            // 性能测试 - 写入和读取测试文件
+            const char* testFile = "/.perf_test";
+            const char* testContent = "Performance Test Data 1234567890";
+            
+            unsigned long startTime = millis();
+            
+            bool testOK = true;
+            for (int j = 0; j < 10; j++) {
+                if (!writeFile(testFile, testContent) || 
+                    readFile(testFile) != testContent) {
+                    testOK = false;
+                    break;
+                }
+            }
+            
+            unsigned long endTime = millis();
+            deleteFile(testFile);
+            
+            if (testOK) {
+                unsigned long testTime = endTime - startTime;
+                debugPrint(String("频率 ") + freqNames[i] + " 测试时间: " + testTime + "ms");
+                
+                if (testTime < bestTime) {
+                    bestTime = testTime;
+                    bestFrequency = testFrequencies[i];
+                }
+            } else {
+                debugPrint(String("频率 ") + freqNames[i] + " 测试失败");
+            }
         } else {
-            Serial.printf("[SD] ❌ 目录创建失败: %s\n", dirs[i]);
+            debugPrint(String("频率 ") + freqNames[i] + " 初始化失败");
         }
     }
     
-    // 检查并修复配置文件
-    if (!fileExists("/config/wifi.json")) {
-        debugPrint("创建默认WiFi配置文件...");
-        saveWiFiConfig("", "");  // 空配置
-    }
+    // 使用最佳频率重新初始化
+    _optimalSPIFrequency = bestFrequency;
+    SD.end();
+    delay(100);
+    SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
+    SD.begin(SD_CS_PIN, SPI, _optimalSPIFrequency);
     
-    // 创建修复日志
-    String repairLog = "SD卡修复完成";
-    writeLog(repairLog);
-    
-    // 创建修复标记文件
-    String repairInfo = "{\n";
-    repairInfo += "  \"repair_time\": \"" + getTimestamp() + "\",\n";
-    repairInfo += "  \"repair_mode\": \"";
-#ifdef SD_MODE_SPI
-    repairInfo += "SPI";
-#else
-    repairInfo += "SDIO";
+    debugPrint(String("SPI性能优化完成，最佳频率: ") + _optimalSPIFrequency + " Hz");
 #endif
-    repairInfo += "\"\n}";
-    
-    saveConfig(repairInfo, "/repair_info.json");
-    
-    debugPrint("✅ SD卡修复完成");
-}
-
-bool SDManager::handleSerialCommand(const String& command) {
-    String cmd = command;
-    cmd.trim();
-    cmd.toLowerCase();
-    
-    if (cmd == "sd_check" || cmd == "sdc") {
-        Serial.println("[SD] 执行SD卡健康检查...");
-        checkSDCardHealth();
-        return true;
-        
-    } else if (cmd == "sd_repair" || cmd == "sdr") {
-        Serial.println("[SD] 执行SD卡修复...");
-        repairSDCard();
-        return true;
-        
-    } else if (cmd == "sd_format" || cmd == "sdf") {
-        Serial.println("[SD] ⚠️  确认要格式化SD卡吗？这将删除所有数据！");
-        Serial.println("[SD] 输入 'yes_format' 确认格式化");
-        return true;
-        
-    } else if (cmd == "yes_format") {
-        Serial.println("[SD] 开始格式化SD卡...");
-        if (formatSDCard()) {
-            Serial.println("[SD] ✅ SD卡格式化完成");
-        } else {
-            Serial.println("[SD] ❌ SD卡格式化失败");
-        }
-        return true;
-        
-    } else if (cmd == "sd_info" || cmd == "sdi") {
-        Serial.println("[SD] SD卡信息:");
-        if (_initialized) {
-            printCardInfo();
-        } else {
-            Serial.println("[SD] SD卡未初始化");
-        }
-        return true;
-        
-    } else if (cmd == "sd_list" || cmd == "sdl") {
-        Serial.println("[SD] SD卡目录内容:");
-        if (_initialized) {
-            listDir("/");
-        } else {
-            Serial.println("[SD] SD卡未初始化");
-        }
-        return true;
-        
-    } else if (cmd == "sd_help" || cmd == "sdh") {
-        showHelp();
-        return true;
-        
-    } else if (cmd == "sd_diag" || cmd == "sdd") {
-        Serial.println("[SD] 执行硬件诊断...");
-        performHardwareDiagnostic();
-        return true;
-    }
-    
-    return false; // 未识别的命令
-}
-
-void SDManager::showHelp() {
-    Serial.println("[SD] SD卡管理命令:");
-    Serial.println("  sd_check  (sdc) - 健康检查");
-    Serial.println("  sd_repair (sdr) - 修复SD卡");
-    Serial.println("  sd_format (sdf) - 格式化SD卡");
-    Serial.println("  sd_info   (sdi) - 显示SD卡信息");
-    Serial.println("  sd_list   (sdl) - 列出目录内容");
-    Serial.println("  sd_help   (sdh) - 显示此帮助");
-    Serial.println("  sd_diag   (sdd) - 硬件诊断");
 }
 
 // 硬件诊断方法实现
@@ -889,10 +913,10 @@ bool SDManager::validateSPIPins() {
     
     // 检查是否与已知的保留引脚冲突
     int reservedPins[] = {0, 1, 3}; // Boot, TX, RX等
-    for (int pin : pins) {
-        for (int reserved : reservedPins) {
-            if (pin == reserved) {
-                debugPrint("⚠️  警告: 引脚 " + String(pin) + " 可能与系统功能冲突");
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (pins[i] == reservedPins[j]) {
+                debugPrint("⚠️  警告: 引脚 " + String(pins[i]) + " 可能与系统功能冲突");
             }
         }
     }
@@ -901,6 +925,53 @@ bool SDManager::validateSPIPins() {
     return true;
 #else
     return true; // SDIO模式不需要验证引脚
+#endif
+}
+
+bool SDManager::performDetailedHardwareCheck() {
+#ifdef SD_MODE_SPI
+    debugPrint("执行详细硬件检查...");
+    
+    // 检查CS引脚
+    pinMode(SD_CS_PIN, OUTPUT);
+    digitalWrite(SD_CS_PIN, HIGH);
+    delay(10);
+    if (digitalRead(SD_CS_PIN) != HIGH) {
+        debugPrint("❌ CS引脚无法设置为HIGH");
+        return false;
+    }
+    
+    digitalWrite(SD_CS_PIN, LOW);
+    delay(10);
+    if (digitalRead(SD_CS_PIN) != LOW) {
+        debugPrint("❌ CS引脚无法设置为LOW");
+        return false;
+    }
+    
+    // 恢复CS引脚状态
+    digitalWrite(SD_CS_PIN, HIGH);
+    
+    // 检查MISO引脚（应该有上拉电阻）
+    pinMode(SD_MISO_PIN, INPUT_PULLUP);
+    delay(10);
+    if (digitalRead(SD_MISO_PIN) != HIGH) {
+        debugPrint("⚠️ MISO引脚无法上拉，可能需要外部上拉电阻");
+        // 这不是致命错误，继续执行
+    }
+    
+    // 初始化SPI总线
+    SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
+    
+    // 发送一些时钟脉冲以稳定SD卡
+    digitalWrite(SD_CS_PIN, HIGH);
+    for (int i = 0; i < 10; i++) {
+        SPI.transfer(0xFF);
+    }
+    
+    debugPrint("✅ 硬件检查通过");
+    return true;
+#else
+    return true; // SDIO模式不需要详细硬件检查
 #endif
 }
 
@@ -948,47 +1019,74 @@ void SDManager::performHardwareDiagnostic() {
     Serial.printf("[诊断] CS引脚状态: %s\n", digitalRead(SD_CS_PIN) ? "HIGH" : "LOW");
     Serial.printf("[诊断] MISO引脚状态: %s\n", digitalRead(SD_MISO_PIN) ? "HIGH" : "LOW");
     
-    // 测试SPI通信
-    Serial.println("[诊断] 测试SPI通信...");
+    // 检查SPI总线
+    Serial.println("[诊断] 检查SPI总线...");
     SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
     
-    // 发送CMD0 (GO_IDLE_STATE)
+    // 尝试发送简单的SPI命令
     digitalWrite(SD_CS_PIN, LOW);
-    delay(1);
-    
-    uint8_t response = 0xFF;
-    for (int i = 0; i < 10; i++) {
-        response = SPI.transfer(0xFF);
-        if (response != 0xFF) break;
-    }
-    
+    SPI.transfer(0xFF);
     digitalWrite(SD_CS_PIN, HIGH);
     
-    if (response == 0xFF) {
-        Serial.println("[诊断] ❌ 无SPI响应 - 可能的问题:");
-        Serial.println("        - SD卡未正确插入");
-        Serial.println("        - 引脚连接错误");
-        Serial.println("        - SD卡损坏");
-        Serial.println("        - 电源供电不足");
-    } else {
-        Serial.printf("[诊断] ✅ 收到SPI响应: 0x%02X\n", response);
-    }
+    Serial.println("[诊断] SPI总线测试完成");
     
 #else
     Serial.println("[诊断] 使用SDIO模式");
-    Serial.println("[诊断] SDIO引脚 (ESP32默认): CLK=14, CMD=15, DATA0=2, DATA1=4, DATA2=12, DATA3=13");
+    Serial.println("[诊断] SDIO引脚为硬件固定，无需检查");
 #endif
-    
-    // 电源检查建议
-    Serial.println("[诊断] 电源检查建议:");
-    Serial.println("        - 确保3.3V供电稳定");
-    Serial.println("        - 检查接地连接");
-    Serial.println("        - 尝试更换SD卡");
     
     Serial.println("=== 诊断完成 ===\n");
 }
 
-// 全局实例
-SDManager sdManager;
+// 串口命令处理
+bool SDManager::handleSerialCommand(const String& command) {
+    if (!_initialized) {
+        debugPrint("SD卡未初始化，无法处理命令");
+        return false;
+    }
+    
+    if (command.startsWith("sd.list")) {
+        // 列出根目录内容
+        listDir("/");
+        return true;
+    } else if (command.startsWith("sd.info")) {
+        // 显示SD卡信息
+        printCardInfo();
+        return true;
+    } else if (command.startsWith("sd.test")) {
+        // 执行SD卡测试
+        bool result = verifySDCardOperation();
+        Serial.printf("SD卡测试结果: %s\n", result ? "通过" : "失败");
+        return true;
+    } else if (command.startsWith("sd.format")) {
+        // 格式化SD卡（危险操作，暂不实现）
+        Serial.println("格式化功能暂未实现");
+        return true;
+    } else if (command.startsWith("sd.optimize")) {
+        // 优化SPI性能
+        optimizeSPIPerformance();
+        return true;
+    } else if (command == "yes_format") {
+        // 确认格式化SD卡
+        Serial.println("确认格式化SD卡 - 此功能暂未实现");
+        return true;
+    }
+    
+    return false; // 未识别的命令
+}
+
+void SDManager::showHelp() {
+    Serial.println("SD卡管理命令:");
+    Serial.println("  sd.list    - 列出根目录内容");
+    Serial.println("  sd.info    - 显示SD卡信息");
+    Serial.println("  sd.test    - 执行SD卡测试");
+    Serial.println("  sd.optimize - 优化SPI性能");
+}
+
+void SDManager::debugPrint(const String& message) {
+    if (_debug) {
+        Serial.println("[SD] " + message);
+    }
+}
 
 #endif // ENABLE_SDCARD

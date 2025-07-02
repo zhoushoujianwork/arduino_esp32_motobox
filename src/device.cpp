@@ -30,6 +30,11 @@ void print_device_info()
     Serial.printf("GPS Type: %s\n", gpsManager.getType().c_str());
     Serial.printf("IMU Ready: %d\n", device_state.imuReady);
     Serial.printf("Compass Ready: %d\n", device_state.compassReady);
+    Serial.printf("SD Card Ready: %d\n", device_state.sdCardReady);
+    if (device_state.sdCardReady) {
+        Serial.printf("SD Card Size: %llu MB\n", device_state.sdCardSizeMB);
+        Serial.printf("SD Card Free: %llu MB\n", device_state.sdCardFreeMB);
+    }
     Serial.println("--------------------------------");
 }
 
@@ -54,7 +59,7 @@ void set_device_state(device_state_t *state)
 }
 
 // 生成精简版设备状态JSON
-// fw: 固件版本, hw: 硬件版本, wifi/ble/gps/imu/compass: 各模块状态, bat_v: 电池电压, bat_pct: 电池百分比, is_charging: 充电状态, ext_power: 外部电源状态
+// fw: 固件版本, hw: 硬件版本, wifi/ble/gps/imu/compass: 各模块状态, bat_v: 电池电压, bat_pct: 电池百分比, is_charging: 充电状态, ext_power: 外部电源状态, sd: SD卡状态
 String device_state_to_json(device_state_t *state)
 {
     StaticJsonDocument<256> doc; // 精简后更小即可
@@ -70,6 +75,11 @@ String device_state_to_json(device_state_t *state)
     doc["bat_pct"] = device_state.battery_percentage;
     doc["is_charging"] = device_state.is_charging;
     doc["ext_power"] = device_state.external_power;
+    doc["sd"] = device_state.sdCardReady;
+    if (device_state.sdCardReady) {
+        doc["sd_size"] = device_state.sdCardSizeMB;
+        doc["sd_free"] = device_state.sdCardFreeMB;
+    }
     return doc.as<String>();
 }
 
@@ -217,6 +227,9 @@ Device::Device()
     device_state.imuReady = false;
     device_state.compassReady = false;
     device_state.gsmReady = false;
+    device_state.sdCardReady = false;
+    device_state.sdCardSizeMB = 0;
+    device_state.sdCardFreeMB = 0;
 }
 
 void Device::begin()
@@ -496,6 +509,15 @@ void update_device_state()
                             String(last_state.led_mode).c_str(),
                             String(device_state.led_mode).c_str());
         state_changes.led_mode_changed = true;
+    }
+
+    // 检查SD卡状态变化
+    if (device_state.sdCardReady != last_state.sdCardReady)
+    {
+        notify_state_change("SD卡状态",
+                            last_state.sdCardReady ? "就绪" : "未就绪",
+                            device_state.sdCardReady ? "就绪" : "未就绪");
+        state_changes.sdcard_changed = true;
     }
 
     // 更新上一次状态
