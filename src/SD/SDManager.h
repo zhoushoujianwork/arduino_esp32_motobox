@@ -265,6 +265,42 @@ public:
                    float heading, const String& timestamp);
     
     /**
+     * @brief 检查SD卡剩余空间是否足够
+     * @param requiredMB 所需的最小空间(MB)
+     * @return true 空间足够，false 空间不足
+     */
+    bool checkFreeSpace(uint64_t requiredMB = 100);
+    
+    /**
+     * @brief 获取目录大小
+     * @param directory 目录路径
+     * @return 目录大小(字节)
+     */
+    uint64_t getDirectorySize(const char* directory);
+    
+    /**
+     * @brief 获取文件大小
+     * @param filename 文件名
+     * @return 文件大小(字节)
+     */
+    uint64_t getFileSize(const char* filename);
+    
+    /**
+     * @brief 查找目录中最旧的文件
+     * @param directory 目录路径
+     * @return 最旧文件的完整路径，如果没有文件则返回空字符串
+     */
+    String findOldestFile(const char* directory);
+    
+    /**
+     * @brief 强制执行存储限制，删除旧文件直到目录大小低于限制
+     * @param directory 目录路径
+     * @param maxSizeMB 最大允许大小(MB)
+     * @return true 成功执行，false 执行失败
+     */
+    bool enforceStorageLimit(const char* directory, uint64_t maxSizeMB);
+    
+    /**
      * @brief 为深度睡眠准备SD卡
      */
     void prepareForSleep();

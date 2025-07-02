@@ -256,7 +256,7 @@ void Device::begin()
     }
 
 #ifdef BAT_PIN
-    bat.setDebug(true);
+    // bat.setDebug(true);
     bat.begin();
 #endif
 
