@@ -24,6 +24,8 @@ void print_device_info()
     Serial.printf("BLE Connected: %d\n", device_state.bleConnected);
     Serial.printf("Battery Voltage: %d\n", device_state.battery_voltage);
     Serial.printf("Battery Percentage: %d\n", device_state.battery_percentage);
+    Serial.printf("Is Charging: %d\n", device_state.is_charging);
+    Serial.printf("External Power: %d\n", device_state.external_power);
     Serial.printf("GPS Ready: %d\n", device_state.gpsReady);
     Serial.printf("GPS Type: %s\n", gpsManager.getType().c_str());
     Serial.printf("IMU Ready: %d\n", device_state.imuReady);
@@ -52,7 +54,7 @@ void set_device_state(device_state_t *state)
 }
 
 // 生成精简版设备状态JSON
-// fw: 固件版本, hw: 硬件版本, wifi/ble/gps/imu/compass: 各模块状态, bat_v: 电池电压, bat_pct: 电池百分比
+// fw: 固件版本, hw: 硬件版本, wifi/ble/gps/imu/compass: 各模块状态, bat_v: 电池电压, bat_pct: 电池百分比, is_charging: 充电状态, ext_power: 外部电源状态
 String device_state_to_json(device_state_t *state)
 {
     StaticJsonDocument<256> doc; // 精简后更小即可
@@ -66,6 +68,8 @@ String device_state_to_json(device_state_t *state)
     doc["compass"] = device_state.compassReady;
     doc["bat_v"] = device_state.battery_voltage;
     doc["bat_pct"] = device_state.battery_percentage;
+    doc["is_charging"] = device_state.is_charging;
+    doc["ext_power"] = device_state.external_power;
     return doc.as<String>();
 }
 
@@ -182,6 +186,8 @@ Device::Device()
     device_state.bleConnected = false;
     device_state.battery_voltage = 0;
     device_state.battery_percentage = 0;
+    device_state.is_charging = false;
+    device_state.external_power = false;
     device_state.gpsReady = false;
     device_state.imuReady = false;
     device_state.compassReady = false;
@@ -212,7 +218,13 @@ void Device::begin()
     }
 
 #ifdef BAT_PIN
+    bat.setDebug(true);
     bat.begin();
+#endif
+
+#ifdef RTC_INT_PIN
+    externalPower.setDebug(true);
+    externalPower.begin();
 #endif
 
     // LED初始化
@@ -353,6 +365,15 @@ void update_device_state()
                             String(last_state.battery_percentage).c_str(),
                             String(device_state.battery_percentage).c_str());
         state_changes.battery_changed = true;
+    }
+
+    // 检查外部电源状态变化
+    if (device_state.external_power != last_state.external_power)
+    {
+        notify_state_change("外部电源",
+                            last_state.external_power ? "已连接" : "未连接",
+                            device_state.external_power ? "已连接" : "未连接");
+        state_changes.external_power_changed = true;
     }
 
     // 检查网络状态变化 - 根据模式区分

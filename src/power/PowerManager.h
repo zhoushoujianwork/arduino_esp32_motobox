@@ -46,6 +46,13 @@ public:
      // 新增：打断低功耗模式进入过程
     void interruptLowPowerMode();
 
+    // 新增：GPIO39稳定性检查
+    bool checkGPIO39Stability();
+
+    // 新增：车辆电门状态检测
+    bool isVehicleStarted();
+    void handleVehicleStateChange();
+
 
 
 private:

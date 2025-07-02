@@ -21,6 +21,9 @@
 #ifndef DISABLE_MQTT
 #include "net/MqttManager.h"
 #endif
+#ifdef RTC_INT_PIN
+#include "power/ExternalPower.h"
+#endif
 #include "led/LEDManager.h"
 
 
@@ -35,6 +38,7 @@ typedef struct
     int battery_voltage;
     int battery_percentage;
     bool is_charging;          // 新增：充电状态
+    bool external_power;       // 新增：外部电源接入状态（车辆电门）
     bool wifiConnected; // WiFi连接状态
     bool bleConnected; // BLE连接状态
     bool gpsReady; // GPS准备状态
@@ -48,6 +52,7 @@ typedef struct
 // 添加状态变化跟踪
 typedef struct {
         bool battery_changed;      // 电池状态变化
+        bool external_power_changed; // 外部电源状态变化
         bool wifi_changed;         // WiFi连接状态变化
         bool ble_changed;          // BLE连接状态变化
         bool gps_changed;          // GPS状态变化

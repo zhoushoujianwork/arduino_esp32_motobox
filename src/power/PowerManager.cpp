@@ -131,10 +131,24 @@ bool PowerManager::configureWakeupSources()
             return false;
         }
 
-        // 配置GPIO方向和上拉
+        // 配置GPIO方向
         rtc_gpio_set_direction((gpio_num_t)IMU_INT_PIN, RTC_GPIO_MODE_INPUT_ONLY);
-        rtc_gpio_pullup_en((gpio_num_t)IMU_INT_PIN);
-        rtc_gpio_pulldown_dis((gpio_num_t)IMU_INT_PIN);
+        
+        // GPIO39 (SENSOR_VN) 不支持内部上拉/下拉，跳过配置
+        if (IMU_INT_PIN != 39) {
+            rtc_gpio_pullup_en((gpio_num_t)IMU_INT_PIN);
+            rtc_gpio_pulldown_dis((gpio_num_t)IMU_INT_PIN);
+        } else {
+            Serial.println("[电源管理] ⚠️ GPIO39不支持内部上拉，需要外部上拉电阻");
+        }
+
+        // 在配置唤醒前检查GPIO39的稳定性
+        if (IMU_INT_PIN == 39) {
+            if (!checkGPIO39Stability()) {
+                Serial.println("[电源管理] ❌ GPIO39状态不稳定，取消休眠");
+                return false;
+            }
+        }
 
         // 配置EXT0唤醒
         ret = esp_sleep_enable_ext0_wakeup((gpio_num_t)IMU_INT_PIN, 0);
@@ -167,9 +181,54 @@ bool PowerManager::configureWakeupSources()
     }
     Serial.println("[电源管理] ✅ 定时器唤醒配置成功");
 
-// 配置RTC_INT_PIN 外部供电的时候唤醒
+// 3. 配置车辆电门启动检测唤醒 (RTC_INT_PIN)
 #ifdef RTC_INT_PIN
-    esp_sleep_enable_ext0_wakeup((gpio_num_t)RTC_INT_PIN, 0);
+    if (RTC_INT_PIN >= 0 && RTC_INT_PIN <= 21)
+    {
+        // 检查是否为有效的RTC GPIO
+        if (!rtc_gpio_is_valid_gpio((gpio_num_t)RTC_INT_PIN))
+        {
+            Serial.printf("[电源管理] ❌ 车辆电门检测引脚GPIO%d 不是有效的RTC GPIO\n", RTC_INT_PIN);
+        }
+        else
+        {
+            // 解除GPIO保持状态
+            rtc_gpio_hold_dis((gpio_num_t)RTC_INT_PIN);
+
+            // 初始化RTC GPIO
+            esp_err_t ret = rtc_gpio_init((gpio_num_t)RTC_INT_PIN);
+            if (ret != ESP_OK)
+            {
+                Serial.printf("[电源管理] ❌ 车辆电门检测RTC GPIO初始化失败: %s\n", esp_err_to_name(ret));
+            }
+            else
+            {
+                // 配置GPIO方向和上拉（车辆未启动时为高电平）
+                rtc_gpio_set_direction((gpio_num_t)RTC_INT_PIN, RTC_GPIO_MODE_INPUT_ONLY);
+                rtc_gpio_pullup_en((gpio_num_t)RTC_INT_PIN);
+                rtc_gpio_pulldown_dis((gpio_num_t)RTC_INT_PIN);
+
+                // 检查当前车辆电门状态
+                int current_vehicle_state = digitalRead(RTC_INT_PIN);
+                Serial.printf("[电源管理] 当前车辆电门状态: %s (GPIO%d = %d)\n", 
+                             current_vehicle_state == LOW ? "已启动(供电中)" : "未启动", 
+                             RTC_INT_PIN, current_vehicle_state);
+
+                // 配置EXT1唤醒 - 当车辆启动时(从高电平变为低电平)唤醒
+                // 使用EXT1可以支持多个引脚，这里只用一个引脚
+                uint64_t ext1_mask = 1ULL << RTC_INT_PIN;
+                ret = esp_sleep_enable_ext1_wakeup(ext1_mask, ESP_EXT1_WAKEUP_ALL_LOW);
+                if (ret != ESP_OK)
+                {
+                    Serial.printf("[电源管理] ❌ 车辆电门唤醒配置失败: %s\n", esp_err_to_name(ret));
+                }
+                else
+                {
+                    Serial.printf("[电源管理] ✅ 车辆电门唤醒配置成功 (GPIO%d, 低电平触发)\n", RTC_INT_PIN);
+                }
+            }
+        }
+    }
 #endif
 
     return true;
@@ -312,19 +371,30 @@ void PowerManager::disablePeripherals()
     periph_module_disable(PERIPH_UART1_MODULE);
     periph_module_disable(PERIPH_UART2_MODULE);
 
-    Serial.println("[电源管理] 外设时钟已关闭，即将降低CPU频率...");
-    Serial.println("[电源管理] ⚠️ 如果看到此消息后出现乱码属于正常现象");
+    Serial.println("[电源管理] 外设时钟已关闭，准备进入深度睡眠...");
+    Serial.println("[电源管理] 💤 即将进入深度睡眠模式");
     Serial.flush();
-    delay(200); // 确保最后的消息能够发送完成
-
-    // 最后才降低CPU频率
-    setCpuFrequencyMhz(10);
+    delay(500); // 确保最后的消息能够发送完成
+    
+    // 完全关闭串口以避免乱码
+    Serial.end();
+    
+    // 不降低CPU频率，直接进入深度睡眠
+    // setCpuFrequencyMhz(10); // 注释掉这行，避免串口乱码
 }
 
 void PowerManager::loop()
 {
     static unsigned long lastMotionCheck = 0;
+    static unsigned long lastVehicleCheck = 0;
     unsigned long now = millis();
+
+    // 每隔1秒检测一次车辆状态
+    if (now - lastVehicleCheck >= 1000)
+    {
+        lastVehicleCheck = now;
+        handleVehicleStateChange();
+    }
 
     // 只每隔200ms检测一次运动
     if (now - lastMotionCheck >= 200)
@@ -340,8 +410,22 @@ void PowerManager::loop()
         return;
 #else
 
+        // 优化：当车辆启动时，跳过IMU运动检测
+#ifdef RTC_INT_PIN
+        bool vehicle_started = (digitalRead(RTC_INT_PIN) == LOW);
+        if (vehicle_started) {
+            // 车辆启动时，直接更新运动时间，跳过IMU检测
+            lastMotionTime = millis();
+            if (powerState != POWER_STATE_NORMAL) {
+                powerState = POWER_STATE_NORMAL;
+                Serial.println("[电源管理] 车辆启动，设备保持正常工作状态");
+            }
+            return; // 直接返回，跳过后续的IMU运动检测
+        }
+#endif
+
 #ifdef ENABLE_IMU
-        // 仅在正常工作状态下检测运动和空闲状态
+        // 仅在正常工作状态下且车辆未启动时检测运动和空闲状态
         if (powerState == POWER_STATE_NORMAL)
         {
             // 检测设备是否有运动
@@ -372,7 +456,7 @@ void PowerManager::loop()
 
 bool PowerManager::isDeviceIdle()
 {
-    // 新增：AP模式下有客户端连接时不判定为空闲
+    // 注意：车辆启动状态检测已在loop()中处理，此函数只需检查空闲时间
     // 检查设备是否空闲足够长的时间
     return (millis() - lastMotionTime) > idleThreshold;
 }
@@ -470,14 +554,20 @@ void PowerManager::enterLowPowerMode()
     configurePowerDomains();
     Serial.println("[电源管理] ✅ 电源域配置完成");
 
-    // 4. 最后的准备
+    // 4. 最后的准备和信息输出
     Serial.println("[电源管理] 🌙 准备进入深度睡眠...");
 #if defined(ENABLE_IMU) && defined(IMU_INT_PIN)
     Serial.printf("[电源管理] - IMU中断引脚: GPIO%d\n", IMU_INT_PIN);
 #endif
-    Serial.printf("[电源管理] - 定时器唤醒: 5分钟\n");
+    Serial.printf("[电源管理] - 定时器唤醒: 1小时\n");
+    Serial.println("[电源管理] - 系统将在3秒后进入深度睡眠");
     Serial.flush();
-    delay(100);
+    
+    // 给足够时间让串口输出完成
+    delay(3000);
+    
+    // 最后关闭串口
+    Serial.end();
 
     // 5. 进入深度睡眠
     esp_deep_sleep_start();
@@ -490,6 +580,105 @@ void PowerManager::interruptLowPowerMode()
     powerState = POWER_STATE_NORMAL;
     // 重置运动检测窗口时间
     lastMotionTime = millis();
+}
+
+/**
+ * GPIO39稳定性检查
+ * 由于GPIO39不支持内部上拉，需要检查信号稳定性
+ */
+bool PowerManager::checkGPIO39Stability()
+{
+    Serial.println("[电源管理] 🔍 开始GPIO39稳定性检查...");
+    
+    // 连续检查10次，每次间隔50ms
+    int stableCount = 0;
+    int lastState = digitalRead(39);
+    
+    Serial.printf("[电源管理] GPIO39初始状态: %d\n", lastState);
+    
+    for(int i = 0; i < 10; i++) {
+        delay(50);
+        int currentState = digitalRead(39);
+        
+        if(currentState == lastState) {
+            stableCount++;
+        } else {
+            Serial.printf("[电源管理] GPIO39状态变化: %d -> %d (第%d次检查)\n", 
+                         lastState, currentState, i+1);
+            stableCount = 0; // 重置稳定计数
+            lastState = currentState;
+        }
+    }
+    
+    // 需要至少8次连续稳定读取
+    bool isStable = (stableCount >= 8);
+    
+    Serial.printf("[电源管理] GPIO39稳定性检查结果: %s (稳定次数: %d/10)\n", 
+                 isStable ? "稳定" : "不稳定", stableCount);
+    
+    if (!isStable) {
+        Serial.println("[电源管理] ⚠️ GPIO39信号不稳定，可能需要外部上拉电阻");
+        Serial.println("[电源管理] ⚠️ 建议添加10kΩ上拉电阻到3.3V");
+    }
+    
+    return isStable;
+}
+
+/**
+ * 检查车辆是否启动（电门开启）
+ */
+bool PowerManager::isVehicleStarted()
+{
+#ifdef RTC_INT_PIN
+    return (digitalRead(RTC_INT_PIN) == LOW);
+#else
+    return false;
+#endif
+}
+
+/**
+ * 处理车辆状态变化
+ */
+void PowerManager::handleVehicleStateChange()
+{
+#ifdef RTC_INT_PIN
+    static bool last_vehicle_state = false;
+    static bool first_check = true;
+    bool current_vehicle_state = isVehicleStarted();
+    
+    // 首次检查时记录当前状态，但不输出变化日志
+    if (first_check) {
+        last_vehicle_state = current_vehicle_state;
+        first_check = false;
+        if (current_vehicle_state) {
+            Serial.println("[电源管理] 🚗 检测到车辆电门已启动");
+            Serial.println("[电源管理] 将跳过IMU运动检测，直接保持活跃状态");
+        }
+        return;
+    }
+    
+    if (current_vehicle_state != last_vehicle_state) {
+        if (current_vehicle_state) {
+            Serial.println("[电源管理] 🚗 车辆电门启动检测到！");
+            Serial.println("[电源管理] 设备将保持活跃状态");
+            Serial.println("[电源管理] ⚡ 优化：跳过IMU运动检测，节省CPU资源");
+            // 重置运动时间，防止进入休眠
+            lastMotionTime = millis();
+            // 如果正在倒计时，取消进入休眠
+            if (powerState == POWER_STATE_COUNTDOWN) {
+                interruptLowPowerMode();
+                Serial.println("[电源管理] 车辆启动，取消休眠倒计时");
+            }
+        } else {
+            Serial.println("[电源管理] 🚗 车辆电门关闭检测到");
+            Serial.println("[电源管理] 设备将根据运动状态决定是否休眠");
+            Serial.println("[电源管理] ⚡ 恢复：重新启用IMU运动检测");
+            // 重置运动时间，开始新的空闲计时
+            lastMotionTime = millis();
+        }
+        last_vehicle_state = current_vehicle_state;
+    }
+#endif
 }
 
 /**
@@ -511,9 +700,21 @@ void PowerManager::printWakeupReason()
             Serial.println("[系统] 从外部RTC_IO唤醒，但IMU引脚配置无效");
         }
 #endif
+#ifdef RTC_INT_PIN
+        Serial.printf("[系统] 可能从RTC外部电源唤醒 (GPIO%d)\n", RTC_INT_PIN);
+#endif
         break;
     case ESP_SLEEP_WAKEUP_EXT1:
         Serial.println("[系统] 从外部RTC_CNTL唤醒");
+#ifdef RTC_INT_PIN
+        // 检查是否是车辆电门启动唤醒
+        if (digitalRead(RTC_INT_PIN) == LOW) {
+            Serial.printf("[系统] 🚗 检测到车辆电门启动！(GPIO%d = LOW)\n", RTC_INT_PIN);
+            Serial.println("[系统] 车辆开始供电，设备从休眠中唤醒");
+        } else {
+            Serial.printf("[系统] EXT1唤醒，但车辆电门未启动 (GPIO%d = HIGH)\n", RTC_INT_PIN);
+        }
+#endif
         break;
     case ESP_SLEEP_WAKEUP_TIMER:
         Serial.println("[系统] 从定时器唤醒");
@@ -549,16 +750,32 @@ void PowerManager::checkWakeupCause()
         {
             if (digitalRead(IMU_INT_PIN) == LOW)
             {
-                Serial.println("[系统] 检测到IMU运动唤醒");
-                // 这里可以添加特定的运动唤醒处理逻辑
+                Serial.println("[系统] IMU运动唤醒检测到，记录运动事件");
+                lastMotionTime = millis(); // 重置运动时间
             }
             else
             {
                 Serial.println("[系统] 检测到按钮唤醒");
-                // 这里可以添加特定的按钮唤醒处理逻辑
             }
         }
 #endif
+        break;
+    case ESP_SLEEP_WAKEUP_EXT1:
+        {
+            Serial.println("[系统] 通过外部中断唤醒 (EXT1)");
+#ifdef RTC_INT_PIN
+            // 检查车辆电门启动状态
+            bool vehicle_started = (digitalRead(RTC_INT_PIN) == LOW);
+            if (vehicle_started) {
+                Serial.println("[系统] 🚗 车辆电门启动检测到！");
+                Serial.println("[系统] 设备将保持唤醒状态，直到车辆关闭");
+                // 重置运动时间，防止立即进入休眠
+                lastMotionTime = millis();
+            } else {
+                Serial.println("[系统] EXT1唤醒，但车辆电门未启动");
+            }
+#endif
+        }
         break;
     case ESP_SLEEP_WAKEUP_TIMER:
         Serial.println("[系统] 通过定时器唤醒");

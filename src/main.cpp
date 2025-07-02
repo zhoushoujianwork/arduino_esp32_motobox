@@ -25,6 +25,10 @@
 #include "bat/BAT.h"
 #endif
 
+#ifdef RTC_INT_PIN
+#include "power/ExternalPower.h"
+#endif
+
 #ifdef BTN_PIN
 #include "btn/BTN.h"
 #endif
@@ -92,6 +96,11 @@ void taskSystem(void *parameter)
     // 电池监控
 #ifdef BAT_PIN
     bat.loop();
+#endif
+
+    // 外部电源检测
+#ifdef RTC_INT_PIN
+    externalPower.loop();
 #endif
 
     // 按钮状态更新
