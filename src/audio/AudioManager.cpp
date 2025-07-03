@@ -2,7 +2,7 @@
 #include <math.h>
 #include "FS.h"
 #include "SPIFFS.h"
-#include "welcome_audio.h"
+#include "welcome_voice.h"  // 真实的语音数据
 
 static const char* TAG = "AudioManager";
 
@@ -267,20 +267,22 @@ bool AudioManager::testAudio() {
 }
 
 bool AudioManager::playWelcomeVoice() {
-    ESP_LOGI(TAG, "Playing welcome voice: %s", WELCOME_VOICE.description);
+    ESP_LOGI(TAG, "Playing welcome voice: %s", WELCOME_VOICE_DATA_INFO.description);
     
-    // 首先尝试播放内置的语音数据
-    if (playVoiceFromArray(WELCOME_VOICE.data, WELCOME_VOICE.size)) {
+    // 首先尝试播放内置的真实语音数据
+    if (playVoiceFromArray(WELCOME_VOICE_DATA_INFO.data, WELCOME_VOICE_DATA_INFO.size)) {
+        ESP_LOGI(TAG, "Successfully played embedded voice data");
         return true;
     }
     
     // 如果内置数据播放失败，尝试从文件播放
     if (playVoiceFromFile("/spiffs/welcome.wav")) {
+        ESP_LOGI(TAG, "Successfully played voice from SPIFFS file");
         return true;
     }
     
     // 如果都失败，播放替代的音调序列
-    ESP_LOGW(TAG, "Welcome voice playback failed, using tone sequence");
+    ESP_LOGW(TAG, "Voice playback failed, using tone sequence fallback");
     
     // 创建一个特殊的音调序列来代表"大菠萝车机,扎西德勒"
     // 使用中国传统五声音阶：宫商角徵羽
