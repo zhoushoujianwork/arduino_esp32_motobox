@@ -390,7 +390,20 @@ void MqttManager::loop()
         // 根据网络和MQTT连接状态设置相应的状态
         if (!isNetworkConnected())
         {
-            setMqttState(MqttState::DISCONNECTED);
+            if (_MqttState != MqttState::DISCONNECTED)
+            {
+                setMqttState(MqttState::DISCONNECTED);
+                debugPrint("WiFi连接已断开，设置为DISCONNECTED状态");
+            }
+            
+            // 尝试重新连接WiFi
+            unsigned long now = millis();
+            if (now - _lastReconnectAttempt > RECONNECT_INTERVAL)
+            {
+                _lastReconnectAttempt = now;
+                debugPrint("尝试重新连接WiFi...");
+                connectWifi();
+            }
         }
         else if (!isMqttConnected())
         {
