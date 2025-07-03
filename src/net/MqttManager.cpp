@@ -289,7 +289,13 @@ void MqttManager::loop()
         _lastNetworkCheckTime = millis();
 
 #ifdef ENABLE_GSM
+#ifdef USE_AIR780EG_GSM
+        if (!air780eg_modem.isNetworkReadyCheck())
+#elif defined(USE_ML307_GSM)
         if (!ml307_at.isNetworkReadyCheck())
+#else
+        if (true)  // 默认认为网络未就绪
+#endif
         {
             Serial.println("[MqttManager] 网络未就绪, 设置为DISCONNECTED");
             setMqttState(MqttState::DISCONNECTED);
@@ -297,7 +303,11 @@ void MqttManager::loop()
         }
 
         // 如果在获取lbs数据，则不进行mqtt的读取
+#ifdef USE_ML307_GSM
         if (ml307_at.isLBSLoading())
+#else
+        if (false)  // Air780EG暂时不检查LBS加载状态
+#endif
             return;
 
         // 4G逻辑优化 - 减少重复查询
@@ -331,7 +341,13 @@ void MqttManager::loop()
                 { // 5秒检查一次
                     lastNetworkCheck = millis();
 
+#ifdef USE_AIR780EG_GSM
+                    if (air780eg_modem.isNetworkReady())
+#elif defined(USE_ML307_GSM)
                     if (ml307_at.isNetworkReady())
+#else
+                    if (false)
+#endif
                     {
 #ifdef USE_ML307_GSM
                         if (ml307Mqtt.connected())
@@ -340,7 +356,11 @@ void MqttManager::loop()
 #endif
                         {
                             setMqttState(MqttState::CONNECTED);
+#ifdef USE_AIR780EG_GSM
+                            debugPrint("Cellular connected, CSQ: " + String(air780eg_modem.getCSQ()));
+#elif defined(USE_ML307_GSM)
                             debugPrint("Cellular connected, CSQ: " + String(ml307_at.getCSQ()));
+#endif
 
                             if (_connectCallback)
                             {
@@ -375,7 +395,13 @@ void MqttManager::loop()
         case MqttState::DISCONNECTED:
         {
             // 检查网络是否恢复
+#ifdef USE_AIR780EG_GSM
+            if (air780eg_modem.isNetworkReady())
+#elif defined(USE_ML307_GSM)
             if (ml307_at.isNetworkReady())
+#else
+            if (false)
+#endif
             {
                 debugPrint("网络已恢复，开始重新连接...");
                 setMqttState(MqttState::CONNECTING);
@@ -579,7 +605,13 @@ bool MqttManager::isNetworkConnected() const
 #ifdef ENABLE_WIFI
     return WiFi.status() == WL_CONNECTED;
 #else
+#ifdef USE_AIR780EG_GSM
+    return air780eg_modem.isNetworkReady();
+#elif defined(USE_ML307_GSM)
     return ml307_at.isNetworkReady();
+#else
+    return false;
+#endif
 #endif
 }
 
@@ -591,8 +623,13 @@ String MqttManager::getNetworkInfo() const
     info += ", IP: " + WiFi.localIP().toString();
     info += ", RSSI: " + String(WiFi.RSSI());
 #else
+#ifdef USE_AIR780EG_GSM
+    info = "Cellular CSQ: " + String(air780eg_modem.getCSQ());
+    info += ", IP: " + air780eg_modem.getLocalIP();
+#elif defined(USE_ML307_GSM)
     info = "Cellular CSQ: " + String(ml307_at.getCSQ());
     info += ", IP: " + ml307_at.getLocalIP();
+#endif
 #endif
     return info;
 }

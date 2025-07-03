@@ -367,8 +367,15 @@ void Device::begin()
 #endif
 
 #ifdef ENABLE_GSM
+#ifdef USE_AIR780EG_GSM
+    // Air780EG模块初始化已在main.cpp中完成
+    Serial.println("[Device] 使用Air780EG模块");
+#elif defined(USE_ML307_GSM)
+    // ML307模块初始化
+    Serial.println("[Device] 使用ML307模块");
     ml307_at.setDebug(true);
     ml307_at.begin(115200);
+#endif
 
 #ifdef ENABLE_GNSS
     gpsManager.setGNSSEnabled(true);
