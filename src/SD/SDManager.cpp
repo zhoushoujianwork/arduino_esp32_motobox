@@ -13,31 +13,83 @@ bool SDManager::begin() {
         return true;
     }
 
-    debugPrint("初始化SD卡...");
+    debugPrint("正在初始化SD卡...");
 
 #ifdef SD_MODE_SPI
     // SPI模式初始化
+    debugPrint("使用SPI模式，引脚配置: CS=" + String(SD_CS_PIN) + ", MOSI=" + String(SD_MOSI_PIN) + ", MISO=" + String(SD_MISO_PIN) + ", SCK=" + String(SD_SCK_PIN));
+    
     SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
+    
     if (!SD.begin(SD_CS_PIN)) {
-        debugPrint("❌ SD卡SPI模式初始化失败");
+        debugPrint("❌ SD卡初始化失败");
+        debugPrint("可能的原因：");
+        debugPrint("  1. 未插入SD卡");
+        debugPrint("  2. SD卡损坏或格式不支持");
+        debugPrint("  3. 硬件连接错误");
+        debugPrint("  4. SD卡格式不是FAT32");
+        debugPrint("请检查SD卡并重试");
         return false;
     }
+    
+    // 检查SD卡类型和容量
+    uint8_t cardType = SD.cardType();
+    if (cardType == CARD_NONE) {
+        debugPrint("❌ 未检测到SD卡");
+        debugPrint("请确认SD卡已正确插入");
+        return false;
+    }
+    
+    String cardTypeStr;
+    switch (cardType) {
+        case CARD_MMC:
+            cardTypeStr = "MMC";
+            break;
+        case CARD_SD:
+            cardTypeStr = "SDSC";
+            break;
+        case CARD_SDHC:
+            cardTypeStr = "SDHC";
+            break;
+        default:
+            cardTypeStr = "未知";
+            break;
+    }
+    
+    debugPrint("✅ SD卡初始化成功");
+    debugPrint("SD卡类型: " + cardTypeStr);
+    debugPrint("SD卡容量: " + String((unsigned long)getTotalSpaceMB()) + " MB");
+    debugPrint("可用空间: " + String((unsigned long)getFreeSpaceMB()) + " MB");
+    
 #else
     // MMC模式初始化
+    debugPrint("使用MMC模式");
     if (!SD_MMC.begin()) {
         debugPrint("❌ SD卡MMC模式初始化失败");
+        debugPrint("可能的原因：");
+        debugPrint("  1. 未插入SD卡");
+        debugPrint("  2. SD卡损坏");
+        debugPrint("  3. MMC模式不支持此SD卡");
+        debugPrint("请检查SD卡并重试");
         return false;
     }
+    
+    debugPrint("✅ SD卡MMC模式初始化成功");
+    debugPrint("SD卡容量: " + String((unsigned long)getTotalSpaceMB()) + " MB");
+    debugPrint("可用空间: " + String((unsigned long)getFreeSpaceMB()) + " MB");
 #endif
 
     _initialized = true;
-    debugPrint("✅ SD卡初始化成功");
 
     // 创建必要的目录结构
-    createDirectoryStructure();
+    if (!createDirectoryStructure()) {
+        debugPrint("⚠️ 目录结构创建失败，但SD卡可用");
+    }
     
     // 保存设备信息
-    saveDeviceInfo();
+    if (!saveDeviceInfo()) {
+        debugPrint("⚠️ 设备信息保存失败，但SD卡可用");
+    }
 
     return true;
 }
@@ -63,26 +115,38 @@ bool SDManager::isInitialized() {
 
 uint64_t SDManager::getTotalSpaceMB() {
     if (!_initialized) {
+        debugPrint("⚠️ SD卡未初始化，无法获取容量信息");
         return 0;
     }
 
+    try {
 #ifdef SD_MODE_SPI
-    return SD.totalBytes() / (1024 * 1024);
+        return SD.totalBytes() / (1024 * 1024);
 #else
-    return SD_MMC.totalBytes() / (1024 * 1024);
+        return SD_MMC.totalBytes() / (1024 * 1024);
 #endif
+    } catch (...) {
+        debugPrint("⚠️ 获取SD卡容量失败，可能SD卡已移除");
+        return 0;
+    }
 }
 
 uint64_t SDManager::getFreeSpaceMB() {
     if (!_initialized) {
+        debugPrint("⚠️ SD卡未初始化，无法获取剩余空间");
         return 0;
     }
 
+    try {
 #ifdef SD_MODE_SPI
-    return (SD.totalBytes() - SD.usedBytes()) / (1024 * 1024);
+        return (SD.totalBytes() - SD.usedBytes()) / (1024 * 1024);
 #else
-    return (SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
+        return (SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
 #endif
+    } catch (...) {
+        debugPrint("⚠️ 获取SD卡剩余空间失败，可能SD卡已移除");
+        return 0;
+    }
 }
 
 bool SDManager::createDirectoryStructure() {
@@ -165,6 +229,13 @@ bool SDManager::saveDeviceInfo() {
 
 bool SDManager::recordGPSData(double latitude, double longitude, double altitude, float speed, int satellites) {
     if (!_initialized) {
+        debugPrint("⚠️ SD卡未初始化，无法记录GPS数据");
+        return false;
+    }
+
+    // 验证GPS数据有效性
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+        debugPrint("⚠️ GPS数据无效: lat=" + String(latitude, 6) + ", lon=" + String(longitude, 6));
         return false;
     }
 
@@ -173,26 +244,42 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
     
     // 检查文件是否存在，如果不存在则创建GeoJSON头部
     bool fileExists = false;
-#ifdef SD_MODE_SPI
-    File testFile = SD.open(filename.c_str(), FILE_READ);
-#else
-    File testFile = SD_MMC.open(filename.c_str(), FILE_READ);
-#endif
     
-    if (testFile) {
-        fileExists = true;
-        testFile.close();
+    try {
+#ifdef SD_MODE_SPI
+        File testFile = SD.open(filename.c_str(), FILE_READ);
+#else
+        File testFile = SD_MMC.open(filename.c_str(), FILE_READ);
+#endif
+        
+        if (testFile) {
+            fileExists = true;
+            testFile.close();
+        }
+    } catch (...) {
+        debugPrint("⚠️ 检查GPS文件状态失败，可能SD卡已移除");
+        return false;
     }
 
     // 打开文件进行写入
+    File file;
+    try {
 #ifdef SD_MODE_SPI
-    File file = SD.open(filename.c_str(), FILE_APPEND);
+        file = SD.open(filename.c_str(), FILE_APPEND);
 #else
-    File file = SD_MMC.open(filename.c_str(), FILE_APPEND);
+        file = SD_MMC.open(filename.c_str(), FILE_APPEND);
 #endif
+    } catch (...) {
+        debugPrint("⚠️ 打开GPS数据文件失败，可能SD卡已移除");
+        return false;
+    }
 
     if (!file) {
-        debugPrint("无法打开GPS数据文件: " + filename);
+        debugPrint("❌ 无法打开GPS数据文件: " + filename);
+        debugPrint("可能的原因：");
+        debugPrint("  1. SD卡空间不足");
+        debugPrint("  2. SD卡已移除");
+        debugPrint("  3. 文件系统错误");
         return false;
     }
 
@@ -220,10 +307,16 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
     gpsFeature += "      }\n";
     gpsFeature += "    }";
 
-    file.print(gpsFeature);
+    size_t bytesWritten = file.print(gpsFeature);
     file.close();
 
-    debugPrint("📍 GPS数据已记录: " + String(latitude, 6) + "," + String(longitude, 6));
+    if (bytesWritten == 0) {
+        debugPrint("❌ GPS数据写入失败");
+        debugPrint("可能SD卡空间不足或已移除");
+        return false;
+    }
+
+    debugPrint("📍 GPS数据已记录: " + String(latitude, 6) + "," + String(longitude, 6) + " (卫星:" + String(satellites) + ")");
     return true;
 }
 
@@ -259,32 +352,94 @@ void SDManager::debugPrint(const String& message) {
 
 // 串口命令处理
 bool SDManager::handleSerialCommand(const String& command) {
-    if (!_initialized) {
-        Serial.println("SD卡未初始化");
-        return false;
-    }
-
     if (command == "sd.info") {
+        if (!_initialized) {
+            Serial.println("❌ SD卡未初始化");
+            Serial.println("可能的原因：");
+            Serial.println("  1. 未插入SD卡");
+            Serial.println("  2. SD卡损坏或格式不支持");
+            Serial.println("  3. 硬件连接错误");
+            return false;
+        }
+        
         Serial.println("=== SD卡信息 ===");
         Serial.println("设备ID: " + getDeviceID());
-        Serial.println("总容量: " + String((unsigned long)getTotalSpaceMB()) + " MB");
-        Serial.println("剩余空间: " + String((unsigned long)getFreeSpaceMB()) + " MB");
+        
+        uint64_t totalMB = getTotalSpaceMB();
+        uint64_t freeMB = getFreeSpaceMB();
+        
+        if (totalMB > 0) {
+            Serial.println("总容量: " + String((unsigned long)totalMB) + " MB");
+            Serial.println("剩余空间: " + String((unsigned long)freeMB) + " MB");
+            Serial.println("使用率: " + String((unsigned long)((totalMB - freeMB) * 100 / totalMB)) + "%");
+        } else {
+            Serial.println("⚠️ 无法获取容量信息，SD卡可能已移除");
+        }
+        
         Serial.println("初始化状态: " + String(_initialized ? "已初始化" : "未初始化"));
         return true;
     }
     else if (command == "sd.test") {
+        if (!_initialized) {
+            Serial.println("❌ SD卡未初始化，无法进行测试");
+            Serial.println("请先插入SD卡并重启设备");
+            return false;
+        }
+        
         // 测试GPS数据记录
-        Serial.println("测试GPS数据记录...");
+        Serial.println("正在测试GPS数据记录...");
+        Serial.println("测试数据: 北京天安门广场坐标");
+        
         bool result = recordGPSData(39.9042, 116.4074, 50.0, 25.5, 8);
-        Serial.println("测试结果: " + String(result ? "成功" : "失败"));
+        
+        if (result) {
+            Serial.println("✅ GPS数据记录测试成功");
+            Serial.println("数据已保存到: /data/gps/gps_" + getCurrentDateString() + ".geojson");
+        } else {
+            Serial.println("❌ GPS数据记录测试失败");
+            Serial.println("请检查SD卡状态");
+        }
+        
         return result;
     }
     else if (command == "yes_format") {
-        // 简化版暂不支持格式化功能
-        Serial.println("简化版SD管理器暂不支持格式化功能");
+        Serial.println("⚠️ 简化版SD管理器暂不支持格式化功能");
+        Serial.println("如需格式化，请使用电脑格式化为FAT32格式");
         return false;
     }
+    else if (command == "sd.status") {
+        Serial.println("=== SD卡状态检查 ===");
+        
+        if (!_initialized) {
+            Serial.println("❌ SD卡状态: 未初始化");
+            Serial.println("建议操作:");
+            Serial.println("  1. 检查SD卡是否正确插入");
+            Serial.println("  2. 确认SD卡格式为FAT32");
+            Serial.println("  3. 重启设备重新初始化");
+            return false;
+        }
+        
+        Serial.println("✅ SD卡状态: 已初始化");
+        
+        // 测试基本读写功能
+        Serial.println("正在测试基本读写功能...");
+        
+        uint64_t freeMB = getFreeSpaceMB();
+        if (freeMB == 0) {
+            Serial.println("⚠️ 警告: 无法获取剩余空间，SD卡可能已移除");
+            return false;
+        }
+        
+        Serial.println("✅ 读写功能正常");
+        Serial.println("剩余空间: " + String((unsigned long)freeMB) + " MB");
+        
+        return true;
+    }
     
-    Serial.println("未知命令: " + command);
+    Serial.println("❌ 未知SD卡命令: " + command);
+    Serial.println("可用的SD卡命令:");
+    Serial.println("  sd.info   - 显示SD卡详细信息");
+    Serial.println("  sd.test   - 测试GPS数据记录");
+    Serial.println("  sd.status - 检查SD卡状态");
     return false;
 }

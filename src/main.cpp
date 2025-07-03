@@ -115,7 +115,7 @@ void taskSystem(void *parameter)
         command.trim();
         
         if (command.length() > 0) {
-            Serial.println("收到命令: " + command);
+            Serial.println(">>> 收到命令: " + command);
             
 #ifdef ENABLE_SDCARD
             // SD卡相关命令
@@ -128,28 +128,73 @@ void taskSystem(void *parameter)
                 Serial.println("=== 设备信息 ===");
                 Serial.println("设备ID: " + device_state.device_id);
                 Serial.println("固件版本: " + String(device_state.device_firmware_version));
+                Serial.println("硬件版本: " + String(device_state.device_hardware_version));
+                Serial.println("启动次数: " + String(bootCount));
+                Serial.println("运行时间: " + String(millis() / 1000) + " 秒");
+                Serial.println("");
+                Serial.println("--- 连接状态 ---");
                 Serial.println("WiFi状态: " + String(device_state.wifiConnected ? "已连接" : "未连接"));
+                Serial.println("BLE状态: " + String(device_state.bleConnected ? "已连接" : "未连接"));
+                Serial.println("");
+                Serial.println("--- 传感器状态 ---");
                 Serial.println("GPS状态: " + String(device_state.gpsReady ? "就绪" : "未就绪"));
+                Serial.println("IMU状态: " + String(device_state.imuReady ? "就绪" : "未就绪"));
+                Serial.println("");
+                Serial.println("--- 电源状态 ---");
+                Serial.println("电池电压: " + String(device_state.battery_voltage) + " mV");
+                Serial.println("电池电量: " + String(device_state.battery_percentage) + "%");
+                Serial.println("充电状态: " + String(device_state.is_charging ? "充电中" : "未充电"));
+                Serial.println("外部电源: " + String(device_state.external_power ? "已连接" : "未连接"));
+                Serial.println("");
 #ifdef ENABLE_SDCARD
-                Serial.println("SD卡状态: " + String(device_state.sdCardReady ? "就绪" : "未就绪"));
+                Serial.println("--- SD卡状态 ---");
                 if (device_state.sdCardReady) {
+                    Serial.println("SD卡状态: 就绪");
                     Serial.println("SD卡容量: " + String((unsigned long)device_state.sdCardSizeMB) + " MB");
                     Serial.println("SD卡剩余: " + String((unsigned long)device_state.sdCardFreeMB) + " MB");
+                } else {
+                    Serial.println("SD卡状态: 未就绪");
+                    Serial.println("⚠️ 请检查SD卡是否正确插入");
                 }
 #endif
             }
+            else if (command == "status") {
+                Serial.println("=== 系统状态 ===");
+                Serial.println("系统正常运行");
+                Serial.println("空闲内存: " + String(ESP.getFreeHeap()) + " 字节");
+                Serial.println("最小空闲内存: " + String(ESP.getMinFreeHeap()) + " 字节");
+                Serial.println("芯片温度: " + String(temperatureRead(), 1) + "°C");
+                Serial.println("CPU频率: " + String(ESP.getCpuFreqMHz()) + " MHz");
+            }
+            else if (command == "restart" || command == "reboot") {
+                Serial.println("正在重启设备...");
+                Serial.flush();
+                delay(1000);
+                ESP.restart();
+            }
             else if (command == "help") {
                 Serial.println("=== 可用命令 ===");
-                Serial.println("info - 显示设备信息");
+                Serial.println("基本命令:");
+                Serial.println("  info     - 显示详细设备信息");
+                Serial.println("  status   - 显示系统状态");
+                Serial.println("  restart  - 重启设备");
+                Serial.println("  help     - 显示此帮助信息");
+                Serial.println("");
 #ifdef ENABLE_SDCARD
-                Serial.println("sd.info - 显示SD卡信息");
-                Serial.println("sd.test - 测试GPS数据记录");
+                Serial.println("SD卡命令:");
+                Serial.println("  sd.info   - 显示SD卡详细信息");
+                Serial.println("  sd.test   - 测试GPS数据记录");
+                Serial.println("  sd.status - 检查SD卡状态");
+                Serial.println("");
 #endif
-                Serial.println("help - 显示此帮助信息");
+                Serial.println("提示: 命令不区分大小写");
             }
             else {
-                Serial.println("未知命令，输入 'help' 查看可用命令");
+                Serial.println("❌ 未知命令: " + command);
+                Serial.println("输入 'help' 查看可用命令");
             }
+            
+            Serial.println(""); // 添加空行分隔
         }
     }
 
