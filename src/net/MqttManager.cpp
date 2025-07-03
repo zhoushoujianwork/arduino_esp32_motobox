@@ -4,6 +4,14 @@
 
 #include "MqttManager.h"
 
+// 根据配置包含相应的GSM模块实例
+#ifdef USE_AIR780EG_GSM
+extern Air780EGModem air780eg_modem;  // 在Air780EGModem.cpp中定义
+#elif defined(USE_ML307_GSM)
+extern Ml307AtModem ml307_at;  // 在Ml307AtModem.cpp中定义
+extern Ml307Mqtt ml307Mqtt;   // ML307 MQTT客户端
+#endif
+
 MqttManager mqttManager;
 MqttMessageCallback MqttManager::_messageCallback = nullptr;
 
@@ -77,7 +85,21 @@ bool MqttManager::initCellular()
     _MqttState = MqttState::CONNECTING;
     _connectionStartTime = millis();
 
+#ifdef USE_AIR780EG_GSM
+    debugPrint("使用Air780EG模块 - MQTT功能暂时禁用");
+    // Air780EG的MQTT功能将在后续版本中实现
+    // 目前专注于基本的4G连接和GNSS功能
+    return false;  // 暂时返回false，不启用MQTT
+    
+#elif defined(USE_ML307_GSM)
+    debugPrint("初始化ML307模块");
+    // ML307初始化代码保持不变
     return true;
+    
+#else
+    debugPrint("未定义GSM模块类型");
+    return false;
+#endif
 }
 
 bool MqttManager::connectWifi()
@@ -168,12 +190,18 @@ bool MqttManager::connect()
     debugPrint("MqttManager connect 4G clientId: " + String(_config.clientId));
     debugPrint("MqttManager connect 4G username: " + String(_config.username));
     debugPrint("MqttManager connect 4G password: " + String(_config.password));
+    
+#ifdef USE_ML307_GSM
     success = ml307Mqtt.connect(
         _config.broker,
         _config.port,
         _config.clientId,
         _config.username,
         _config.password);
+#else
+    // Air780EG MQTT功能暂时禁用
+    success = false;
+#endif
 #endif
 
     debugPrint("MqttManager connect callback success");
@@ -201,11 +229,13 @@ bool MqttManager::forceReconnect()
         delay(100); // 等待断开完成
     }
 #else
+#ifdef USE_ML307_GSM
     if (ml307Mqtt.connected())
     {
         ml307Mqtt.disconnect();
         delay(500); // 4G模块需要更长时间断开
     }
+#endif
 #endif
 
     // 重置连接状态
@@ -303,7 +333,11 @@ void MqttManager::loop()
 
                     if (ml307_at.isNetworkReady())
                     {
+#ifdef USE_ML307_GSM
                         if (ml307Mqtt.connected())
+#else
+                        if (false)  // Air780EG暂时不支持MQTT
+#endif
                         {
                             setMqttState(MqttState::CONNECTED);
                             debugPrint("Cellular connected, CSQ: " + String(ml307_at.getCSQ()));
@@ -331,7 +365,9 @@ void MqttManager::loop()
         case MqttState::CONNECTED:
         {
             // 连接正常，处理MQTT消息
+#ifdef USE_ML307_GSM
             ml307Mqtt.loop();
+#endif
 
             break;
         }
@@ -482,7 +518,11 @@ bool MqttManager::publish(const char *topic, const char *payload, bool retain)
     }
     return result;
 #else
+#ifdef USE_ML307_GSM
     bool result = ml307Mqtt.publish(topic, payload, retain);
+#else
+    bool result = false;  // Air780EG暂时不支持MQTT
+#endif
     if (!result)
     {
         debugPrint("Cellular MQTT publish 失败 - Topic: " + String(topic));
@@ -497,7 +537,11 @@ bool MqttManager::subscribe(const char *topic, uint8_t qos)
 #ifdef ENABLE_WIFI
     return _wifiMqttClient && _wifiMqttClient->subscribe(topic, qos);
 #else
+#ifdef USE_ML307_GSM
     return ml307Mqtt.subscribe(topic, qos);
+#else
+    return false;  // Air780EG暂时不支持MQTT
+#endif
 #endif
 }
 
@@ -507,7 +551,11 @@ bool MqttManager::unsubscribe(const char *topic)
 #ifdef ENABLE_WIFI
     return _wifiMqttClient && _wifiMqttClient->unsubscribe(topic);
 #else
+#ifdef USE_ML307_GSM
     return ml307Mqtt.unsubscribe(topic);
+#else
+    return false;  // Air780EG暂时不支持MQTT
+#endif
 #endif
 }
 
@@ -515,7 +563,9 @@ void MqttManager::onMessage(MqttMessageCallback callback)
 {
     _messageCallback = callback;
 #ifdef ENABLE_GSM
+#ifdef USE_ML307_GSM
     ml307Mqtt.onMessage(callback);
+#endif
 #endif
 }
 
@@ -651,7 +701,11 @@ bool MqttManager::isMqttConnected() const
 #ifdef ENABLE_WIFI
     return _wifiMqttClient && _wifiMqttClient->connected();
 #else
+#ifdef USE_ML307_GSM
     return ml307Mqtt.connected() && ml307Mqtt.canPublish();
+#else
+    return false;  // Air780EG暂时不支持MQTT
+#endif
 #endif
 }
 

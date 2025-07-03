@@ -55,6 +55,13 @@ typedef struct
     bool gsmReady; // GSM准备状态
     bool lbsReady; // LBS准备状态
     bool gnssReady; // GNSS准备状态
+    
+    // GPS/GNSS数据字段
+    double latitude;    // 纬度
+    double longitude;   // 经度
+    int satellites;     // 卫星数量
+    int signalStrength; // GSM信号强度
+    
     bool sdCardReady; // SD卡准备状态
     uint64_t sdCardSizeMB; // SD卡大小(MB)
     uint64_t sdCardFreeMB; // SD卡剩余空间(MB)

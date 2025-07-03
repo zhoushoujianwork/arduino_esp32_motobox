@@ -16,6 +16,17 @@
 // GSM引脚配置检查
 #if defined(GSM_RX_PIN) && defined(GSM_TX_PIN)
 #define ENABLE_GSM
+
+// 根据编译环境确定使用哪个GSM模块
+#ifdef ENABLE_AIR780EG
+#define USE_AIR780EG_GSM
+#elif defined(ENABLE_ML307)
+#define USE_ML307_GSM
+#else
+// 默认使用ML307（向后兼容）
+#define USE_ML307_GSM
+#endif
+
 #else
 #define ENABLE_WIFI
 #endif

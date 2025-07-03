@@ -3,6 +3,15 @@
 #include "gps/GPSManager.h"
 #include "imu/qmi8658.h"
 
+// GSM模块包含
+#ifdef USE_AIR780EG_GSM
+#include "net/Air780EGModem.h"
+extern Air780EGModem air780eg_modem;
+#elif defined(USE_ML307_GSM)
+#include "net/Ml307Mqtt.h"
+extern Ml307Mqtt ml307Mqtt;
+#endif
+
 #ifdef ENABLE_SDCARD
 #include "SD/SDManager.h"
 extern SDManager sdManager;
@@ -384,7 +393,14 @@ void Device::begin()
 
     // 初始化 MQTT 管理器
     mqttManager.setDebug(true);
+    
+    // 根据使用的GSM模块设置调试
+#ifdef USE_AIR780EG_GSM
+    air780eg_modem.setDebug(true);
+#elif defined(USE_ML307_GSM)
     ml307Mqtt.setDebug(true);
+#endif
+    
     if (!mqttManager.begin(config))
     {
         Serial.println("MQTT 初始化失败，将在运行时重试");

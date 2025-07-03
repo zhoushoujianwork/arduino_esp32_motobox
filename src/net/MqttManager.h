@@ -10,11 +10,20 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <map>
-#include "Ml307Mqtt.h"
 #include "config.h"
 #include "device.h"
 #include "gps/GPSManager.h"
 #include "utils/PreferencesUtils.h"
+
+// 根据配置包含相应的GSM模块
+#ifdef USE_AIR780EG_GSM
+#include "Air780EGMqtt.h"
+#elif defined(USE_ML307_GSM)
+#include "Ml307Mqtt.h"
+#endif
+
+// MQTT消息回调函数类型定义
+typedef std::function<void(const String& topic, const String& payload)> MqttMessageCallback;
 
 // MQTT 网络类型
 enum class MqttNetworkType {

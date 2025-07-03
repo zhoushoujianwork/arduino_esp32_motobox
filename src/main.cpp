@@ -48,6 +48,15 @@
 #endif
 #endif
 
+// GSM模块包含
+#ifdef USE_AIR780EG_GSM
+#include "net/Air780EGModem.h"
+extern Air780EGModem air780eg_modem;
+#elif defined(USE_ML307_GSM)
+#include "net/Ml307AtModem.h"
+extern Ml307AtModem ml307_at;
+#endif
+
 #ifdef ENABLE_IMU
 #include "imu/qmi8658.h"
 #endif
@@ -412,6 +421,40 @@ void setup()
 #endif
   //================ SD卡初始化结束 ================
 
+  //================ GSM模块初始化开始 ================
+#ifdef USE_AIR780EG_GSM
+  Serial.println("step 6.5");
+  Serial.println("[GSM] 初始化Air780EG模块...");
+  
+  // 手动控制GSM_EN引脚确保模块上电
+  pinMode(GSM_EN, OUTPUT);
+  digitalWrite(GSM_EN, LOW);
+  delay(100);
+  digitalWrite(GSM_EN, HIGH);
+  delay(2000);
+  
+  Serial.printf("[GSM] GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
+  Serial.printf("[GSM] 引脚配置 - RX:%d, TX:%d, EN:%d\n", GSM_RX_PIN, GSM_TX_PIN, GSM_EN);
+  
+  air780eg_modem.setDebug(true);
+  if (air780eg_modem.begin()) {
+    Serial.println("[GSM] ✅ Air780EG初始化成功");
+    device_state.gsmReady = true;
+    
+    // 启用GNSS
+    if (air780eg_modem.enableGNSS(true)) {
+      Serial.println("[GSM] ✅ GNSS启用成功");
+      air780eg_modem.setGNSSUpdateRate(1);
+    } else {
+      Serial.println("[GSM] ⚠️ GNSS启用失败");
+    }
+  } else {
+    Serial.println("[GSM] ❌ Air780EG初始化失败");
+    device_state.gsmReady = false;
+  }
+#endif
+  //================ GSM模块初始化结束 ================
+
   // 创建任务
   xTaskCreate(taskSystem, "TaskSystem", 1024 * 15, NULL, 1, NULL);
   xTaskCreate(taskDataProcessing, "TaskData", 1024 * 15, NULL, 2, NULL);
@@ -439,6 +482,39 @@ void loop()
     update_device_state();
 
     // bat.print_voltage();
+
+    // Air780EG状态检查和GNSS数据更新
+#ifdef USE_AIR780EG_GSM
+    static unsigned long lastGNSSCheck = 0;
+    if (millis() - lastGNSSCheck > 5000) {  // 每5秒检查一次
+      lastGNSSCheck = millis();
+      
+      // 更新GNSS数据
+      if (air780eg_modem.updateGNSSData()) {
+        GNSSData gnss = air780eg_modem.getGNSSData();
+        if (gnss.valid) {
+          Serial.printf("[GNSS] 位置: %.6f, %.6f, 卫星: %d\n", 
+                       gnss.latitude, gnss.longitude, gnss.satellites);
+          
+          // 更新设备状态
+          device_state.gpsReady = true;
+          device_state.latitude = gnss.latitude;
+          device_state.longitude = gnss.longitude;
+          device_state.satellites = gnss.satellites;
+        } else {
+          device_state.gpsReady = false;
+        }
+      }
+      
+      // 网络状态检查
+      if (air780eg_modem.isNetworkReady()) {
+        device_state.gsmReady = true;
+        device_state.signalStrength = air780eg_modem.getCSQ();
+      } else {
+        device_state.gsmReady = false;
+      }
+    }
+#endif
 
     // 获取GPS数据用于调试
     if (gpsManager.isReady())
