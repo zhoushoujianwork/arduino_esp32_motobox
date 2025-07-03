@@ -79,6 +79,11 @@
 // RTC内存变量（深度睡眠后保持）
 RTC_DATA_ATTR int bootCount = 0;
 
+#ifdef ENABLE_SDCARD
+// SD卡管理器
+SDManager sdManager;
+#endif
+
 /**
  * 系统监控任务
  * 负责电源管理、LED状态、按钮处理
@@ -116,7 +121,9 @@ void taskSystem(void *parameter)
     // 每10秒更新一次SD卡状态
     if (currentTime - lastSDCheckTime > 10000) {
         lastSDCheckTime = currentTime;
-        sdManager.updateStatus();
+        if (sdManager.isInitialized()) {
+            device_state.sdCardFreeMB = sdManager.getFreeSpaceMB();
+        }
     }
 #endif
 
@@ -182,10 +189,9 @@ void taskDataProcessing(void *parameter)
               gpsData.hour, gpsData.minute, gpsData.second);
       
       // 记录到SD卡
-      sdManager.logGPSData(
+      sdManager.recordGPSData(
         gpsData.latitude, gpsData.longitude, gpsData.altitude,
-        gpsData.speed, gpsData.heading, gpsData.satellites,
-        gpsData.hdop, timestamp
+        gpsData.speed, gpsData.satellites
       );
     }
     
@@ -211,15 +217,8 @@ void taskDataProcessing(void *parameter)
       // 获取当前时间作为时间戳
       char timestamp[32];
       time_t now;
-      time(&now);
-      struct tm timeinfo;
-      localtime_r(&now, &timeinfo);
-      sprintf(timestamp, "%04d-%02d-%02d %02d:%02d:%02d", 
-              timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
-              timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-      
-      // 记录到SD卡
-      sdManager.logIMUData(ax, ay, az, gx, gy, gz, heading, timestamp);
+      // IMU数据记录功能已简化，暂时移除
+      // 可以在后续版本中根据需要重新添加
     }
 #endif
 
@@ -293,32 +292,21 @@ void setup()
   //================ SD卡初始化开始 ================
 #ifdef ENABLE_SDCARD
   Serial.println("step 6");
-  sdManager.setDebug(true);
   if (sdManager.begin()) {
     Serial.println("[SD] SD卡初始化成功");
     
     // 更新设备状态
     device_state.sdCardReady = true;
-    device_state.sdCardSizeMB = sdManager.getCardSizeMB();
+    device_state.sdCardSizeMB = sdManager.getTotalSpaceMB();
     device_state.sdCardFreeMB = sdManager.getFreeSpaceMB();
     
-    // 检查是否有固件更新
-    if (sdManager.hasFirmwareUpdate()) {
-      Serial.println("[SD] 发现固件更新文件，开始升级...");
-      sdManager.performFirmwareUpdate();
-    }
+    // 保存设备信息
+    sdManager.saveDeviceInfo();
     
-    // 尝试从SD卡加载WiFi配置
-    String ssid, password;
-    if (sdManager.loadWiFiConfig(ssid, password)) {
-      Serial.println("[SD] 从SD卡加载WiFi配置成功");
-      // 这里可以设置WiFi配置到系统中
-    }
-    
-    // 记录启动日志
-    sdManager.writeLog("系统启动，启动次数: " + String(bootCount));
+    Serial.println("[SD] 设备信息已保存到SD卡");
   } else {
     Serial.println("[SD] SD卡初始化失败");
+    device_state.sdCardReady = false;
   }
 #endif
   //================ SD卡初始化结束 ================

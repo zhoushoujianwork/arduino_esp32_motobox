@@ -97,9 +97,9 @@ void PowerManager::handleWakeup()
     extern SDManager sdManager;
     if (!sdManager.isInitialized()) {
         Serial.println("[电源管理] 从睡眠恢复，重新初始化SD卡");
-        sdManager.restoreFromSleep();
-        if (sdManager.isInitialized()) {
-            // 记录唤醒日志
+        if (sdManager.begin()) {
+            Serial.println("[电源管理] SD卡重新初始化成功");
+            // 记录唤醒日志（简化版）
             String wakeupLog = "设备从深度睡眠唤醒，原因: ";
             switch (wakeup_reason) {
                 case ESP_SLEEP_WAKEUP_EXT0:
@@ -112,7 +112,7 @@ void PowerManager::handleWakeup()
                     wakeupLog += "其他";
                     break;
             }
-            sdManager.writeLog(wakeupLog);
+            Serial.println("[电源管理] " + wakeupLog);
         }
     }
 #endif
@@ -370,10 +370,9 @@ void PowerManager::disablePeripherals()
     
     extern SDManager sdManager;
     if (sdManager.isInitialized()) {
-        // 记录进入睡眠的日志
-        sdManager.writeLog("设备进入深度睡眠模式");
-        // 准备SD卡进入睡眠
-        sdManager.prepareForSleep();
+        // 记录进入睡眠的日志（简化版）
+        Serial.println("[电源管理] 设备进入深度睡眠模式");
+        // 简化版SD管理器不需要特殊的睡眠准备
         Serial.println("[电源管理] SD卡已准备进入睡眠");
     }
     Serial.flush();

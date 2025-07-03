@@ -3,6 +3,11 @@
 #include "gps/GPSManager.h"
 #include "imu/qmi8658.h"
 
+#ifdef ENABLE_SDCARD
+#include "SD/SDManager.h"
+extern SDManager sdManager;
+#endif
+
 extern const VersionInfo &getVersionInfo();
 
 device_state_t device_state;
