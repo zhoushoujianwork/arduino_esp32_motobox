@@ -187,6 +187,7 @@ void taskSystem(void *parameter)
                 Serial.println("  sd.status  - 检查SD卡状态");
                 Serial.println("  sd.session - 显示当前GPS会话信息");
                 Serial.println("  sd.finish  - 结束当前GPS会话");
+                Serial.println("  sd.dirs    - 检查和创建目录结构");
                 Serial.println("");
 #endif
                 Serial.println("提示: 命令不区分大小写");

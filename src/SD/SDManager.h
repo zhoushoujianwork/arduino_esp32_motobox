@@ -44,6 +44,8 @@ private:
     // 内部方法
     bool createDirectoryStructure();
     bool createDirectory(const char* path);
+    bool ensureGPSDirectoryExists();
+    bool directoryExists(const char* path);
     
     // 工具方法
     String getDeviceID();

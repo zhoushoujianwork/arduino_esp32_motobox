@@ -178,23 +178,49 @@ bool SDManager::createDirectoryStructure() {
 
 bool SDManager::createDirectory(const char* path) {
     if (!_initialized) {
+        debugPrint("⚠️ SD卡未初始化，无法创建目录: " + String(path));
         return false;
     }
 
-#ifdef SD_MODE_SPI
-    File dir = SD.open(path);
-    if (!dir) {
-        return SD.mkdir(path);
+    // 先检查目录是否已存在
+    if (directoryExists(path)) {
+        debugPrint("📁 目录已存在: " + String(path));
+        return true;
     }
-#else
-    File dir = SD_MMC.open(path);
-    if (!dir) {
-        return SD_MMC.mkdir(path);
-    }
-#endif
 
-    dir.close();
-    return true;
+    debugPrint("🔧 正在创建目录: " + String(path));
+
+    bool success = false;
+    try {
+#ifdef SD_MODE_SPI
+        success = SD.mkdir(path);
+#else
+        success = SD_MMC.mkdir(path);
+#endif
+    } catch (...) {
+        debugPrint("❌ 创建目录时发生异常: " + String(path));
+        return false;
+    }
+
+    if (success) {
+        debugPrint("✅ 目录创建成功: " + String(path));
+        
+        // 验证目录是否真的创建成功
+        if (directoryExists(path)) {
+            return true;
+        } else {
+            debugPrint("⚠️ 目录创建报告成功但验证失败: " + String(path));
+            return false;
+        }
+    } else {
+        debugPrint("❌ 目录创建失败: " + String(path));
+        debugPrint("可能的原因：");
+        debugPrint("  1. SD卡空间不足");
+        debugPrint("  2. SD卡写保护");
+        debugPrint("  3. 文件系统错误");
+        debugPrint("  4. 路径格式错误");
+        return false;
+    }
 }
 
 bool SDManager::saveDeviceInfo() {
@@ -246,6 +272,12 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
     // 生成当前会话的GPS文件名
     String filename = generateGPSSessionFilename();
     
+    // 确保GPS目录存在
+    if (!ensureGPSDirectoryExists()) {
+        debugPrint("❌ 无法创建GPS目录");
+        return false;
+    }
+    
     // 检查文件是否存在，如果不存在则创建GeoJSON头部
     bool fileExists = false;
     
@@ -259,6 +291,7 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
         if (testFile) {
             fileExists = true;
             testFile.close();
+            debugPrint("📄 使用现有GPS会话文件: " + filename);
         }
     } catch (...) {
         debugPrint("⚠️ 检查GPS文件状态失败，可能SD卡已移除");
@@ -284,11 +317,22 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
         debugPrint("  1. SD卡空间不足");
         debugPrint("  2. SD卡已移除");
         debugPrint("  3. 文件系统错误");
+        debugPrint("  4. 目录权限问题");
+        
+        // 尝试重新创建目录
+        debugPrint("🔧 尝试重新创建GPS目录...");
+        if (createDirectory("/data") && createDirectory("/data/gps")) {
+            debugPrint("✅ GPS目录重新创建成功，请重试");
+        } else {
+            debugPrint("❌ GPS目录重新创建失败");
+        }
         return false;
     }
 
     // 如果是新文件，写入GeoJSON头部和会话信息
     if (!fileExists) {
+        debugPrint("📁 创建新的GPS会话文件: " + filename);
+        
         file.println("{");
         file.println("  \"type\": \"FeatureCollection\",");
         file.println("  \"metadata\": {");
@@ -298,7 +342,6 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
         file.println("    \"firmware_version\": \"" + String(FIRMWARE_VERSION) + "\"");
         file.println("  },");
         file.println("  \"features\": [");
-        debugPrint("📁 创建新的GPS会话文件: " + filename);
     } else {
         // 如果文件已存在，需要在最后一个特征后添加逗号
         file.print(",\n");
@@ -321,6 +364,7 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
     gpsFeature += "    }";
 
     size_t bytesWritten = file.print(gpsFeature);
+    file.flush(); // 确保数据写入
     file.close();
 
     if (bytesWritten == 0) {
@@ -456,6 +500,59 @@ bool SDManager::finishGPSSession() {
     return true;
 }
 
+bool SDManager::ensureGPSDirectoryExists() {
+    if (!_initialized) {
+        return false;
+    }
+
+    // 检查并创建 /data 目录
+    if (!directoryExists("/data")) {
+        debugPrint("🔧 创建 /data 目录...");
+        if (!createDirectory("/data")) {
+            debugPrint("❌ 创建 /data 目录失败");
+            return false;
+        }
+        debugPrint("✅ /data 目录创建成功");
+    }
+
+    // 检查并创建 /data/gps 目录
+    if (!directoryExists("/data/gps")) {
+        debugPrint("🔧 创建 /data/gps 目录...");
+        if (!createDirectory("/data/gps")) {
+            debugPrint("❌ 创建 /data/gps 目录失败");
+            return false;
+        }
+        debugPrint("✅ /data/gps 目录创建成功");
+    }
+
+    return true;
+}
+
+bool SDManager::directoryExists(const char* path) {
+    if (!_initialized) {
+        return false;
+    }
+
+    File dir;
+    try {
+#ifdef SD_MODE_SPI
+        dir = SD.open(path);
+#else
+        dir = SD_MMC.open(path);
+#endif
+    } catch (...) {
+        return false;
+    }
+
+    if (!dir) {
+        return false;
+    }
+
+    bool isDir = dir.isDirectory();
+    dir.close();
+    return isDir;
+}
+
 void SDManager::debugPrint(const String& message) {
     Serial.println("[SDManager] " + message);
 }
@@ -543,6 +640,29 @@ bool SDManager::handleSerialCommand(const String& command) {
         
         return result;
     }
+    else if (command == "sd.dirs") {
+        if (!_initialized) {
+            Serial.println("❌ SD卡未初始化");
+            return false;
+        }
+        
+        Serial.println("=== 目录状态检查 ===");
+        Serial.println("/data 目录: " + String(directoryExists("/data") ? "存在" : "不存在"));
+        Serial.println("/data/gps 目录: " + String(directoryExists("/data/gps") ? "存在" : "不存在"));
+        Serial.println("/config 目录: " + String(directoryExists("/config") ? "存在" : "不存在"));
+        
+        Serial.println("");
+        Serial.println("正在确保GPS目录存在...");
+        bool result = ensureGPSDirectoryExists();
+        
+        if (result) {
+            Serial.println("✅ GPS目录检查/创建成功");
+        } else {
+            Serial.println("❌ GPS目录检查/创建失败");
+        }
+        
+        return result;
+    }
     else if (command == "yes_format") {
         Serial.println("⚠️ 简化版SD管理器暂不支持格式化功能");
         Serial.println("如需格式化，请使用电脑格式化为FAT32格式");
@@ -584,5 +704,6 @@ bool SDManager::handleSerialCommand(const String& command) {
     Serial.println("  sd.status  - 检查SD卡状态");
     Serial.println("  sd.session - 显示当前GPS会话信息");
     Serial.println("  sd.finish  - 结束当前GPS会话");
+    Serial.println("  sd.dirs    - 检查和创建目录结构");
     return false;
 }
