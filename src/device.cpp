@@ -196,6 +196,8 @@ void mqttMessageCallback(const String &topic, const String &payload)
             if (event && device_state.audioReady) {
                 if (strcmp(event, "boot_success") == 0) {
                     audioManager.playBootSuccessSound();
+                } else if (strcmp(event, "welcome") == 0) {
+                    audioManager.playWelcomeVoice();
                 } else if (strcmp(event, "wifi_connected") == 0) {
                     audioManager.playWiFiConnectedSound();
                 } else if (strcmp(event, "gps_fixed") == 0) {

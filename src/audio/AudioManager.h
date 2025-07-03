@@ -58,6 +58,11 @@ public:
     bool playSleepModeSound();
     bool playCustomBeep(float frequency = 1000.0, int duration = 200);
     
+    // 语音播放功能
+    bool playWelcomeVoice();  // 播放"大菠萝车机,扎西德勒"
+    bool playVoiceFromFile(const char* filename);
+    bool playVoiceFromArray(const uint8_t* audioData, size_t dataSize);
+    
     // 音频事件播放
     bool playAudioEvent(AudioEvent event);
     

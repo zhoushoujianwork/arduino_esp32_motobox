@@ -1,5 +1,8 @@
 #include "AudioManager.h"
 #include <math.h>
+#include "FS.h"
+#include "SPIFFS.h"
+#include "welcome_audio.h"
 
 static const char* TAG = "AudioManager";
 
@@ -166,13 +169,10 @@ bool AudioManager::playBeepSequence(const float* frequencies, const int* duratio
 }
 
 bool AudioManager::playBootSuccessSound() {
-    ESP_LOGI(TAG, "Playing boot success sound");
+    ESP_LOGI(TAG, "Playing boot success sound with welcome voice");
     
-    // 开机成功音：上升音调序列 (C-E-G-C)
-    const float frequencies[] = {523.25, 659.25, 783.99, 1046.50}; // C5-E5-G5-C6
-    const int durations[] = {200, 200, 200, 400};
-    
-    return playBeepSequence(frequencies, durations, 4, 0.6);
+    // 播放中文语音"大菠萝车机,扎西德勒"
+    return playWelcomeVoice();
 }
 
 bool AudioManager::playWiFiConnectedSound() {
@@ -264,4 +264,147 @@ bool AudioManager::testAudio() {
     
     ESP_LOGI(TAG, "Audio test %s", result ? "PASSED" : "FAILED");
     return result;
+}
+
+bool AudioManager::playWelcomeVoice() {
+    ESP_LOGI(TAG, "Playing welcome voice: %s", WELCOME_VOICE.description);
+    
+    // 首先尝试播放内置的语音数据
+    if (playVoiceFromArray(WELCOME_VOICE.data, WELCOME_VOICE.size)) {
+        return true;
+    }
+    
+    // 如果内置数据播放失败，尝试从文件播放
+    if (playVoiceFromFile("/spiffs/welcome.wav")) {
+        return true;
+    }
+    
+    // 如果都失败，播放替代的音调序列
+    ESP_LOGW(TAG, "Welcome voice playback failed, using tone sequence");
+    
+    // 创建一个特殊的音调序列来代表"大菠萝车机,扎西德勒"
+    // 使用中国传统五声音阶：宫商角徵羽
+    const float frequencies[] = {
+        523.25,  // C5 - 大
+        587.33,  // D5 - 菠
+        659.25,  // E5 - 萝
+        698.46,  // F5 - 车
+        783.99,  // G5 - 机
+        100,     // 停顿
+        880.00,  // A5 - 扎
+        987.77,  // B5 - 西
+        1046.50, // C6 - 德
+        1174.66, // D6 - 勒
+    };
+    
+    const int durations[] = {
+        300, 300, 400, 300, 500,  // 大菠萝车机
+        200,                       // 停顿
+        300, 300, 300, 600        // 扎西德勒
+    };
+    
+    return playBeepSequence(frequencies, durations, 10, 0.6);
+}
+
+bool AudioManager::playVoiceFromFile(const char* filename) {
+    if (!initialized) {
+        ESP_LOGE(TAG, "AudioManager not initialized");
+        return false;
+    }
+    
+    if (!SPIFFS.begin(true)) {
+        ESP_LOGE(TAG, "SPIFFS Mount Failed");
+        return false;
+    }
+    
+    File audioFile = SPIFFS.open(filename, "r");
+    if (!audioFile) {
+        ESP_LOGW(TAG, "Failed to open audio file: %s", filename);
+        return false;
+    }
+    
+    ESP_LOGI(TAG, "Playing audio file: %s (size: %d bytes)", filename, audioFile.size());
+    
+    // 简单的WAV文件播放（跳过44字节的WAV头）
+    audioFile.seek(44);
+    
+    const size_t bufferSize = 1024;
+    uint8_t* buffer = (uint8_t*)malloc(bufferSize);
+    if (!buffer) {
+        ESP_LOGE(TAG, "Failed to allocate audio buffer");
+        audioFile.close();
+        return false;
+    }
+    
+    playing = true;
+    size_t totalBytesRead = 0;
+    
+    while (audioFile.available() && playing) {
+        size_t bytesRead = audioFile.read(buffer, bufferSize);
+        if (bytesRead > 0) {
+            size_t bytesWritten = 0;
+            esp_err_t err = i2s_write(I2S_PORT, buffer, bytesRead, &bytesWritten, portMAX_DELAY);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "I2S write failed: %s", esp_err_to_name(err));
+                break;
+            }
+            totalBytesRead += bytesRead;
+        }
+        
+        // 允许其他任务运行
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+    
+    free(buffer);
+    audioFile.close();
+    playing = false;
+    
+    ESP_LOGI(TAG, "Audio playback completed, played %d bytes", totalBytesRead);
+    return totalBytesRead > 0;
+}
+
+bool AudioManager::playVoiceFromArray(const uint8_t* audioData, size_t dataSize) {
+    if (!initialized || !audioData || dataSize == 0) {
+        ESP_LOGE(TAG, "Invalid parameters for voice playback");
+        return false;
+    }
+    
+    ESP_LOGI(TAG, "Playing voice from array (size: %d bytes)", dataSize);
+    
+    playing = true;
+    
+    // 跳过WAV头（如果存在）
+    const uint8_t* data = audioData;
+    size_t size = dataSize;
+    
+    // 检查是否是WAV文件（以"RIFF"开头）
+    if (size > 44 && memcmp(data, "RIFF", 4) == 0) {
+        data += 44;  // 跳过WAV头
+        size -= 44;
+    }
+    
+    const size_t chunkSize = 1024;
+    size_t offset = 0;
+    
+    while (offset < size && playing) {
+        size_t currentChunkSize = (size - offset > chunkSize) ? chunkSize : (size - offset);
+        
+        size_t bytesWritten = 0;
+        esp_err_t err = i2s_write(I2S_PORT, data + offset, currentChunkSize, &bytesWritten, portMAX_DELAY);
+        
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "I2S write failed: %s", esp_err_to_name(err));
+            playing = false;
+            return false;
+        }
+        
+        offset += currentChunkSize;
+        
+        // 允许其他任务运行
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+    
+    playing = false;
+    ESP_LOGI(TAG, "Voice playback from array completed");
+    return true;
 }
