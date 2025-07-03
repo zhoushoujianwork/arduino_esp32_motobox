@@ -421,6 +421,27 @@ void setup()
 #endif
   //================ SD卡初始化结束 ================
 
+  // 宏定义测试
+  Serial.println("=== 宏定义测试 ===");
+#ifdef ENABLE_AIR780EG
+  Serial.println("✅ ENABLE_AIR780EG 已定义");
+#else
+  Serial.println("❌ ENABLE_AIR780EG 未定义");
+#endif
+
+#ifdef USE_AIR780EG_GSM
+  Serial.println("✅ USE_AIR780EG_GSM 已定义");
+#else
+  Serial.println("❌ USE_AIR780EG_GSM 未定义");
+#endif
+
+#ifdef ENABLE_GSM
+  Serial.println("✅ ENABLE_GSM 已定义");
+#else
+  Serial.println("❌ ENABLE_GSM 未定义");
+#endif
+  Serial.println("=== 宏定义测试结束 ===");
+
   //================ GSM模块初始化开始 ================
 #ifdef USE_AIR780EG_GSM
   Serial.println("step 6.5");

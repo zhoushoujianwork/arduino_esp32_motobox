@@ -6,8 +6,13 @@
 
 #ifdef ENABLE_GSM
 #include "GSMGNSSAdapter.h"
+#ifdef USE_AIR780EG_GSM
+#include "../net/Air780EGModem.h"
+extern Air780EGModem air780eg_modem;
+#elif defined(USE_ML307_GSM)
 #include "../net/Ml307AtModem.h"
 extern Ml307AtModem ml307_at;
+#endif
 #elif defined(ENABLE_GPS)
 #include "ExternalGPSAdapter.h"
 #include "GPS.h"
@@ -109,11 +114,23 @@ void GPSManager::setGNSSEnabled(bool enable)
 void GPSManager::setLBSEnabled(bool enable)
 {
 #ifdef ENABLE_GSM
+#ifdef USE_AIR780EG_GSM
+    // Air780EG模块的LBS启用
+    if (enable) {
+        Serial.println("[GPS] 启用Air780EG LBS定位");
+        // Air780EG的LBS功能通常在网络连接后自动可用
+        // 这里可以添加具体的Air780EG LBS配置代码
+    } else {
+        Serial.println("[GPS] 禁用Air780EG LBS定位");
+    }
+#elif defined(USE_ML307_GSM)
+    // ML307模块的LBS启用
     while (!ml307_at.enableLBS(enable))
     {
         Serial.println("重试启用LBS...");
         delay(1000);
     }
+#endif
 #endif
 }
 
@@ -138,20 +155,38 @@ void GPSManager::handleLBSUpdate()
     }
     
     // 检查网络状态
+#ifdef USE_AIR780EG_GSM
+    if (!air780eg_modem.isNetworkReady())
+#elif defined(USE_ML307_GSM)
     if (!ml307_at.isNetworkReady())
+#else
+    if (true) // 没有GSM模块时跳过
+#endif
     {
         debugPrint("网络未就绪，跳过LBS更新");
         return;
     }
     
     // 检查LBS是否正在加载
+#ifdef USE_AIR780EG_GSM
+    // Air780EG暂时不检查LBS加载状态
+    if (false)
+#elif defined(USE_ML307_GSM)
     if (ml307_at.isLBSLoading())
+#else
+    if (false)
+#endif
     {
         debugPrint("LBS正在加载中，跳过本次更新");
         return;
     }
     
-    // 更新LBS数据 - 直接调用Ml307AtModem的方法
+    // 更新LBS数据
+#ifdef USE_AIR780EG_GSM
+    // Air780EG的LBS数据更新
+    // TODO: 实现Air780EG的LBS数据获取
+    debugPrint("Air780EG LBS数据更新 - 待实现");
+#elif defined(USE_ML307_GSM)
     if (ml307_at.updateLBSData())
     {
         _lastLBSUpdate = now;
@@ -174,6 +209,7 @@ void GPSManager::handleLBSUpdate()
             lastFailureLog = now;
         }
     }
+#endif
 #endif
 }
 
