@@ -32,13 +32,16 @@ bool SDManager::begin() {
         return false;
     }
     
-    // 检查SD卡类型和容量
+    // 检查SD卡类型
     uint8_t cardType = SD.cardType();
     if (cardType == CARD_NONE) {
         debugPrint("❌ 未检测到SD卡");
         debugPrint("请确认SD卡已正确插入");
         return false;
     }
+    
+    // 设置初始化标志 - 在获取容量信息之前设置
+    _initialized = true;
     
     String cardTypeStr;
     switch (cardType) {
@@ -74,12 +77,13 @@ bool SDManager::begin() {
         return false;
     }
     
+    // 设置初始化标志
+    _initialized = true;
+    
     debugPrint("✅ SD卡MMC模式初始化成功");
     debugPrint("SD卡容量: " + String((unsigned long)getTotalSpaceMB()) + " MB");
     debugPrint("可用空间: " + String((unsigned long)getFreeSpaceMB()) + " MB");
 #endif
-
-    _initialized = true;
 
     // 创建必要的目录结构
     if (!createDirectoryStructure()) {
