@@ -39,6 +39,13 @@ ESP32-S3 MotoBox是一个基于ESP32-S3的摩托车数据采集与显示系统�
   - 配置完成后直接重启设备，无需校验
   - 重启后自动尝试使用已保存的WiFi配置连接网络
 
+### 6. 音频反馈系统
+- **NS4168功率放大芯片**：支持I2S数字音频输出，提供清晰的音频反馈
+- **开机成功播报**：设备启动完成时播放上升音调序列
+- **状态音频提示**：WiFi连接、GPS定位、低电量、睡眠模式等状态变化音频反馈
+- **远程音频控制**：支持通过MQTT远程播放音频和测试音频系统
+- **自定义音频播放**：支持指定频率和时长的自定义音频播放
+
 ## 版本历史
 
 ### v2.2.2 (2025-06-07)
@@ -90,6 +97,35 @@ void configureWakeupSources();
 3. 当检测到运动时，IMU中断引脚触发，唤醒ESP32-S3
 4. 系统启动后检查唤醒原因，并根据唤醒源执行相应操作
 
+### 音频系统实现
+```cpp
+// 音频管理器初始化
+bool AudioManager::begin(int ws_pin, int bclk_pin, int data_pin);
+
+// 预定义音频事件播放
+bool playBootSuccessSound();     // 开机成功音：上升音调序列
+bool playWiFiConnectedSound();   // WiFi连接音：双音调
+bool playGPSFixedSound();        // GPS定位音：三短音
+bool playLowBatterySound();      // 低电量音：下降音调
+bool playSleepModeSound();       // 睡眠音：渐弱音调
+
+// 自定义音频播放
+bool playCustomBeep(float frequency, int duration);
+```
+
+### I2S音频配置
+```cpp
+// NS4168引脚配置
+#define IIS_S_WS_PIN    23  // Word Select
+#define IIS_S_BCLK_PIN  22  // Bit Clock
+#define IIS_S_DATA_PIN  21  // Data
+
+// 音频参数
+#define AUDIO_SAMPLE_RATE       16000  // 16kHz采样率
+#define AUDIO_BITS_PER_SAMPLE   16     // 16位采样
+#define AUDIO_CHANNELS          1      // 单声道
+```
+
 ## 注意事项与最佳实践
 
 1. **RTC GPIO限制**：ESP32-S3只有GPIO0-GPIO21可用作RTC GPIO，请确保IMU中断引脚连接到这些引脚之一
@@ -98,6 +134,9 @@ void configureWakeupSources();
 4. **去抖处理**：添加适当的去抖逻辑，避免误触发
 5. **WiFi与休眠**：当设备处于WiFi AP配网模式且有客户端连接时，不应进入休眠状态
 6. **休眠失败处理**：当休眠模式配置失败时，应重新尝试进入休眠模式，防止设备无法唤醒
+7. **音频引脚冲突**：确保I2S音频引脚不与其他功能冲突，避免系统异常
+8. **音频功耗管理**：音频播放会增加功耗，在低电量时应适当减少音频提示
+9. **深度睡眠音频处理**：进入深度睡眠前会自动关闭I2S外设，唤醒后需重新初始化
 
 ## 许可证信息
 
