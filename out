@@ -1,0 +1,213 @@
+ *  Executing task: platformio device monitor --environment esp32-air780eg --port /dev/cu.usbserial-10 
+
+--- Terminal on /dev/cu.usbserial-10 | 115200 8-N-1
+--- Available filters and text transformations: colorize, debug, default, direct, esp32_exception_decoder, hexlify, log2file, nocontrol, printable, send_on_enter, time
+--- More details at https://bit.ly/pio-monitor-filters
+--- Quit: Ctrl+C | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+>> AT+CREG?
+<< 
++CREG: 1,1
+
+OK
+
+[Air780EG] Air780EG: 网络注册成功
+[Air780EG] Air780EG: 初始化完成
+[GSM] ✅ Air780EG初始化成功
+[GSM] GSM_EN引脚状态: HIGH
+[Air780EG] Air780EG: 启用GNSS
+>> AT+CGNSPWR=1
+<< 
+OK
+
+>> AT+CGNSSEQ="RMC"
+<< 
+OK
+
+[GSM] ✅ GNSS启用成功
+>> AT+CGNSSEQ="RMC",1000
+<< 
++CME ERROR: 3
+
+
+[系统] 系统监控任务启动[系统] 数据处理任务启动
+[系统] 初始化完成
+
+[电源管理] 🚗 检测到车辆电门已启动
+[电源管理] 将跳过IMU运动检测，直接保持活跃状态
+[状态变化] 电池电量: 0 -> 99
+[状态变化] 外部电源: 未连接 -> 已连接
+[状态变化] 4G连接: 未连接 -> 已连接
+[状态变化] IMU状态: 未就绪 -> 就绪
+[状态变化] 罗盘状态: 未就绪 -> 就绪
+[状态变化] 休眠时间: 0 -> 300
+[状态变化] SD卡状态: 未就绪 -> 就绪
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 24,0
+
+OK
+
+[状态变化] 电池电量: 99 -> 98
+[状态变化] 电池电量: 98 -> 99
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 24,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 24,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 24,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 24,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 24,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 24,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 24,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 24,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 24,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 24,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 23,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 23,0
+
+OK
+
+>> AT+CGNSINF
+<< 
++CGNSINF: 1,0,,,,0.000,0.00,0.00,1,,99.9,99.9,4.00,,0,0,,,0,,
+
+OK
+
+>> AT+CSQ
+<< 
++CSQ: 23,0
+
+OK
+
