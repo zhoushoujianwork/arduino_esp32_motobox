@@ -239,8 +239,8 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
         return false;
     }
 
-    // 生成文件名（按日期）
-    String filename = "/data/gps/gps_" + getCurrentDateString() + ".geojson";
+    // 生成当前会话的GPS文件名
+    String filename = generateGPSSessionFilename();
     
     // 检查文件是否存在，如果不存在则创建GeoJSON头部
     bool fileExists = false;
@@ -283,11 +283,18 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
         return false;
     }
 
-    // 如果是新文件，写入GeoJSON头部
+    // 如果是新文件，写入GeoJSON头部和会话信息
     if (!fileExists) {
         file.println("{");
         file.println("  \"type\": \"FeatureCollection\",");
+        file.println("  \"metadata\": {");
+        file.println("    \"device_id\": \"" + getDeviceID() + "\",");
+        file.println("    \"session_start\": \"" + getCurrentTimestamp() + "\",");
+        file.println("    \"boot_count\": " + String(getBootCount()) + ",");
+        file.println("    \"firmware_version\": \"" + String(FIRMWARE_VERSION) + "\"");
+        file.println("  },");
         file.println("  \"features\": [");
+        debugPrint("📁 创建新的GPS会话文件: " + filename);
     } else {
         // 如果文件已存在，需要在最后一个特征后添加逗号
         file.print(",\n");
@@ -302,8 +309,10 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
     gpsFeature += "      },\n";
     gpsFeature += "      \"properties\": {\n";
     gpsFeature += "        \"timestamp\": \"" + getCurrentTimestamp() + "\",\n";
-    gpsFeature += "        \"speed\": " + String(speed, 2) + ",\n";
-    gpsFeature += "        \"satellites\": " + String(satellites) + "\n";
+    gpsFeature += "        \"runtime_ms\": " + String(millis()) + ",\n";
+    gpsFeature += "        \"speed_kmh\": " + String(speed, 2) + ",\n";
+    gpsFeature += "        \"satellites\": " + String(satellites) + ",\n";
+    gpsFeature += "        \"hdop\": 0.0\n";  // 可以后续添加HDOP数据
     gpsFeature += "      }\n";
     gpsFeature += "    }";
 
@@ -344,6 +353,103 @@ String SDManager::getCurrentDateString() {
     // 简单的日期字符串，实际项目中应该使用真实日期
     unsigned long days = millis() / (24 * 60 * 60 * 1000);
     return String(days);
+}
+
+String SDManager::getCurrentTimeString() {
+    // 生成当前时间字符串 HHMMSS
+    unsigned long currentTime = millis();
+    unsigned long hours = (currentTime % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000);
+    unsigned long minutes = (currentTime % (60 * 60 * 1000)) / (60 * 1000);
+    unsigned long seconds = (currentTime % (60 * 1000)) / 1000;
+    
+    String timeStr = "";
+    if (hours < 10) timeStr += "0";
+    timeStr += String(hours);
+    if (minutes < 10) timeStr += "0";
+    timeStr += String(minutes);
+    if (seconds < 10) timeStr += "0";
+    timeStr += String(seconds);
+    
+    return timeStr;
+}
+
+String SDManager::generateGPSSessionFilename() {
+    // 生成基于启动会话的GPS文件名
+    // 格式: gps_YYYYMMDD_HHMMSS_bootXXX.geojson
+    
+    // 获取当前日期时间（简化版）
+    String dateStr = getCurrentDateString();
+    String timeStr = getCurrentTimeString();
+    
+    // 格式化启动次数
+    String bootStr = String(getBootCount());
+    while (bootStr.length() < 3) {
+        bootStr = "0" + bootStr;
+    }
+    
+    return "/data/gps/gps_" + dateStr + "_" + timeStr + "_boot" + bootStr + ".geojson";
+}
+
+int SDManager::getBootCount() {
+    // 从外部获取启动次数
+    extern int bootCount;
+    return bootCount;
+}
+
+bool SDManager::finishGPSSession() {
+    if (!_initialized) {
+        debugPrint("⚠️ SD卡未初始化，无法结束GPS会话");
+        return false;
+    }
+
+    // 获取当前会话文件名
+    String filename = generateGPSSessionFilename();
+    
+    // 检查文件是否存在
+    File testFile;
+    try {
+#ifdef SD_MODE_SPI
+        testFile = SD.open(filename.c_str(), FILE_READ);
+#else
+        testFile = SD_MMC.open(filename.c_str(), FILE_READ);
+#endif
+    } catch (...) {
+        debugPrint("⚠️ 检查GPS文件失败");
+        return false;
+    }
+
+    if (!testFile) {
+        debugPrint("⚠️ GPS会话文件不存在: " + filename);
+        return false;
+    }
+    testFile.close();
+
+    // 以追加模式打开文件，添加GeoJSON结尾
+    File file;
+    try {
+#ifdef SD_MODE_SPI
+        file = SD.open(filename.c_str(), FILE_APPEND);
+#else
+        file = SD_MMC.open(filename.c_str(), FILE_APPEND);
+#endif
+    } catch (...) {
+        debugPrint("⚠️ 打开GPS文件失败");
+        return false;
+    }
+
+    if (!file) {
+        debugPrint("❌ 无法打开GPS会话文件进行结束操作");
+        return false;
+    }
+
+    // 添加GeoJSON结尾
+    file.println("");
+    file.println("  ]");
+    file.println("}");
+    file.close();
+
+    debugPrint("✅ GPS会话已结束: " + filename);
+    return true;
 }
 
 void SDManager::debugPrint(const String& message) {
@@ -389,15 +495,46 @@ bool SDManager::handleSerialCommand(const String& command) {
         // 测试GPS数据记录
         Serial.println("正在测试GPS数据记录...");
         Serial.println("测试数据: 北京天安门广场坐标");
+        Serial.println("当前会话文件: " + generateGPSSessionFilename());
         
         bool result = recordGPSData(39.9042, 116.4074, 50.0, 25.5, 8);
         
         if (result) {
             Serial.println("✅ GPS数据记录测试成功");
-            Serial.println("数据已保存到: /data/gps/gps_" + getCurrentDateString() + ".geojson");
+            Serial.println("数据已保存到当前会话文件");
         } else {
             Serial.println("❌ GPS数据记录测试失败");
             Serial.println("请检查SD卡状态");
+        }
+        
+        return result;
+    }
+    else if (command == "sd.session") {
+        if (!_initialized) {
+            Serial.println("❌ SD卡未初始化");
+            return false;
+        }
+        
+        Serial.println("=== GPS会话信息 ===");
+        Serial.println("当前会话文件: " + generateGPSSessionFilename());
+        Serial.println("启动次数: " + String(getBootCount()));
+        Serial.println("运行时间: " + String(millis() / 1000) + " 秒");
+        Serial.println("设备ID: " + getDeviceID());
+        return true;
+    }
+    else if (command == "sd.finish") {
+        if (!_initialized) {
+            Serial.println("❌ SD卡未初始化");
+            return false;
+        }
+        
+        Serial.println("正在结束当前GPS会话...");
+        bool result = finishGPSSession();
+        
+        if (result) {
+            Serial.println("✅ GPS会话已正确结束");
+        } else {
+            Serial.println("❌ GPS会话结束失败");
         }
         
         return result;
@@ -438,8 +575,10 @@ bool SDManager::handleSerialCommand(const String& command) {
     
     Serial.println("❌ 未知SD卡命令: " + command);
     Serial.println("可用的SD卡命令:");
-    Serial.println("  sd.info   - 显示SD卡详细信息");
-    Serial.println("  sd.test   - 测试GPS数据记录");
-    Serial.println("  sd.status - 检查SD卡状态");
+    Serial.println("  sd.info    - 显示SD卡详细信息");
+    Serial.println("  sd.test    - 测试GPS数据记录");
+    Serial.println("  sd.status  - 检查SD卡状态");
+    Serial.println("  sd.session - 显示当前GPS会话信息");
+    Serial.println("  sd.finish  - 结束当前GPS会话");
     return false;
 }

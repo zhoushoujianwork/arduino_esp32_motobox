@@ -33,6 +33,7 @@ public:
     // 核心功能
     bool saveDeviceInfo();
     bool recordGPSData(double latitude, double longitude, double altitude = 0.0, float speed = 0.0, int satellites = 0);
+    bool finishGPSSession();
 
     // 串口命令处理
     bool handleSerialCommand(const String& command);
@@ -48,6 +49,9 @@ private:
     String getDeviceID();
     String getCurrentTimestamp();
     String getCurrentDateString();
+    String getCurrentTimeString();
+    String generateGPSSessionFilename();
+    int getBootCount();
     void debugPrint(const String& message);
 };
 

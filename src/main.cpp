@@ -182,9 +182,11 @@ void taskSystem(void *parameter)
                 Serial.println("");
 #ifdef ENABLE_SDCARD
                 Serial.println("SD卡命令:");
-                Serial.println("  sd.info   - 显示SD卡详细信息");
-                Serial.println("  sd.test   - 测试GPS数据记录");
-                Serial.println("  sd.status - 检查SD卡状态");
+                Serial.println("  sd.info    - 显示SD卡详细信息");
+                Serial.println("  sd.test    - 测试GPS数据记录");
+                Serial.println("  sd.status  - 检查SD卡状态");
+                Serial.println("  sd.session - 显示当前GPS会话信息");
+                Serial.println("  sd.finish  - 结束当前GPS会话");
                 Serial.println("");
 #endif
                 Serial.println("提示: 命令不区分大小写");
