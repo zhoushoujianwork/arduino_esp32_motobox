@@ -96,5 +96,18 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 #endif
 #endif
 
+/* Audio Configuration */
+// 音频引脚配置检查
+#if defined(IIS_S_WS_PIN) && defined(IIS_S_BCLK_PIN) && defined(IIS_S_DATA_PIN)
+#define ENABLE_AUDIO
+#endif
+
+/* Audio Events Configuration */
+#define AUDIO_BOOT_SUCCESS_ENABLED    true
+#define AUDIO_WIFI_CONNECTED_ENABLED  true
+#define AUDIO_GPS_FIXED_ENABLED       true
+#define AUDIO_LOW_BATTERY_ENABLED     true
+#define AUDIO_SLEEP_MODE_ENABLED      true
+
 
 #endif /* CONFIG_H */

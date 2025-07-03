@@ -9,6 +9,11 @@
 #include "soc/periph_defs.h"
 #include "device.h"
 
+#ifdef ENABLE_AUDIO
+#include "audio/AudioManager.h"
+extern AudioManager audioManager;
+#endif
+
 // 初始化静态变量
 #ifdef ENABLE_SLEEP
 RTC_DATA_ATTR bool PowerManager::sleepEnabled = true;
@@ -598,6 +603,16 @@ void PowerManager::enterLowPowerMode()
 
     // 4. 最后的准备和信息输出
     Serial.println("[电源管理] 🌙 准备进入深度睡眠...");
+    
+#ifdef ENABLE_AUDIO
+    // 播放睡眠模式音频提示
+    if (device_state.audioReady && AUDIO_SLEEP_MODE_ENABLED) {
+        Serial.println("[电源管理] 播放睡眠模式音频提示");
+        audioManager.playSleepModeSound();
+        delay(1000); // 等待音频播放完成
+    }
+#endif
+
 #if defined(ENABLE_IMU) && defined(IMU_INT_PIN)
     Serial.printf("[电源管理] - IMU中断引脚: GPIO%d\n", IMU_INT_PIN);
 #endif

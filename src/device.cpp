@@ -8,6 +8,10 @@
 extern SDManager sdManager;
 #endif
 
+#ifdef ENABLE_AUDIO
+extern AudioManager audioManager;
+#endif
+
 extern const VersionInfo &getVersionInfo();
 
 device_state_t device_state;
@@ -40,6 +44,7 @@ void print_device_info()
         Serial.printf("SD Card Size: %llu MB\n", device_state.sdCardSizeMB);
         Serial.printf("SD Card Free: %llu MB\n", device_state.sdCardFreeMB);
     }
+    Serial.printf("Audio Ready: %d\n", device_state.audioReady);
     Serial.println("--------------------------------");
 }
 
@@ -85,6 +90,7 @@ String device_state_to_json(device_state_t *state)
         doc["sd_size"] = device_state.sdCardSizeMB;
         doc["sd_free"] = device_state.sdCardFreeMB;
     }
+    doc["audio"] = device_state.audioReady;
     return doc.as<String>();
 }
 
@@ -169,6 +175,44 @@ void mqttMessageCallback(const String &topic, const String &payload)
             // {
             //     Serial.println("格式化存储卡失败");
             // }
+        }
+#endif
+#ifdef ENABLE_AUDIO
+        // 音频测试
+        else if (strcmp(cmd, "audio_test") == 0)
+        {
+            Serial.println("执行音频测试");
+            if (device_state.audioReady) {
+                audioManager.testAudio();
+            } else {
+                Serial.println("音频系统未就绪");
+            }
+        }
+        // 播放自定义音频
+        else if (strcmp(cmd, "play_audio") == 0)
+        {
+            // {"cmd": "play_audio", "event": "boot_success"}
+            const char* event = doc["event"];
+            if (event && device_state.audioReady) {
+                if (strcmp(event, "boot_success") == 0) {
+                    audioManager.playBootSuccessSound();
+                } else if (strcmp(event, "wifi_connected") == 0) {
+                    audioManager.playWiFiConnectedSound();
+                } else if (strcmp(event, "gps_fixed") == 0) {
+                    audioManager.playGPSFixedSound();
+                } else if (strcmp(event, "low_battery") == 0) {
+                    audioManager.playLowBatterySound();
+                } else if (strcmp(event, "sleep_mode") == 0) {
+                    audioManager.playSleepModeSound();
+                } else if (strcmp(event, "custom") == 0) {
+                    float frequency = doc["frequency"] | 1000.0;
+                    int duration = doc["duration"] | 200;
+                    audioManager.playCustomBeep(frequency, duration);
+                }
+                Serial.printf("播放音频事件: %s\n", event);
+            } else {
+                Serial.println("音频系统未就绪或事件参数无效");
+            }
         }
 #endif
     }
@@ -356,6 +400,12 @@ void Device::begin()
                 // WiFi模式下可以同时更新WiFi状态
                 device_state.wifiConnected = true;
                 Serial.println("MQTT连接成功");
+#ifdef ENABLE_AUDIO
+                // 播放WiFi连接成功音
+                if (device_state.audioReady && AUDIO_WIFI_CONNECTED_ENABLED) {
+                    audioManager.playWiFiConnectedSound();
+                }
+#endif
 #else
                 // GSM模式下只更新MQTT状态
                 Serial.println("MQTT连接成功");
@@ -388,6 +438,22 @@ void Device::begin()
 
     gpsManager.init();
     Serial.println("GPS初始化完成!");
+
+#ifdef ENABLE_AUDIO
+    // 音频系统初始化
+    if (audioManager.begin()) {
+        device_state.audioReady = true;
+        Serial.println("音频系统初始化成功!");
+        
+        // 播放开机成功音
+        if (AUDIO_BOOT_SUCCESS_ENABLED) {
+            audioManager.playBootSuccessSound();
+        }
+    } else {
+        device_state.audioReady = false;
+        Serial.println("音频系统初始化失败!");
+    }
+#endif
 }
 
 // 通知特定状态变化
@@ -408,6 +474,16 @@ void update_device_state()
                             String(last_state.battery_percentage).c_str(),
                             String(device_state.battery_percentage).c_str());
         state_changes.battery_changed = true;
+        
+#ifdef ENABLE_AUDIO
+        // 当电池电量降到20%以下时播放低电量警告音（避免频繁播放）
+        if (device_state.battery_percentage <= 20 && 
+            last_state.battery_percentage > 20 && 
+            device_state.audioReady && 
+            AUDIO_LOW_BATTERY_ENABLED) {
+            audioManager.playLowBatterySound();
+        }
+#endif
     }
 
     // 检查外部电源状态变化
@@ -456,6 +532,13 @@ void update_device_state()
                             currentGpsReady ? "就绪" : "未就绪");
         state_changes.gps_changed = true;
         device_state.gpsReady = currentGpsReady;
+        
+#ifdef ENABLE_AUDIO
+        // 当GPS从未就绪变为就绪时播放定位成功音
+        if (currentGpsReady && !last_state.gpsReady && device_state.audioReady && AUDIO_GPS_FIXED_ENABLED) {
+            audioManager.playGPSFixedSound();
+        }
+#endif
     }
 
     // 检查LBS状态变化
@@ -523,6 +606,15 @@ void update_device_state()
                             last_state.sdCardReady ? "就绪" : "未就绪",
                             device_state.sdCardReady ? "就绪" : "未就绪");
         state_changes.sdcard_changed = true;
+    }
+
+    // 检查音频状态变化
+    if (device_state.audioReady != last_state.audioReady)
+    {
+        notify_state_change("音频状态",
+                            last_state.audioReady ? "就绪" : "未就绪",
+                            device_state.audioReady ? "就绪" : "未就绪");
+        state_changes.audio_changed = true;
     }
 
     // 更新上一次状态

@@ -56,6 +56,10 @@
 #include "SD/SDManager.h"
 #endif
 
+#ifdef ENABLE_AUDIO
+#include "audio/AudioManager.h"
+#endif
+
 #include "version.h"
 #ifdef BLE_CLIENT
 #include "ble/ble_client.h"
@@ -82,6 +86,11 @@ RTC_DATA_ATTR int bootCount = 0;
 #ifdef ENABLE_SDCARD
 // SD卡管理器
 SDManager sdManager;
+#endif
+
+#ifdef ENABLE_AUDIO
+// 音频管理器
+AudioManager audioManager;
 #endif
 
 /**

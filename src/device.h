@@ -30,6 +30,10 @@
 #include "SD/SDManager.h"
 #endif
 
+#ifdef ENABLE_AUDIO
+#include "audio/AudioManager.h"
+#endif
+
 
 
 typedef struct
@@ -54,6 +58,7 @@ typedef struct
     bool sdCardReady; // SD卡准备状态
     uint64_t sdCardSizeMB; // SD卡大小(MB)
     uint64_t sdCardFreeMB; // SD卡剩余空间(MB)
+    bool audioReady; // 音频系统准备状态
 } device_state_t;
 
 // 添加状态变化跟踪
@@ -69,6 +74,7 @@ typedef struct {
         bool sleep_time_changed;   // 休眠时间变化
         bool led_mode_changed;     // LED模式变化
         bool sdcard_changed;       // SD卡状态变化
+        bool audio_changed;        // 音频状态变化
 } state_changes_t;
 
 void update_device_state();
