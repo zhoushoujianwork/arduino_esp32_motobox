@@ -109,6 +109,50 @@ void taskSystem(void *parameter)
     bat.loop();
 #endif
 
+    // 串口命令处理
+    if (Serial.available()) {
+        String command = Serial.readStringUntil('\n');
+        command.trim();
+        
+        if (command.length() > 0) {
+            Serial.println("收到命令: " + command);
+            
+#ifdef ENABLE_SDCARD
+            // SD卡相关命令
+            if (command.startsWith("sd.")) {
+                sdManager.handleSerialCommand(command);
+            }
+            else
+#endif
+            if (command == "info") {
+                Serial.println("=== 设备信息 ===");
+                Serial.println("设备ID: " + device_state.device_id);
+                Serial.println("固件版本: " + String(device_state.device_firmware_version));
+                Serial.println("WiFi状态: " + String(device_state.wifiConnected ? "已连接" : "未连接"));
+                Serial.println("GPS状态: " + String(device_state.gpsReady ? "就绪" : "未就绪"));
+#ifdef ENABLE_SDCARD
+                Serial.println("SD卡状态: " + String(device_state.sdCardReady ? "就绪" : "未就绪"));
+                if (device_state.sdCardReady) {
+                    Serial.println("SD卡容量: " + String((unsigned long)device_state.sdCardSizeMB) + " MB");
+                    Serial.println("SD卡剩余: " + String((unsigned long)device_state.sdCardFreeMB) + " MB");
+                }
+#endif
+            }
+            else if (command == "help") {
+                Serial.println("=== 可用命令 ===");
+                Serial.println("info - 显示设备信息");
+#ifdef ENABLE_SDCARD
+                Serial.println("sd.info - 显示SD卡信息");
+                Serial.println("sd.test - 测试GPS数据记录");
+#endif
+                Serial.println("help - 显示此帮助信息");
+            }
+            else {
+                Serial.println("未知命令，输入 'help' 查看可用命令");
+            }
+        }
+    }
+
     // 外部电源检测
 #ifdef RTC_INT_PIN
     externalPower.loop();
