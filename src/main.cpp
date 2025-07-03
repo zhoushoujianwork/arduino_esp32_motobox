@@ -426,20 +426,15 @@ void setup()
   Serial.println("step 6.5");
   Serial.println("[GSM] 初始化Air780EG模块...");
   
-  // 手动控制GSM_EN引脚确保模块上电
-  pinMode(GSM_EN, OUTPUT);
-  digitalWrite(GSM_EN, LOW);
-  delay(100);
-  digitalWrite(GSM_EN, HIGH);
-  delay(2000);
-  
-  Serial.printf("[GSM] GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
   Serial.printf("[GSM] 引脚配置 - RX:%d, TX:%d, EN:%d\n", GSM_RX_PIN, GSM_TX_PIN, GSM_EN);
   
   air780eg_modem.setDebug(true);
   if (air780eg_modem.begin()) {
     Serial.println("[GSM] ✅ Air780EG初始化成功");
     device_state.gsmReady = true;
+    
+    // 检查GSM_EN引脚状态
+    Serial.printf("[GSM] GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
     
     // 启用GNSS
     if (air780eg_modem.enableGNSS(true)) {
@@ -451,6 +446,9 @@ void setup()
   } else {
     Serial.println("[GSM] ❌ Air780EG初始化失败");
     device_state.gsmReady = false;
+    
+    // 调试信息
+    Serial.printf("[GSM] GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
   }
 #endif
   //================ GSM模块初始化结束 ================

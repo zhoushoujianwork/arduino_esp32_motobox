@@ -22,12 +22,32 @@ bool Air780EGModem::begin(uint32_t baudrate) {
     
     // 配置使能引脚
     if (_enPin >= 0) {
+        debugPrint("Air780EG: 配置使能引脚 GPIO" + String(_enPin));
         pinMode(_enPin, OUTPUT);
-        digitalWrite(_enPin, HIGH);  // 使能模块
-        delay(100);
+        
+        // 先拉低再拉高，确保模块重启
+        digitalWrite(_enPin, LOW);
+        debugPrint("Air780EG: GSM_EN -> LOW");
+        delay(500);  // 增加延时确保模块完全断电
+        
+        digitalWrite(_enPin, HIGH);
+        debugPrint("Air780EG: GSM_EN -> HIGH");
+        delay(2000); // 等待模块启动
+        
+        // 验证引脚状态
+        bool pinState = digitalRead(_enPin);
+        debugPrint("Air780EG: GSM_EN引脚状态: " + String(pinState ? "HIGH" : "LOW"));
+        
+        if (!pinState) {
+            debugPrint("Air780EG: 警告 - GSM_EN引脚未能拉高！");
+            return false;
+        }
+    } else {
+        debugPrint("Air780EG: 警告 - 未配置使能引脚");
     }
     
     // 初始化串口
+    debugPrint("Air780EG: 初始化串口 - RX:" + String(_rxPin) + ", TX:" + String(_txPin));
     _serial.begin(baudrate, SERIAL_8N1, _rxPin, _txPin);
     delay(1000);
     
