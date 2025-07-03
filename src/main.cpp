@@ -434,11 +434,11 @@ void loop()
     lastMsg = millis();
 
     // 打印设备 ID
-    Serial.println("设备 ID: " + String(device.get_device_id()));
+    // Serial.println("设备 ID: " + String(device.get_device_id()));
 
     update_device_state();
 
-    bat.print_voltage();
+    // bat.print_voltage();
 
     // 获取GPS数据用于调试
     if (gpsManager.isReady())
