@@ -831,13 +831,10 @@ void loop()
 
     // 发送状态消息 - 条件编译
 #ifndef DISABLE_MQTT
-    Serial.println("[MQTT] 准备发送状态消息...");
-    String status = String("设备运行时间: ") + (millis() / 1000) + "秒";
-    bool publishResult1 = mqttManager.publish("test/status", status.c_str());
-    bool publishResult2 = mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
-    Serial.printf("[MQTT] 状态消息发送结果: status=%s, device_info=%s\n", 
-                  publishResult1 ? "成功" : "失败", 
-                  publishResult2 ? "成功" : "失败");
+    Serial.println("[MQTT] 准备发送设备状态消息...");
+    bool publishResult = mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
+    Serial.printf("[MQTT] 设备状态消息发送结果: device_info=%s\n", 
+                  publishResult ? "成功" : "失败");
 #endif
     
     Serial.println("[状态] 定期状态更新完成");
