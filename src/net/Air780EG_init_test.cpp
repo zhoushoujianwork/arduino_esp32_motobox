@@ -3,6 +3,10 @@
  * 用于验证Air780EG模块的基本初始化和GSM_EN引脚控制
  */
 
+#include "config.h"
+
+#ifdef USE_AIR780EG_GSM
+
 #include "Air780EGModem.h"
 
 void air780eg_init_test() {
@@ -115,3 +119,5 @@ void air780eg_continuous_test() {
         }
     }
 }
+
+#endif // USE_AIR780EG_GSM

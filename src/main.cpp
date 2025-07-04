@@ -399,6 +399,30 @@ void setup()
   Serial.println("step 5");
   device.begin();
 
+  // 调试信息：检查各系统初始化状态
+  Serial.println("=== 系统初始化状态检查 ===");
+  Serial.printf("音频系统状态: %s\n", device_state.audioReady ? "✅ 就绪" : "❌ 未就绪");
+  Serial.printf("WiFi状态: %s\n", device_state.wifiConnected ? "✅ 已连接" : "❌ 未连接");
+  Serial.printf("GPS状态: %s\n", device_state.gpsReady ? "✅ 就绪" : "❌ 未就绪");
+  Serial.printf("IMU状态: %s\n", device_state.imuReady ? "✅ 就绪" : "❌ 未就绪");
+  
+#ifndef DISABLE_MQTT
+  Serial.println("MQTT功能: ✅ 已启用");
+#else
+  Serial.println("MQTT功能: ❌ 已禁用");
+#endif
+
+#ifdef ENABLE_AUDIO
+  Serial.println("音频功能: ✅ 编译时已启用");
+  if (device_state.audioReady) {
+    Serial.println("尝试播放测试音频...");
+    audioManager.playBootSuccessSound();
+  }
+#else
+  Serial.println("音频功能: ❌ 编译时未启用");
+#endif
+  Serial.println("=== 系统初始化状态检查结束 ===");
+
   //================ SD卡初始化开始 ================
 #ifdef ENABLE_SDCARD
   Serial.println("step 6");
@@ -480,9 +504,21 @@ void setup()
 
 void loop()
 {
+  // 添加循环计数器用于调试
+  static unsigned long loopCount = 0;
+  static unsigned long lastLoopReport = 0;
+  loopCount++;
+  
+  // 每10秒报告一次循环状态
+  if (millis() - lastLoopReport > 10000) {
+    lastLoopReport = millis();
+    Serial.printf("[主循环] 运行正常，循环计数: %lu, 空闲内存: %d 字节\n", 
+                  loopCount, ESP.getFreeHeap());
+  }
+
   // Air780EG后台初始化处理
 #ifdef USE_AIR780EG_GSM
-  air780eg_modem.handleBackgroundInit();
+  air780eg_modem.loop();
 #endif
 
   // 主循环留空，所有功能都在RTOS任务中处理
@@ -490,16 +526,13 @@ void loop()
 
   // 每 30 秒发送一次状态消息
   static unsigned long lastMsg = 0;
-  if (millis() - lastMsg > 1000)
+  if (millis() - lastMsg > 30000)  // 改为30秒发送一次，减少频率
   {
     lastMsg = millis();
 
-    // 打印设备 ID
-    // Serial.println("设备 ID: " + String(device.get_device_id()));
+    Serial.println("[状态] 定期状态更新开始...");
 
     update_device_state();
-
-    // bat.print_voltage();
 
     // Air780EG状态检查和GNSS数据更新
 #ifdef USE_AIR780EG_GSM
@@ -541,20 +574,17 @@ void loop()
       print_gps_data(gps_data);
     }
 
-    // 显示LBS基站定位信息 - 通过GPS管理器获取
-    // if (gpsManager.isLBSReady()) {
-    //   lbs_data_t lbsData = gpsManager.getLBSData();
-    //   if (lbsData.valid) {
-    //     Serial.printf("[LBS] 位置: %.6f, %.6f, 半径: %d m\n",
-    //                  lbsData.latitude, lbsData.longitude, lbsData.radius);
-    //   }
-    // }
-
     // 发送状态消息 - 条件编译
 #ifndef DISABLE_MQTT
-    // String status = String("设备运行时间: ") + (millis() / 1000) + "秒";
-    // mqttManager.publish("test/status", status.c_str());
-    // mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
+    Serial.println("[MQTT] 准备发送状态消息...");
+    String status = String("设备运行时间: ") + (millis() / 1000) + "秒";
+    bool publishResult1 = mqttManager.publish("test/status", status.c_str());
+    bool publishResult2 = mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
+    Serial.printf("[MQTT] 状态消息发送结果: status=%s, device_info=%s\n", 
+                  publishResult1 ? "成功" : "失败", 
+                  publishResult2 ? "成功" : "失败");
 #endif
+    
+    Serial.println("[状态] 定期状态更新完成");
   }
 }

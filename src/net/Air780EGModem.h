@@ -38,7 +38,7 @@ public:
     void setDebug(bool debug);
     bool isNetworkReady() { return _isNetworkReady; }
     bool isNetworkReadyCheck();
-    void handleBackgroundInit();     // 后台初始化处理
+    void loop();     // 后台初始化处理
     bool isFullyInitialized();      // 检查是否完全初始化完成
     bool reset();
     bool powerOn();

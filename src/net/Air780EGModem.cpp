@@ -3,6 +3,9 @@
  */
 
 #include "Air780EGModem.h"
+
+#ifdef USE_AIR780EG_GSM
+
 #include <HardwareSerial.h>
 
 // 全局实例声明
@@ -760,7 +763,7 @@ void Air780EGModem::debugLBSConfig() {
 }
 
 // 后台初始化处理
-void Air780EGModem::handleBackgroundInit() {
+void Air780EGModem::loop() {
     unsigned long now = millis();
     
     // 每2秒检查一次
@@ -810,3 +813,5 @@ void Air780EGModem::handleBackgroundInit() {
 bool Air780EGModem::isFullyInitialized() {
     return _initState == INIT_COMPLETED;
 }
+
+#endif // USE_AIR780EG_GSM
