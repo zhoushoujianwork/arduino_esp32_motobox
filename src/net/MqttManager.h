@@ -128,6 +128,11 @@ private:
     PubSubClient* _wifiMqttClient;
     bool _isInitialized;
 
+    // GSM MQTT客户端
+#ifdef USE_AIR780EG_GSM
+    Air780EGMqtt* _air780egMqtt;
+#endif
+
     unsigned long _lastNetworkCheckTime;
     static const unsigned long NETWORK_CHECK_INTERVAL = 2000; // 2秒检查一次
     

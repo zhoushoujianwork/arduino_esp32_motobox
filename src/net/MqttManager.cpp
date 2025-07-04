@@ -21,6 +21,9 @@ MqttManager::MqttManager()
       _connectCallback(nullptr), _MqttState(MqttState::DISCONNECTED),
       _connectionStartTime(0), _connectionTimeout(30000),
       _lastConnectionState(false)
+#ifdef USE_AIR780EG_GSM
+      , _air780egMqtt(nullptr)
+#endif
 {
 }
 
@@ -36,6 +39,15 @@ void MqttManager::cleanup()
         delete _wifiMqttClient;
         _wifiMqttClient = nullptr;
     }
+    
+#ifdef USE_AIR780EG_GSM
+    if (_air780egMqtt)
+    {
+        delete _air780egMqtt;
+        _air780egMqtt = nullptr;
+    }
+#endif
+    
     _isInitialized = false;
 }
 
@@ -86,10 +98,31 @@ bool MqttManager::initCellular()
     _connectionStartTime = millis();
 
 #ifdef USE_AIR780EG_GSM
-    debugPrint("使用Air780EG模块 - MQTT功能暂时禁用");
-    // Air780EG的MQTT功能将在后续版本中实现
-    // 目前专注于基本的4G连接和GNSS功能
-    return false;  // 暂时返回false，不启用MQTT
+    debugPrint("初始化Air780EG MQTT模块");
+    
+    // 检查Air780EG模块是否就绪
+    if (!air780eg_modem.isNetworkReady()) {
+        debugPrint("Air780EG网络未就绪，等待网络连接...");
+        // 不返回false，允许初始化继续，稍后重试连接
+    }
+    
+    // 创建Air780EG MQTT客户端，传递modem引用
+    _air780egMqtt = new Air780EGMqtt(air780eg_modem);
+    if (!_air780egMqtt) {
+        debugPrint("Air780EG MQTT客户端创建失败");
+        return false;
+    }
+    
+    // 初始化MQTT客户端
+    if (!_air780egMqtt->begin()) {
+        debugPrint("Air780EG MQTT客户端初始化失败");
+        delete _air780egMqtt;
+        _air780egMqtt = nullptr;
+        return false;
+    }
+    
+    debugPrint("Air780EG MQTT初始化成功");
+    return true;
     
 #elif defined(USE_ML307_GSM)
     debugPrint("初始化ML307模块");
@@ -191,7 +224,19 @@ bool MqttManager::connect()
     debugPrint("MqttManager connect 4G username: " + String(_config.username));
     debugPrint("MqttManager connect 4G password: " + String(_config.password));
     
-#ifdef USE_ML307_GSM
+#ifdef USE_AIR780EG_GSM
+    if (_air780egMqtt) {
+        success = _air780egMqtt->connect(
+            _config.broker,
+            _config.port,
+            _config.clientId,
+            _config.username,
+            _config.password);
+    } else {
+        debugPrint("Air780EG MQTT客户端未初始化");
+        success = false;
+    }
+#elif defined(USE_ML307_GSM)
     success = ml307Mqtt.connect(
         _config.broker,
         _config.port,
@@ -199,7 +244,7 @@ bool MqttManager::connect()
         _config.username,
         _config.password);
 #else
-    // Air780EG MQTT功能暂时禁用
+    debugPrint("未定义GSM模块类型");
     success = false;
 #endif
 #endif

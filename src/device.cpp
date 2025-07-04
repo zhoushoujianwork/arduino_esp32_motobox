@@ -424,52 +424,57 @@ void Device::begin()
     
     if (!mqttManager.begin(config))
     {
-        Serial.println("MQTT 初始化失败，将在运行时重试");
-        return;
+        Serial.println("❌ MQTT 初始化失败，将在运行时重试");
+        Serial.println("⚠️ 继续初始化其他系统...");
+        // 不要return，继续初始化其他系统
     }
-
-    // 设置回调在开始之前
-    mqttManager.onMessage(mqttMessageCallback);
-    mqttManager.onConnect(mqttConnectionCallback);
-    mqttManager.onMqttState([](MqttState state)
-                            {
-        switch (state) {
-            case MqttState::CONNECTED:
+    else
+    {
+        Serial.println("✅ MQTT 初始化成功");
+        
+        // 设置回调在开始之前
+        mqttManager.onMessage(mqttMessageCallback);
+        mqttManager.onConnect(mqttConnectionCallback);
+        mqttManager.onMqttState([](MqttState state)
+                                {
+            switch (state) {
+                case MqttState::CONNECTED:
 #ifdef ENABLE_WIFI
-                // WiFi模式下可以同时更新WiFi状态
-                device_state.wifiConnected = true;
-                Serial.println("MQTT连接成功");
+                    // WiFi模式下可以同时更新WiFi状态
+                    device_state.wifiConnected = true;
+                    Serial.println("MQTT连接成功");
 #ifdef ENABLE_AUDIO
-                // 播放WiFi连接成功音
-                if (device_state.audioReady && AUDIO_WIFI_CONNECTED_ENABLED) {
-                    audioManager.playWiFiConnectedSound();
-                }
+                    // 播放WiFi连接成功音
+                    if (device_state.audioReady && AUDIO_WIFI_CONNECTED_ENABLED) {
+                        audioManager.playWiFiConnectedSound();
+                    }
 #endif
 #else
-                // GSM模式下只更新MQTT状态
-                Serial.println("MQTT连接成功");
+                    // GSM模式下只更新MQTT状态
+                    Serial.println("MQTT连接成功");
 #endif
-                ledManager.setLEDState(LED_BLINK_DUAL);
-                break;
-            case MqttState::DISCONNECTED:
+                    ledManager.setLEDState(LED_BLINK_DUAL);
+                    break;
+                case MqttState::DISCONNECTED:
 #ifdef ENABLE_WIFI
-                device_state.wifiConnected = false;
-                Serial.println("MQTT连接断开");
+                    device_state.wifiConnected = false;
+                    Serial.println("MQTT连接断开");
 #else
-                Serial.println("MQTT连接断开");
+                    Serial.println("MQTT连接断开");
 #endif
-                ledManager.setLEDState(LED_OFF);
-                break;
-            case MqttState::ERROR:
+                    ledManager.setLEDState(LED_OFF);
+                    break;
+                case MqttState::ERROR:
 #ifdef ENABLE_WIFI
-                device_state.wifiConnected = false;
-                Serial.println("MQTT连接错误");
+                    device_state.wifiConnected = false;
+                    Serial.println("MQTT连接错误");
 #else
-                Serial.println("MQTT连接错误");
+                    Serial.println("MQTT连接错误");
 #endif
-                ledManager.setLEDState(LED_BLINK_5_SECONDS);
-                break;
-        } });
+                    ledManager.setLEDState(LED_BLINK_5_SECONDS);
+                    break;
+            } });
+    }
 
     Serial.println("完成底层网络配置，wifi/gsm/mqtt 初始化完成");
 
