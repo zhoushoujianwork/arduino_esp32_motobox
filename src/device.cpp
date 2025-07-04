@@ -348,7 +348,18 @@ void Device::begin()
 #endif
 
 #ifdef ENABLE_IMU
-    imu.begin();
+    Serial.println("[IMU] 开始初始化IMU系统...");
+    Serial.printf("[IMU] 引脚配置 - SDA:%d, SCL:%d, INT:%d\n", IMU_SDA_PIN, IMU_SCL_PIN, IMU_INT_PIN);
+    
+    try {
+        imu.begin();
+        device_state.imuReady = true;  // 设置IMU状态为就绪
+        Serial.println("[IMU] ✅ IMU系统初始化成功，状态已设置为就绪");
+    } catch (...) {
+        device_state.imuReady = false;
+        Serial.println("[IMU] ❌ IMU系统初始化异常");
+    }
+    
     // 如果是从深度睡眠唤醒，检查唤醒原因
     if (isWakeFromDeepSleep)
     {
@@ -364,6 +375,9 @@ void Device::begin()
             break;
         }
     }
+#else
+    device_state.imuReady = false;
+    Serial.println("[IMU] IMU功能未启用 (ENABLE_IMU未定义)");
 #endif
 
 #ifdef ENABLE_GSM
@@ -466,18 +480,29 @@ void Device::begin()
 
 #ifdef ENABLE_AUDIO
     // 音频系统初始化
+    Serial.println("[音频] 开始初始化音频系统...");
+    Serial.printf("[音频] 引脚配置 - WS:%d, BCLK:%d, DATA:%d\n", IIS_S_WS_PIN, IIS_S_BCLK_PIN, IIS_S_DATA_PIN);
+    
     if (audioManager.begin()) {
         device_state.audioReady = true;
-        Serial.println("音频系统初始化成功!");
+        Serial.println("[音频] ✅ 音频系统初始化成功!");
         
         // 播放开机成功音
         if (AUDIO_BOOT_SUCCESS_ENABLED) {
+            Serial.println("[音频] 播放开机成功音...");
             audioManager.playBootSuccessSound();
         }
     } else {
         device_state.audioReady = false;
-        Serial.println("音频系统初始化失败!");
+        Serial.println("[音频] ❌ 音频系统初始化失败!");
+        Serial.println("[音频] 请检查:");
+        Serial.println("[音频] 1. 音频引脚是否正确定义");
+        Serial.println("[音频] 2. I2S硬件是否正常连接");
+        Serial.println("[音频] 3. 引脚是否与其他功能冲突");
     }
+#else
+    device_state.audioReady = false;
+    Serial.println("[音频] 音频功能未启用 (ENABLE_AUDIO未定义)");
 #endif
 }
 
