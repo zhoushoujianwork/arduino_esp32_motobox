@@ -302,7 +302,16 @@ void taskSystem(void *parameter)
                 }
                 else if (command == "mqtt.connect") {
                     Serial.println("尝试连接MQTT...");
-                    mqttManager.forceReconnect();
+                    Serial.println("当前网络状态:");
+#ifdef USE_AIR780EG_GSM
+                    Serial.println("- GSM网络: " + String(air780eg_modem.isNetworkReady() ? "就绪" : "未就绪"));
+                    Serial.println("- 信号强度: " + String(air780eg_modem.getCSQ()));
+#endif
+                    Serial.println("- MQTT状态: " + String((int)mqttManager.getMqttState()));
+                    
+                    // 强制重新连接
+                    bool result = mqttManager.forceReconnect();
+                    Serial.println("连接结果: " + String(result ? "成功" : "失败"));
                 }
                 else if (command == "mqtt.test") {
                     Serial.println("发送MQTT测试消息...");

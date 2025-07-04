@@ -94,17 +94,15 @@ bool MqttManager::initWifi()
 bool MqttManager::initCellular()
 {
     debugPrint("MqttManager initCellular");
-    _MqttState = MqttState::CONNECTING;
+    _MqttState = MqttState::DISCONNECTED;  // 初始状态设为DISCONNECTED
     _connectionStartTime = millis();
 
 #ifdef USE_AIR780EG_GSM
     debugPrint("初始化Air780EG MQTT模块");
     
-    // 检查Air780EG模块是否就绪
-    if (!air780eg_modem.isNetworkReady()) {
-        debugPrint("Air780EG网络未就绪，等待网络连接...");
-        // 不返回false，允许初始化继续，稍后重试连接
-    }
+    // 不检查网络状态，允许初始化继续
+    // 网络连接将在后台任务中完成，MQTT会在网络就绪后自动连接
+    debugPrint("Air780EG MQTT客户端准备就绪，等待网络连接...");
     
     // 创建Air780EG MQTT客户端，传递modem引用
     _air780egMqtt = new Air780EGMqtt(air780eg_modem);
@@ -121,7 +119,7 @@ bool MqttManager::initCellular()
         return false;
     }
     
-    debugPrint("Air780EG MQTT初始化成功");
+    debugPrint("Air780EG MQTT初始化成功，等待网络就绪后连接");
     return true;
     
 #elif defined(USE_ML307_GSM)
@@ -454,19 +452,31 @@ void MqttManager::loop()
             if (false)
 #endif
             {
-                debugPrint("网络已恢复，开始重新连接...");
-                setMqttState(MqttState::CONNECTING);
-                _connectionStartTime = millis();
-            }
-            else
-            {
-                // 尝试重新连接
+                // 网络就绪，尝试连接MQTT
                 unsigned long now = millis();
                 if (now - _lastReconnectAttempt > RECONNECT_INTERVAL)
                 {
                     _lastReconnectAttempt = now;
-                    debugPrint("尝试重新连接网络...");
-                    // 这里可以添加网络重连逻辑
+                    debugPrint("网络已就绪，开始MQTT连接...");
+                    setMqttState(MqttState::CONNECTING);
+                    _connectionStartTime = millis();
+                    
+                    // 立即尝试连接
+                    if (connect())
+                    {
+                        setMqttState(MqttState::CONNECTED);
+                        debugPrint("MQTT连接成功");
+                    }
+                }
+            }
+            else
+            {
+                // 网络未就绪，等待网络连接
+                static unsigned long lastNetworkLog = 0;
+                if (millis() - lastNetworkLog > 10000) // 10秒打印一次日志
+                {
+                    lastNetworkLog = millis();
+                    debugPrint("等待网络连接...");
                 }
             }
             break;
