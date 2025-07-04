@@ -32,6 +32,7 @@ public:
     // 状态检查
     bool checkConnection();
     void setDebug(bool debug);
+    bool testMQTTSupport();  // 测试MQTT功能支持
     
 private:
     Air780EGModem& _modem;

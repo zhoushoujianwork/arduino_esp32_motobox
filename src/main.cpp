@@ -166,6 +166,15 @@ void taskSystem(void *parameter)
                     Serial.printf("网络状态: %s\n", air780eg_modem.isNetworkReady() ? "已连接" : "未连接");
                     Serial.printf("信号强度: %d\n", air780eg_modem.getCSQ());
                 }
+                else if (command == "gsm.mqtt") {
+                    Serial.println("=== Air780EG MQTT测试 ===");
+                    if (device_state.gsmReady) {
+                        // 测试MQTT功能支持
+                        mqttManager.testMQTTSupport();
+                    } else {
+                        Serial.println("GSM模块未就绪，无法测试MQTT功能");
+                    }
+                }
 #else
                 Serial.println("Air780EG模块未启用");
 #endif
@@ -436,6 +445,7 @@ void taskSystem(void *parameter)
                 Serial.println("  gsm.test   - 测试AT命令和波特率");
                 Serial.println("  gsm.reset  - 重置Air780EG模块");
                 Serial.println("  gsm.info   - 显示模块状态信息");
+                Serial.println("  gsm.mqtt   - 测试MQTT功能支持");
                 Serial.println("");
 #endif
                 Serial.println("提示: 命令不区分大小写");

@@ -758,6 +758,48 @@ void MqttManager::debugPrint(const String &msg)
     }
 }
 
+void MqttManager::testMQTTSupport() {
+    debugPrint("开始测试MQTT功能支持");
+    
+#ifdef USE_AIR780EG_GSM
+    if (_air780egMqtt) {
+        debugPrint("使用Air780EG MQTT实现");
+        bool result = _air780egMqtt->testMQTTSupport();
+        if (result) {
+            debugPrint("✅ Air780EG MQTT功能测试通过");
+        } else {
+            debugPrint("❌ Air780EG MQTT功能测试失败");
+        }
+    } else {
+        debugPrint("❌ Air780EG MQTT对象未初始化");
+    }
+#elif defined(USE_ML307_GSM)
+    if (_ml307Mqtt) {
+        debugPrint("使用ML307 MQTT实现");
+        // ML307的测试函数可以后续添加
+        debugPrint("ML307 MQTT测试功能待实现");
+    } else {
+        debugPrint("❌ ML307 MQTT对象未初始化");
+    }
+#elif defined(ENABLE_WIFI)
+    debugPrint("使用WiFi MQTT实现");
+    if (_wifiClient && _wifiMqttClient) {
+        debugPrint("✅ WiFi MQTT客户端已初始化");
+        debugPrint("WiFi连接状态: " + String(WiFi.isConnected() ? "已连接" : "未连接"));
+        if (WiFi.isConnected()) {
+            debugPrint("WiFi IP: " + WiFi.localIP().toString());
+            debugPrint("WiFi信号强度: " + String(WiFi.RSSI()) + " dBm");
+        }
+    } else {
+        debugPrint("❌ WiFi MQTT客户端未初始化");
+    }
+#else
+    debugPrint("❌ 未启用任何MQTT实现");
+#endif
+    
+    debugPrint("MQTT测试完成");
+}
+
 void MqttManager::wifiMqttCallback(char *topic, byte *payload, unsigned int length)
 {
     if (_messageCallback)

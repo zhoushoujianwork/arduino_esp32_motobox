@@ -97,6 +97,9 @@ public:
     // 消息处理
     void loop();
 
+    // 测试和调试功能
+    void testMQTTSupport();  // 测试MQTT功能支持
+
     // 网络状态
     bool isNetworkConnected() const;
     String getNetworkInfo() const;
