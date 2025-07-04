@@ -376,67 +376,6 @@ void taskWiFi(void *parameter)
 }
 #endif
 
-// Air780EG后台初始化状态
-enum Air780EGInitState {
-  AIR780EG_INIT_IDLE,
-  AIR780EG_INIT_WAITING_NETWORK,
-  AIR780EG_INIT_ENABLING_GNSS,
-  AIR780EG_INIT_COMPLETED
-};
-
-Air780EGInitState air780eg_init_state = AIR780EG_INIT_IDLE;
-unsigned long air780eg_init_start_time = 0;
-
-#ifdef USE_AIR780EG_GSM
-void handleAir780EGBackgroundInit() {
-  static unsigned long lastCheck = 0;
-  unsigned long now = millis();
-  
-  // 每2秒检查一次
-  if (now - lastCheck < 2000) {
-    return;
-  }
-  lastCheck = now;
-  
-  switch (air780eg_init_state) {
-    case AIR780EG_INIT_IDLE:
-      if (device_state.gsmReady) {
-        Serial.println("[GSM] 🔄 开始后台网络注册...");
-        air780eg_init_state = AIR780EG_INIT_WAITING_NETWORK;
-        air780eg_init_start_time = now;
-      }
-      break;
-      
-    case AIR780EG_INIT_WAITING_NETWORK:
-      if (air780eg_modem.isNetworkReady()) {
-        Serial.println("[GSM] ✅ 网络注册成功");
-        Serial.println("[GSM] 🛰️ 启用GNSS...");
-        air780eg_init_state = AIR780EG_INIT_ENABLING_GNSS;
-      } else if (now - air780eg_init_start_time > 60000) { // 60秒超时
-        Serial.println("[GSM] ⚠️ 网络注册超时，将继续重试");
-        air780eg_init_start_time = now; // 重置计时器
-      }
-      break;
-      
-    case AIR780EG_INIT_ENABLING_GNSS:
-      if (air780eg_modem.enableGNSS(true)) {
-        Serial.println("[GSM] ✅ GNSS启用成功");
-        air780eg_modem.setGNSSUpdateRate(1);
-        air780eg_init_state = AIR780EG_INIT_COMPLETED;
-        Serial.println("[GSM] 🎉 Air780EG完全初始化完成");
-      } else {
-        Serial.println("[GSM] ⚠️ GNSS启用失败，将重试");
-        // 继续保持在这个状态，下次再试
-      }
-      break;
-      
-    case AIR780EG_INIT_COMPLETED:
-      // 初始化完成，不需要做任何事
-      break;
-  }
-}
-#endif
-
 void setup()
 {
   Serial.begin(115200);
@@ -543,7 +482,7 @@ void loop()
 {
   // Air780EG后台初始化处理
 #ifdef USE_AIR780EG_GSM
-  handleAir780EGBackgroundInit();
+  air780eg_modem.handleBackgroundInit();
 #endif
 
   // 主循环留空，所有功能都在RTOS任务中处理

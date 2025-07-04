@@ -12,6 +12,7 @@ Air780EGModem::Air780EGModem(HardwareSerial& serial, int rxPin, int txPin, int e
     : _serial(serial), _rxPin(rxPin), _txPin(txPin), _enPin(enPin),
       _debug(false), _lbsEnabled(false), _gnssEnabled(false),
       _isNetworkReady(false), _lastNetworkReadyCheckTime(0),
+      _initState(INIT_IDLE), _initStartTime(0), _lastInitCheck(0),
       _lastLBSUpdate(0), _isLBSLoading(false),
       _lastCMEErrorTime(0), _cmeErrorCount(0), _backoffDelay(0),
       _lastGNSSUpdate(0), _gnssUpdateRate(1) {
@@ -117,6 +118,12 @@ bool Air780EGModem::initModem() {
     }
     
     debugPrint("Air780EG: 初始化完成");
+    
+    // 启动后台初始化状态机
+    _initState = INIT_IDLE;
+    _initStartTime = millis();
+    _lastInitCheck = 0;
+    
     return true;
 }
 
@@ -750,4 +757,56 @@ void Air780EGModem::debugLBSConfig() {
     Serial.println("LBS状态: " + String(_lbsEnabled ? "已启用" : "未启用"));
     Serial.println("最后更新: " + String(millis() - _lastLBSUpdate) + "ms前");
     Serial.println("原始数据: " + _lastLBSLocation);
+}
+
+// 后台初始化处理
+void Air780EGModem::handleBackgroundInit() {
+    unsigned long now = millis();
+    
+    // 每2秒检查一次
+    if (now - _lastInitCheck < 2000) {
+        return;
+    }
+    _lastInitCheck = now;
+    
+    switch (_initState) {
+        case INIT_IDLE:
+            // 开始后台初始化
+            debugPrint("Air780EG: 🔄 开始后台网络注册...");
+            _initState = INIT_WAITING_NETWORK;
+            _initStartTime = now;
+            break;
+            
+        case INIT_WAITING_NETWORK:
+            if (isNetworkReady()) {
+                debugPrint("Air780EG: ✅ 网络注册成功");
+                debugPrint("Air780EG: 🛰️ 启用GNSS...");
+                _initState = INIT_ENABLING_GNSS;
+            } else if (now - _initStartTime > 60000) { // 60秒超时
+                debugPrint("Air780EG: ⚠️ 网络注册超时，将继续重试");
+                _initStartTime = now; // 重置计时器
+            }
+            break;
+            
+        case INIT_ENABLING_GNSS:
+            if (enableGNSS(true)) {
+                debugPrint("Air780EG: ✅ GNSS启用成功");
+                setGNSSUpdateRate(1);
+                _initState = INIT_COMPLETED;
+                debugPrint("Air780EG: 🎉 完全初始化完成");
+            } else {
+                debugPrint("Air780EG: ⚠️ GNSS启用失败，将重试");
+                // 继续保持在这个状态，下次再试
+            }
+            break;
+            
+        case INIT_COMPLETED:
+            // 初始化完成，不需要做任何事
+            break;
+    }
+}
+
+// 检查是否完全初始化完成
+bool Air780EGModem::isFullyInitialized() {
+    return _initState == INIT_COMPLETED;
 }

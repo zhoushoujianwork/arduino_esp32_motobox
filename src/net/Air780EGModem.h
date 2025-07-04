@@ -38,6 +38,8 @@ public:
     void setDebug(bool debug);
     bool isNetworkReady() { return _isNetworkReady; }
     bool isNetworkReadyCheck();
+    void handleBackgroundInit();     // 后台初始化处理
+    bool isFullyInitialized();      // 检查是否完全初始化完成
     bool reset();
     bool powerOn();
     bool powerOff();
@@ -105,6 +107,17 @@ private:
     // 网络状态
     bool _isNetworkReady;
     unsigned long _lastNetworkReadyCheckTime;
+    
+    // 后台初始化状态
+    enum InitState {
+        INIT_IDLE,
+        INIT_WAITING_NETWORK,
+        INIT_ENABLING_GNSS,
+        INIT_COMPLETED
+    };
+    InitState _initState;
+    unsigned long _initStartTime;
+    unsigned long _lastInitCheck;
     
     // LBS相关私有成员
     unsigned long _lastLBSUpdate;
