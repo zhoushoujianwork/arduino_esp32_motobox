@@ -412,6 +412,26 @@ void Device::begin()
     config.keepAlive = MQTT_KEEP_ALIVE;
     config.cleanSession = true; // 是否清除会话，true: 清除，false: 保留
 
+    // 打印MQTT配置信息
+    Serial.println("=== MQTT配置信息 ===");
+    Serial.printf("MQTT服务器: %s\n", config.broker);
+    Serial.printf("MQTT端口: %d\n", config.port);
+    Serial.printf("MQTT用户名: %s\n", config.username);
+    Serial.printf("MQTT密码: %s\n", strlen(config.password) > 0 ? "***已设置***" : "***未设置***");
+    Serial.printf("保持连接: %d秒\n", config.keepAlive);
+    Serial.printf("清除会话: %s\n", config.cleanSession ? "是" : "否");
+    
+#ifdef USE_AIR780EG_GSM
+    Serial.println("连接方式: Air780EG 4G网络");
+#elif defined(USE_ML307_GSM)
+    Serial.println("连接方式: ML307 4G网络");
+#elif defined(ENABLE_WIFI)
+    Serial.println("连接方式: WiFi网络");
+#else
+    Serial.println("连接方式: 未定义");
+#endif
+    Serial.println("=== MQTT配置信息结束 ===");
+
     // 初始化 MQTT 管理器
     mqttManager.setDebug(true);
     

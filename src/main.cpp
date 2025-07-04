@@ -191,6 +191,32 @@ void taskSystem(void *parameter)
                     Serial.println("信号强度: " + String(air780eg_modem.getCSQ()));
                 }
 #endif
+                
+                // MQTT连接状态和配置信息
+#ifndef DISABLE_MQTT
+                MqttState mqttState = mqttManager.getMqttState();
+                String stateStr = "未知";
+                switch(mqttState) {
+                    case MqttState::CONNECTED: stateStr = "✅ 已连接"; break;
+                    case MqttState::DISCONNECTED: stateStr = "❌ 未连接"; break;
+                    case MqttState::CONNECTING: stateStr = "🔄 连接中"; break;
+                    case MqttState::ERROR: stateStr = "⚠️ 错误"; break;
+                }
+                Serial.println("MQTT状态: " + stateStr);
+                Serial.println("MQTT服务器: " + String(MQTT_BROKER) + ":" + String(MQTT_PORT));
+                
+                // 显示已注册的主题
+                Serial.println("--- MQTT主题配置 ---");
+                String deviceId = device_state.device_id;
+                String baseTopic = "vehicle/v1/" + deviceId;
+                Serial.println("基础主题: " + baseTopic);
+                Serial.println("设备信息: " + baseTopic + "/telemetry/device");
+                Serial.println("位置信息: " + baseTopic + "/telemetry/location");
+                Serial.println("运动信息: " + baseTopic + "/telemetry/motion");
+                Serial.println("控制命令: " + baseTopic + "/ctrl/#");
+#else
+                Serial.println("MQTT功能: ❌ 已禁用");
+#endif
 #endif
                 Serial.println("");
                 Serial.println("--- 传感器状态 ---");

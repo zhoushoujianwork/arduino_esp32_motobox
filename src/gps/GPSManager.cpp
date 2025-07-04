@@ -185,7 +185,7 @@ void GPSManager::handleLBSUpdate()
 #ifdef USE_AIR780EG_GSM
     // Air780EG的LBS数据更新
     // TODO: 实现Air780EG的LBS数据获取
-    debugPrint("Air780EG LBS数据更新 - 待实现");
+    // debugPrint("Air780EG LBS数据更新 - 待实现");
 #elif defined(USE_ML307_GSM)
     if (ml307_at.updateLBSData())
     {
