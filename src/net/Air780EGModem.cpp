@@ -266,12 +266,63 @@ String Air780EGModem::getNetworkType() {
 bool Air780EGModem::enableGNSS(bool enable) {
     if (enable) {
         debugPrint("Air780EG: 启用GNSS");
+        
+        // 1. 开启GNSS电源
         if (sendAT("AT+CGNSPWR=1", "OK", 3000)) {
             _gnssEnabled = true;
             delay(1000);
-            // 设置NMEA输出
+            
+            // 2. 设置NMEA输出
             sendAT("AT+CGNSSEQ=\"RMC\"");
+            
+            // 3. 检查GNSS状态并提供调试信息
+            delay(2000); // 等待GNSS启动
+            String response = sendATWithResponse("AT+CGNSINF", 3000);
+            
+            if (response.length() > 0) {
+                debugPrint("Air780EG: GNSS状态响应: " + response);
+                
+                // 解析CGNSINF响应格式：power,fix,date,time,lat,lon,alt,speed,course,fix_mode,reserved1,hdop,pdop,vdop,reserved2,view_satellites,used_satellites,reserved3,cn0_max,hpa,vpa
+                int commaCount = 0;
+                int lastPos = 0;
+                String fields[22];
+                
+                for (int i = 0; i < response.length() && commaCount < 21; i++) {
+                    if (response.charAt(i) == ',') {
+                        fields[commaCount] = response.substring(lastPos, i);
+                        lastPos = i + 1;
+                        commaCount++;
+                    }
+                }
+                if (commaCount < 21) {
+                    fields[commaCount] = response.substring(lastPos);
+                }
+                
+                if (commaCount >= 15) {
+                    String powerStatus = fields[0];
+                    String fixStatus = fields[1];
+                    String viewSats = fields[14];
+                    String usedSats = fields[15];
+                    
+                    debugPrint("Air780EG: GNSS电源: " + String(powerStatus == "1" ? "开启" : "关闭"));
+                    debugPrint("Air780EG: 定位状态: " + String(fixStatus == "1" ? "已定位" : "未定位"));
+                    debugPrint("Air780EG: 可见卫星: " + viewSats + " 颗");
+                    debugPrint("Air780EG: 使用卫星: " + usedSats + " 颗");
+                    
+                    if (fixStatus == "0") {
+                        debugPrint("Air780EG: ⚠️ GNSS定位建议:");
+                        debugPrint("  • 确保设备在室外或靠近窗户");
+                        debugPrint("  • 检查GNSS天线连接");
+                        debugPrint("  • 冷启动可能需要5-15分钟");
+                        debugPrint("  • 当前信号强度: CSQ=" + String(getCSQ()));
+                    }
+                }
+            }
+            
             return true;
+        } else {
+            debugPrint("Air780EG: GNSS电源开启失败");
+            return false;
         }
     } else {
         debugPrint("Air780EG: 禁用GNSS");
@@ -286,6 +337,57 @@ bool Air780EGModem::enableGNSS(bool enable) {
 bool Air780EGModem::isGNSSEnabled() {
     String response = sendATWithResponse("AT+CGNSPWR?", 2000);
     return response.indexOf("+CGNSPWR: 1") >= 0;
+}
+
+String Air780EGModem::getGNSSInfo() {
+    String response = sendATWithResponse("AT+CGNSINF", 3000);
+    if (response.length() > 0) {
+        // 解析并格式化GNSS信息
+        int commaCount = 0;
+        int lastPos = 0;
+        String fields[22];
+        
+        for (int i = 0; i < response.length() && commaCount < 21; i++) {
+            if (response.charAt(i) == ',') {
+                fields[commaCount] = response.substring(lastPos, i);
+                lastPos = i + 1;
+                commaCount++;
+            }
+        }
+        if (commaCount < 21) {
+            fields[commaCount] = response.substring(lastPos);
+        }
+        
+        if (commaCount >= 15) {
+            String info = "GNSS状态: ";
+            info += (fields[0] == "1") ? "开启" : "关闭";
+            info += ", 定位: ";
+            info += (fields[1] == "1") ? "成功" : "失败";
+            info += ", 可见卫星: " + fields[14];
+            info += ", 使用卫星: " + fields[15];
+            
+            if (fields[1] == "1" && fields[4].length() > 0 && fields[5].length() > 0) {
+                info += ", 位置: " + fields[4] + "," + fields[5];
+            }
+            
+            return info;
+        }
+    }
+    return "GNSS信息获取失败";
+}
+
+// 检查GNSS是否已定位
+bool Air780EGModem::isGNSSFixed() {
+    String response = sendATWithResponse("AT+CGNSINF", 2000);
+    if (response.length() > 0) {
+        int firstComma = response.indexOf(',');
+        int secondComma = response.indexOf(',', firstComma + 1);
+        if (firstComma > 0 && secondComma > 0) {
+            String fixStatus = response.substring(firstComma + 1, secondComma);
+            return fixStatus == "1";
+        }
+    }
+    return false;
 }
 
 bool Air780EGModem::updateGNSSData() {

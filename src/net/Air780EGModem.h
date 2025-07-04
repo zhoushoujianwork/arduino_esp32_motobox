@@ -63,6 +63,8 @@ public:
     // GNSS 功能
     bool enableGNSS(bool enable);
     bool isGNSSEnabled();
+    bool isGNSSFixed();           // 检查是否已定位
+    String getGNSSInfo();         // 获取GNSS详细信息
     bool updateGNSSData();
     GNSSData getGNSSData();
     bool isGNSSDataValid();
