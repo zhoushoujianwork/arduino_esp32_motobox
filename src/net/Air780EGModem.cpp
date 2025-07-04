@@ -814,4 +814,76 @@ bool Air780EGModem::isFullyInitialized() {
     return _initState == INIT_COMPLETED;
 }
 
+// 测试AT命令
+void Air780EGModem::testATCommand() {
+    Serial.println("=== AT命令测试开始 ===");
+    
+    // 测试不同波特率
+    int baudRates[] = {9600, 115200, 38400, 57600, 19200};
+    int numBaudRates = sizeof(baudRates) / sizeof(baudRates[0]);
+    
+    for (int i = 0; i < numBaudRates; i++) {
+        Serial.printf("测试波特率: %d\n", baudRates[i]);
+        
+        _serial.end();
+        delay(100);
+        _serial.begin(baudRates[i], SERIAL_8N1, _rxPin, _txPin);
+        delay(500);
+        
+        // 清空缓冲区
+        while (_serial.available()) {
+            _serial.read();
+        }
+        
+        // 发送AT命令
+        _serial.println("AT");
+        delay(100);
+        
+        String response = "";
+        unsigned long startTime = millis();
+        while (millis() - startTime < 1000) {
+            if (_serial.available()) {
+                response += (char)_serial.read();
+            }
+        }
+        
+        Serial.printf("响应: '%s'\n", response.c_str());
+        
+        if (response.indexOf("OK") >= 0) {
+            Serial.printf("✅ 找到正确波特率: %d\n", baudRates[i]);
+            
+            // 测试更多AT命令
+            Serial.println("测试更多AT命令...");
+            
+            // 测试模块信息
+            _serial.println("ATI");
+            delay(500);
+            response = "";
+            startTime = millis();
+            while (millis() - startTime < 1000) {
+                if (_serial.available()) {
+                    response += (char)_serial.read();
+                }
+            }
+            Serial.printf("模块信息: %s\n", response.c_str());
+            
+            // 测试SIM卡状态
+            _serial.println("AT+CPIN?");
+            delay(500);
+            response = "";
+            startTime = millis();
+            while (millis() - startTime < 1000) {
+                if (_serial.available()) {
+                    response += (char)_serial.read();
+                }
+            }
+            Serial.printf("SIM卡状态: %s\n", response.c_str());
+            
+            break;
+        }
+    }
+    
+    Serial.println("=== AT命令测试结束 ===");
+}
+
 #endif // USE_AIR780EG_GSM

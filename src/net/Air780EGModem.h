@@ -94,6 +94,7 @@ public:
     void debugNetworkInfo();
     void debugGNSSInfo();
     void debugLBSConfig();
+    void testATCommand();  // 添加AT命令测试方法
 
 private:
     HardwareSerial& _serial;

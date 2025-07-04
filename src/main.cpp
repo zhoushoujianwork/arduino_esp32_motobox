@@ -140,6 +140,36 @@ void taskSystem(void *parameter)
             if (command.startsWith("sd.")) {
                 sdManager.handleSerialCommand(command);
             }
+            // Air780EG调试命令
+            else if (command.startsWith("gsm.")) {
+#ifdef USE_AIR780EG_GSM
+                if (command == "gsm.test") {
+                    Serial.println("=== Air780EG 测试 ===");
+                    Serial.printf("GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
+                    Serial.printf("RX引脚: %d, TX引脚: %d\n", GSM_RX_PIN, GSM_TX_PIN);
+                    
+                    // 尝试发送AT命令
+                    Serial.println("发送AT命令测试...");
+                    air780eg_modem.testATCommand();
+                }
+                else if (command == "gsm.reset") {
+                    Serial.println("重置Air780EG模块...");
+                    digitalWrite(GSM_EN, LOW);
+                    delay(1000);
+                    digitalWrite(GSM_EN, HIGH);
+                    delay(2000);
+                    Serial.println("重置完成");
+                }
+                else if (command == "gsm.info") {
+                    Serial.println("=== Air780EG 信息 ===");
+                    Serial.printf("模块状态: %s\n", device_state.gsmReady ? "就绪" : "未就绪");
+                    Serial.printf("网络状态: %s\n", air780eg_modem.isNetworkReady() ? "已连接" : "未连接");
+                    Serial.printf("信号强度: %d\n", air780eg_modem.getCSQ());
+                }
+#else
+                Serial.println("Air780EG模块未启用");
+#endif
+            }
             else
 #endif
             if (command == "info") {
@@ -206,6 +236,13 @@ void taskSystem(void *parameter)
                 Serial.println("  sd.session - 显示当前GPS会话信息");
                 Serial.println("  sd.finish  - 结束当前GPS会话");
                 Serial.println("  sd.dirs    - 检查和创建目录结构");
+                Serial.println("");
+#endif
+#ifdef USE_AIR780EG_GSM
+                Serial.println("Air780EG命令:");
+                Serial.println("  gsm.test   - 测试AT命令和波特率");
+                Serial.println("  gsm.reset  - 重置Air780EG模块");
+                Serial.println("  gsm.info   - 显示模块状态信息");
                 Serial.println("");
 #endif
                 Serial.println("提示: 命令不区分大小写");
@@ -398,6 +435,31 @@ void setup()
 
   Serial.println("step 5");
   device.begin();
+
+  // 调试信息：检查各系统初始化状态
+  Serial.println("=== 系统初始化状态检查 ===");
+  Serial.printf("音频系统状态: %s\n", device_state.audioReady ? "✅ 就绪" : "❌ 未就绪");
+  Serial.printf("WiFi状态: %s\n", device_state.wifiConnected ? "✅ 已连接" : "❌ 未连接");
+  Serial.printf("GPS状态: %s\n", device_state.gpsReady ? "✅ 就绪" : "❌ 未就绪");
+  Serial.printf("IMU状态: %s\n", device_state.imuReady ? "✅ 就绪" : "❌ 未就绪");
+  Serial.printf("GSM状态: %s\n", device_state.gsmReady ? "✅ 就绪" : "❌ 未就绪");
+  
+#ifndef DISABLE_MQTT
+  Serial.println("MQTT功能: ✅ 已启用");
+#else
+  Serial.println("MQTT功能: ❌ 已禁用");
+#endif
+
+#ifdef ENABLE_AUDIO
+  Serial.println("音频功能: ✅ 编译时已启用");
+  if (device_state.audioReady) {
+    Serial.println("尝试播放测试音频...");
+    audioManager.playBootSuccessSound();
+  }
+#else
+  Serial.println("音频功能: ❌ 编译时未启用");
+#endif
+  Serial.println("=== 系统初始化状态检查结束 ===");
 
   // 调试信息：检查各系统初始化状态
   Serial.println("=== 系统初始化状态检查 ===");
