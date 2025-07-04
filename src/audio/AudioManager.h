@@ -75,6 +75,22 @@ public:
     
     // 测试功能
     bool testAudio();
+
+private:
+    // 播放状态管理，防止重复播放
+    struct PlaybackState {
+        unsigned long lastBootSound = 0;
+        unsigned long lastWiFiSound = 0;
+        unsigned long lastGPSSound = 0;
+        unsigned long lastBatterySound = 0;
+        unsigned long lastSleepSound = 0;
+        static const unsigned long MIN_INTERVAL = 3000; // 3秒内不重复播放同类音频
+    };
+    
+    PlaybackState playbackState;
+    
+    // 检查是否可以播放指定类型的音频
+    bool canPlaySound(unsigned long& lastPlayTime);
 };
 
 #endif // AUDIOMANAGER_H

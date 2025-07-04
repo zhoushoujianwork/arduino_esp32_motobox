@@ -168,7 +168,21 @@ bool AudioManager::playBeepSequence(const float* frequencies, const int* duratio
     return true;
 }
 
+bool AudioManager::canPlaySound(unsigned long& lastPlayTime) {
+    unsigned long currentTime = millis();
+    if (currentTime - lastPlayTime < PlaybackState::MIN_INTERVAL) {
+        ESP_LOGW(TAG, "音频播放间隔太短，跳过播放 (间隔: %lu ms)", currentTime - lastPlayTime);
+        return false;
+    }
+    lastPlayTime = currentTime;
+    return true;
+}
+
 bool AudioManager::playBootSuccessSound() {
+    if (!canPlaySound(playbackState.lastBootSound)) {
+        return false;
+    }
+    
     ESP_LOGI(TAG, "Playing boot success sound with welcome voice");
     
     // 播放中文语音"大菠萝车机,扎西德勒"
@@ -176,6 +190,10 @@ bool AudioManager::playBootSuccessSound() {
 }
 
 bool AudioManager::playWiFiConnectedSound() {
+    if (!canPlaySound(playbackState.lastWiFiSound)) {
+        return false;
+    }
+    
     ESP_LOGI(TAG, "Playing WiFi connected sound");
     
     // WiFi连接音：双音调
@@ -186,6 +204,10 @@ bool AudioManager::playWiFiConnectedSound() {
 }
 
 bool AudioManager::playGPSFixedSound() {
+    if (!canPlaySound(playbackState.lastGPSSound)) {
+        return false;
+    }
+    
     ESP_LOGI(TAG, "Playing GPS fixed sound");
     
     // GPS定位音：三短音
@@ -196,6 +218,10 @@ bool AudioManager::playGPSFixedSound() {
 }
 
 bool AudioManager::playLowBatterySound() {
+    if (!canPlaySound(playbackState.lastBatterySound)) {
+        return false;
+    }
+    
     ESP_LOGI(TAG, "Playing low battery sound");
     
     // 低电量警告音：下降音调
@@ -206,6 +232,10 @@ bool AudioManager::playLowBatterySound() {
 }
 
 bool AudioManager::playSleepModeSound() {
+    if (!canPlaySound(playbackState.lastSleepSound)) {
+        return false;
+    }
+    
     ESP_LOGI(TAG, "Playing sleep mode sound");
     
     // 休眠模式音：渐弱音调

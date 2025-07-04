@@ -512,10 +512,12 @@ void Device::begin()
         device_state.audioReady = true;
         Serial.println("[音频] ✅ 音频系统初始化成功!");
         
-        // 播放开机成功音
-        if (AUDIO_BOOT_SUCCESS_ENABLED) {
+        // 播放开机成功音（只播放一次）
+        static bool bootSoundPlayed = false;
+        if (AUDIO_BOOT_SUCCESS_ENABLED && !bootSoundPlayed) {
             Serial.println("[音频] 播放开机成功音...");
             audioManager.playBootSuccessSound();
+            bootSoundPlayed = true;
         }
     } else {
         device_state.audioReady = false;
