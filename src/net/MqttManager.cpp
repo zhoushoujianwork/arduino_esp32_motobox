@@ -366,6 +366,22 @@ void MqttManager::loop()
         }
 
         debugPrint("MqttManager loop MqttState: " + String((int)_MqttState));
+        
+        // 添加详细的状态调试信息
+        static unsigned long lastDebugTime = 0;
+        if (millis() - lastDebugTime > 10000) { // 10秒打印一次详细状态
+            lastDebugTime = millis();
+            debugPrint("=== MQTT状态详情 ===");
+            debugPrint("当前状态: " + String((int)_MqttState));
+            debugPrint("网络就绪: " + String(air780eg_modem.isNetworkReady()));
+            debugPrint("MQTT连接: " + String(isMqttConnected()));
+            debugPrint("Air780EG客户端: " + String(_air780egMqtt != nullptr));
+            if (_air780egMqtt) {
+                debugPrint("客户端连接状态: " + String(_air780egMqtt->isConnected()));
+            }
+            debugPrint("==================");
+        }
+        
         switch (_MqttState)
         {
         case MqttState::CONNECTING:
@@ -445,7 +461,9 @@ void MqttManager::loop()
         {
             // 检查网络是否恢复
 #ifdef USE_AIR780EG_GSM
-            if (air780eg_modem.isNetworkReady())
+            bool networkReady = air780eg_modem.isNetworkReady();
+            debugPrint("DISCONNECTED状态 - 网络就绪: " + String(networkReady));
+            if (networkReady)
 #elif defined(USE_ML307_GSM)
             if (ml307_at.isNetworkReady())
 #else
@@ -454,18 +472,24 @@ void MqttManager::loop()
             {
                 // 网络就绪，尝试连接MQTT
                 unsigned long now = millis();
+                debugPrint("网络就绪，上次重连时间: " + String(now - _lastReconnectAttempt) + "ms前");
                 if (now - _lastReconnectAttempt > RECONNECT_INTERVAL)
                 {
                     _lastReconnectAttempt = now;
                     debugPrint("网络已就绪，开始MQTT连接...");
+                    debugPrint("调用connect()方法...");
                     setMqttState(MqttState::CONNECTING);
                     _connectionStartTime = millis();
                     
                     // 立即尝试连接
-                    if (connect())
+                    bool connectResult = connect();
+                    debugPrint("connect()结果: " + String(connectResult));
+                    if (connectResult)
                     {
                         setMqttState(MqttState::CONNECTED);
                         debugPrint("MQTT连接成功");
+                    } else {
+                        debugPrint("MQTT连接失败，保持CONNECTING状态等待重试");
                     }
                 }
             }
