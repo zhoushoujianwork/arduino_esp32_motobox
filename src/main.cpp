@@ -16,6 +16,9 @@
 #include "led/LEDManager.h"
 #include "device.h"
 
+// 函数声明
+void handleSerialCommand();
+
 // 条件包含 MQTT 管理器头文件
 #if (defined(ENABLE_GSM) || defined(ENABLE_WIFI)) && !defined(DISABLE_MQTT)
 #include "net/MqttManager.h"
@@ -130,426 +133,7 @@ void taskSystem(void *parameter)
     // 串口命令处理
     if (Serial.available())
     {
-      String command = Serial.readStringUntil('\n');
-      command.trim();
-
-      if (command.length() > 0)
-      {
-        Serial.println(">>> 收到命令: " + command);
-
-#ifdef ENABLE_SDCARD
-        // SD卡相关命令
-        if (command.startsWith("sd."))
-        {
-          sdManager.handleSerialCommand(command);
-        }
-        // Air780EG调试命令
-        else if (command.startsWith("gsm."))
-        {
-#ifdef USE_AIR780EG_GSM
-          if (command == "gsm.test")
-          {
-            Serial.println("=== Air780EG 测试 ===");
-            Serial.printf("GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
-            Serial.printf("RX引脚: %d, TX引脚: %d\n", GSM_RX_PIN, GSM_TX_PIN);
-
-            // 尝试发送AT命令
-            Serial.println("发送AT命令测试...");
-            air780eg_modem.testATCommand();
-          }
-          else if (command == "gsm.reset")
-          {
-            Serial.println("重置Air780EG模块...");
-            digitalWrite(GSM_EN, LOW);
-            delay(1000);
-            digitalWrite(GSM_EN, HIGH);
-            delay(2000);
-            Serial.println("重置完成");
-          }
-          else if (command == "gsm.info")
-          {
-            Serial.println("=== Air780EG 信息 ===");
-            Serial.printf("模块状态: %s\n", device_state.gsmReady ? "就绪" : "未就绪");
-            Serial.printf("网络状态: %s\n", air780eg_modem.isNetworkReady() ? "已连接" : "未连接");
-            Serial.printf("信号强度: %d\n", air780eg_modem.getCSQ());
-          }
-          else if (command == "gsm.mqtt")
-          {
-            Serial.println("=== Air780EG MQTT测试 ===");
-            if (device_state.gsmReady)
-            {
-              // 测试MQTT功能支持
-              mqttManager.testMQTTSupport();
-            }
-            else
-            {
-              Serial.println("GSM模块未就绪，无法测试MQTT功能");
-            }
-          }
-          else if (command == "gsm.mqtt.debug")
-          {
-            Serial.println("=== Air780EG MQTT连接调试 ===");
-            if (device_state.gsmReady)
-            {
-              // 包含调试头文件并调用调试函数
-              extern void debugAir780EGMqtt(Air780EGModem * modem);
-              debugAir780EGMqtt(&air780eg_modem);
-            }
-            else
-            {
-              Serial.println("GSM模块未就绪，无法进行MQTT调试");
-            }
-          }
-#else
-          Serial.println("Air780EG模块未启用");
-#endif
-        }
-        else
-#endif
-            if (command == "info")
-        {
-          Serial.println("=== 设备信息 ===");
-          Serial.println("设备ID: " + device_state.device_id);
-          Serial.println("固件版本: " + String(device_state.device_firmware_version));
-          Serial.println("硬件版本: " + String(device_state.device_hardware_version));
-          Serial.println("启动次数: " + String(bootCount));
-          Serial.println("运行时间: " + String(millis() / 1000) + " 秒");
-          Serial.println("");
-          Serial.println("--- 连接状态 ---");
-          Serial.println("WiFi状态: " + String(device_state.wifiConnected ? "已连接" : "未连接"));
-          Serial.println("BLE状态: " + String(device_state.bleConnected ? "已连接" : "未连接"));
-#ifdef ENABLE_GSM
-          Serial.println("GSM状态: " + String(device_state.gsmReady ? "就绪" : "未就绪"));
-#ifdef USE_AIR780EG_GSM
-          if (device_state.gsmReady)
-          {
-            Serial.println("网络状态: " + String(air780eg_modem.isNetworkReady() ? "已连接" : "未连接"));
-            Serial.println("信号强度: " + String(air780eg_modem.getCSQ()));
-          }
-#endif
-
-          // MQTT连接状态和配置信息
-#ifndef DISABLE_MQTT
-          MqttState mqttState = mqttManager.getMqttState();
-          String stateStr = "未知";
-          switch (mqttState)
-          {
-          case MqttState::CONNECTED:
-            stateStr = "✅ 已连接";
-            break;
-          case MqttState::DISCONNECTED:
-            stateStr = "❌ 未连接";
-            break;
-          case MqttState::CONNECTING:
-            stateStr = "🔄 连接中";
-            break;
-          case MqttState::ERROR:
-            stateStr = "⚠️ 错误";
-            break;
-          }
-          Serial.println("MQTT状态: " + stateStr);
-          Serial.println("MQTT服务器: " + String(MQTT_BROKER) + ":" + String(MQTT_PORT));
-
-          // 显示已注册的主题
-          Serial.println("--- MQTT主题配置 ---");
-          String deviceId = device_state.device_id;
-          String baseTopic = "vehicle/v1/" + deviceId;
-          Serial.println("基础主题: " + baseTopic);
-          Serial.println("设备信息: " + baseTopic + "/telemetry/device");
-          Serial.println("位置信息: " + baseTopic + "/telemetry/location");
-          Serial.println("运动信息: " + baseTopic + "/telemetry/motion");
-          Serial.println("控制命令: " + baseTopic + "/ctrl/#");
-#else
-          Serial.println("MQTT功能: ❌ 已禁用");
-#endif
-#endif
-          Serial.println("");
-          Serial.println("--- 传感器状态 ---");
-          Serial.println("GPS状态: " + String(device_state.gpsReady ? "就绪" : "未就绪"));
-          Serial.println("IMU状态: " + String(device_state.imuReady ? "就绪" : "未就绪"));
-          Serial.println("");
-          Serial.println("--- 音频设备状态 ---");
-#ifdef ENABLE_AUDIO
-          Serial.println("音频系统: " + String(device_state.audioReady ? "✅ 就绪" : "❌ 未就绪"));
-          if (device_state.audioReady)
-          {
-            Serial.printf("音频引脚: WS=%d, BCLK=%d, DATA=%d\n", IIS_S_WS_PIN, IIS_S_BCLK_PIN, IIS_S_DATA_PIN);
-            Serial.println("音频芯片: NS4168 功率放大器");
-            Serial.println("采样率: 16kHz");
-            Serial.println("位深度: 16位");
-            Serial.println("声道: 单声道");
-            Serial.println("支持事件: 开机音/WiFi连接音/GPS定位音/低电量音/睡眠音");
-          }
-          else
-          {
-            Serial.println("⚠️ 音频系统未就绪，请检查:");
-            Serial.println("  1. I2S引脚连接是否正确");
-            Serial.println("  2. NS4168芯片是否正常工作");
-            Serial.println("  3. 音频引脚是否与其他功能冲突");
-          }
-#else
-          Serial.println("音频系统: ❌ 未启用 (编译时禁用)");
-#endif
-          Serial.println("");
-          Serial.println("--- 电源状态 ---");
-          Serial.println("电池电压: " + String(device_state.battery_voltage) + " mV");
-          Serial.println("电池电量: " + String(device_state.battery_percentage) + "%");
-          Serial.println("充电状态: " + String(device_state.is_charging ? "充电中" : "未充电"));
-          Serial.println("外部电源: " + String(device_state.external_power ? "已连接" : "未连接"));
-          Serial.println("");
-#ifdef ENABLE_SDCARD
-          Serial.println("--- SD卡状态 ---");
-          if (device_state.sdCardReady)
-          {
-            Serial.println("SD卡状态: 就绪");
-            Serial.println("SD卡容量: " + String((unsigned long)device_state.sdCardSizeMB) + " MB");
-            Serial.println("SD卡剩余: " + String((unsigned long)device_state.sdCardFreeMB) + " MB");
-          }
-          else
-          {
-            Serial.println("SD卡状态: 未就绪");
-            Serial.println("⚠️ 请检查SD卡是否正确插入");
-          }
-#endif
-        }
-        else if (command == "status")
-        {
-          Serial.println("=== 系统状态 ===");
-          Serial.println("系统正常运行");
-          Serial.println("空闲内存: " + String(ESP.getFreeHeap()) + " 字节");
-          Serial.println("最小空闲内存: " + String(ESP.getMinFreeHeap()) + " 字节");
-          Serial.println("芯片温度: " + String(temperatureRead(), 1) + "°C");
-          Serial.println("CPU频率: " + String(ESP.getCpuFreqMHz()) + " MHz");
-        }
-        else if (command.startsWith("mqtt."))
-        {
-#ifndef DISABLE_MQTT
-          if (command == "mqtt.status")
-          {
-            Serial.println("=== MQTT状态 ===");
-            Serial.println("MQTT服务器: " + String(MQTT_BROKER));
-            Serial.println("MQTT端口: " + String(MQTT_PORT));
-            Serial.println("保持连接: " + String(MQTT_KEEP_ALIVE) + "秒");
-
-#ifdef USE_AIR780EG_GSM
-            Serial.println("连接方式: Air780EG GSM");
-            Serial.println("GSM状态: " + String(device_state.gsmReady ? "就绪" : "未就绪"));
-            if (device_state.gsmReady)
-            {
-              Serial.println("网络状态: " + String(air780eg_modem.isNetworkReady() ? "已连接" : "未连接"));
-              Serial.println("信号强度: " + String(air780eg_modem.getCSQ()));
-            }
-#elif defined(ENABLE_WIFI)
-            Serial.println("连接方式: WiFi");
-            Serial.println("WiFi状态: " + String(device_state.wifiConnected ? "已连接" : "未连接"));
-#endif
-
-            // MQTT连接状态
-            MqttState mqttState = mqttManager.getMqttState();
-            String stateStr = "未知";
-            switch (mqttState)
-            {
-            case MqttState::CONNECTED:
-              stateStr = "已连接";
-              break;
-            case MqttState::DISCONNECTED:
-              stateStr = "未连接";
-              break;
-            case MqttState::CONNECTING:
-              stateStr = "连接中";
-              break;
-            case MqttState::ERROR:
-              stateStr = "错误";
-              break;
-            }
-            Serial.println("MQTT连接: " + stateStr);
-          }
-          else if (command == "mqtt.connect")
-          {
-            Serial.println("尝试连接MQTT...");
-            Serial.println("当前网络状态:");
-#ifdef USE_AIR780EG_GSM
-            Serial.println("- GSM网络: " + String(air780eg_modem.isNetworkReady() ? "就绪" : "未就绪"));
-            Serial.println("- 信号强度: " + String(air780eg_modem.getCSQ()));
-#endif
-            Serial.println("- MQTT状态: " + String((int)mqttManager.getMqttState()));
-
-            // 强制重新连接
-            bool result = mqttManager.forceReconnect();
-            Serial.println("连接结果: " + String(result ? "成功" : "失败"));
-          }
-          else if (command == "mqtt.test")
-          {
-            Serial.println("发送MQTT测试消息...");
-            MqttState mqttState = mqttManager.getMqttState();
-            if (mqttState == MqttState::CONNECTED)
-            {
-              String testTopic = "device/" + device_state.device_id + "/test";
-              String testMessage = "{\"test\":\"mqtt_test\",\"timestamp\":" + String(millis()) + "}";
-              mqttManager.publish(testTopic.c_str(), testMessage.c_str());
-              Serial.println("测试消息已发送到: " + testTopic);
-            }
-            else
-            {
-              Serial.println("❌ MQTT未连接，无法发送测试消息");
-            }
-          }
-          else if (command == "mqtt.help")
-          {
-            Serial.println("=== MQTT命令帮助 ===");
-            Serial.println("mqtt.status     - 显示MQTT状态");
-            Serial.println("mqtt.connect    - 尝试连接MQTT");
-            Serial.println("mqtt.test       - 发送测试消息");
-            Serial.println("mqtt.help       - 显示此帮助信息");
-          }
-          else
-          {
-            Serial.println("未知MQTT命令，输入 'mqtt.help' 查看帮助");
-          }
-#else
-          Serial.println("MQTT功能已禁用");
-#endif
-        }
-        else if (command.startsWith("audio."))
-        {
-#ifdef ENABLE_AUDIO
-          if (command == "audio.test")
-          {
-            Serial.println("=== 音频系统测试 ===");
-            if (device_state.audioReady)
-            {
-              Serial.println("播放测试音频序列...");
-              audioManager.testAudio();
-            }
-            else
-            {
-              Serial.println("❌ 音频系统未就绪，无法测试");
-            }
-          }
-          else if (command == "audio.boot")
-          {
-            Serial.println("播放开机成功音...");
-            if (device_state.audioReady)
-            {
-              audioManager.playBootSuccessSound();
-            }
-            else
-            {
-              Serial.println("❌ 音频系统未就绪");
-            }
-          }
-          else if (command == "audio.wifi")
-          {
-            Serial.println("播放WiFi连接音...");
-            if (device_state.audioReady)
-            {
-              audioManager.playWiFiConnectedSound();
-            }
-            else
-            {
-              Serial.println("❌ 音频系统未就绪");
-            }
-          }
-          else if (command == "audio.gps")
-          {
-            Serial.println("播放GPS定位音...");
-            if (device_state.audioReady)
-            {
-              audioManager.playGPSFixedSound();
-            }
-            else
-            {
-              Serial.println("❌ 音频系统未就绪");
-            }
-          }
-          else if (command == "audio.battery")
-          {
-            Serial.println("播放低电量音...");
-            if (device_state.audioReady)
-            {
-              audioManager.playLowBatterySound();
-            }
-            else
-            {
-              Serial.println("❌ 音频系统未就绪");
-            }
-          }
-          else if (command == "audio.sleep")
-          {
-            Serial.println("播放睡眠音...");
-            if (device_state.audioReady)
-            {
-              audioManager.playSleepModeSound();
-            }
-            else
-            {
-              Serial.println("❌ 音频系统未就绪");
-            }
-          }
-          else if (command == "audio.help")
-          {
-            Serial.println("=== 音频命令帮助 ===");
-            Serial.println("audio.test    - 播放测试音频序列");
-            Serial.println("audio.boot    - 播放开机成功音");
-            Serial.println("audio.wifi    - 播放WiFi连接音");
-            Serial.println("audio.gps     - 播放GPS定位音");
-            Serial.println("audio.battery - 播放低电量音");
-            Serial.println("audio.sleep   - 播放睡眠音");
-            Serial.println("audio.help    - 显示此帮助信息");
-          }
-          else
-          {
-            Serial.println("未知音频命令，输入 'audio.help' 查看帮助");
-          }
-#else
-          Serial.println("音频功能未启用");
-#endif
-        }
-        else if (command == "restart" || command == "reboot")
-        {
-          Serial.println("正在重启设备...");
-          Serial.flush();
-          delay(1000);
-          ESP.restart();
-        }
-        else if (command == "help")
-        {
-          Serial.println("=== 可用命令 ===");
-          Serial.println("基本命令:");
-          Serial.println("  info     - 显示详细设备信息");
-          Serial.println("  status   - 显示系统状态");
-          Serial.println("  restart  - 重启设备");
-          Serial.println("  help     - 显示此帮助信息");
-          Serial.println("");
-#ifdef ENABLE_SDCARD
-          Serial.println("SD卡命令:");
-          Serial.println("  sd.info    - 显示SD卡详细信息");
-          Serial.println("  sd.test    - 测试GPS数据记录");
-          Serial.println("  sd.status  - 检查SD卡状态");
-          Serial.println("  sd.session - 显示当前GPS会话信息");
-          Serial.println("  sd.finish  - 结束当前GPS会话");
-          Serial.println("  sd.dirs    - 检查和创建目录结构");
-          Serial.println("");
-#endif
-#ifdef USE_AIR780EG_GSM
-          Serial.println("Air780EG命令:");
-          Serial.println("  gsm.test   - 测试AT命令和波特率");
-          Serial.println("  gsm.reset  - 重置Air780EG模块");
-          Serial.println("  gsm.info   - 显示模块状态信息");
-          Serial.println("  gsm.mqtt   - 测试MQTT功能支持");
-          Serial.println("  gsm.mqtt.debug - MQTT连接详细调试");
-          Serial.println("");
-#endif
-          Serial.println("提示: 命令不区分大小写");
-        }
-        else
-        {
-          Serial.println("❌ 未知命令: " + command);
-          Serial.println("输入 'help' 查看可用命令");
-        }
-
-        Serial.println(""); // 添加空行分隔
-      }
+      handleSerialCommand();
     }
 
     // 外部电源检测
@@ -891,5 +475,434 @@ void loop()
 #endif
 
     Serial.println("[状态] 定期状态更新完成");
+  }
+}
+
+// ===================== 串口命令处理函数 =====================
+/**
+ * 处理串口输入命令
+ * 支持SD卡、GSM、MQTT、音频等命令
+ */
+void handleSerialCommand()
+{
+  String command = Serial.readStringUntil('\n');
+  command.trim();
+
+  if (command.length() > 0)
+  {
+    Serial.println(">>> 收到命令: " + command);
+
+#ifdef ENABLE_SDCARD
+    // SD卡相关命令
+    if (command.startsWith("sd."))
+    {
+      sdManager.handleSerialCommand(command);
+    }
+    // Air780EG调试命令
+    else if (command.startsWith("gsm."))
+    {
+#ifdef USE_AIR780EG_GSM
+      if (command == "gsm.test")
+      {
+        Serial.println("=== Air780EG 测试 ===");
+        Serial.printf("GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
+        Serial.printf("RX引脚: %d, TX引脚: %d\n", GSM_RX_PIN, GSM_TX_PIN);
+
+        // 尝试发送AT命令
+        Serial.println("发送AT命令测试...");
+        air780eg_modem.testATCommand();
+      }
+      else if (command == "gsm.reset")
+      {
+        Serial.println("重置Air780EG模块...");
+        digitalWrite(GSM_EN, LOW);
+        delay(1000);
+        digitalWrite(GSM_EN, HIGH);
+        delay(2000);
+        Serial.println("重置完成");
+      }
+      else if (command == "gsm.info")
+      {
+        Serial.println("=== Air780EG 信息 ===");
+        Serial.printf("模块状态: %s\n", device_state.gsmReady ? "就绪" : "未就绪");
+        Serial.printf("网络状态: %s\n", air780eg_modem.isNetworkReady() ? "已连接" : "未连接");
+        Serial.printf("信号强度: %d\n", air780eg_modem.getCSQ());
+      }
+      else if (command == "gsm.mqtt")
+      {
+        Serial.println("=== Air780EG MQTT测试 ===");
+        if (device_state.gsmReady)
+        {
+          // 测试MQTT功能支持
+          mqttManager.testMQTTSupport();
+        }
+        else
+        {
+          Serial.println("GSM模块未就绪，无法测试MQTT功能");
+        }
+      }
+      else if (command == "gsm.mqtt.debug")
+      {
+        Serial.println("=== Air780EG MQTT连接调试 ===");
+        if (device_state.gsmReady)
+        {
+          // 包含调试头文件并调用调试函数
+          extern void debugAir780EGMqtt(Air780EGModem * modem);
+          debugAir780EGMqtt(&air780eg_modem);
+        }
+        else
+        {
+          Serial.println("GSM模块未就绪，无法进行MQTT调试");
+        }
+      }
+#else
+      Serial.println("Air780EG模块未启用");
+#endif
+    }
+    else
+#endif
+        if (command == "info")
+    {
+      Serial.println("=== 设备信息 ===");
+      Serial.println("设备ID: " + device_state.device_id);
+      Serial.println("固件版本: " + String(device_state.device_firmware_version));
+      Serial.println("硬件版本: " + String(device_state.device_hardware_version));
+      Serial.println("启动次数: " + String(bootCount));
+      Serial.println("运行时间: " + String(millis() / 1000) + " 秒");
+      Serial.println("");
+      Serial.println("--- 连接状态 ---");
+      Serial.println("WiFi状态: " + String(device_state.wifiConnected ? "已连接" : "未连接"));
+      Serial.println("BLE状态: " + String(device_state.bleConnected ? "已连接" : "未连接"));
+#ifdef ENABLE_GSM
+      Serial.println("GSM状态: " + String(device_state.gsmReady ? "就绪" : "未就绪"));
+#ifdef USE_AIR780EG_GSM
+      if (device_state.gsmReady)
+      {
+        Serial.println("网络状态: " + String(air780eg_modem.isNetworkReady() ? "已连接" : "未连接"));
+        Serial.println("信号强度: " + String(air780eg_modem.getCSQ()));
+      }
+#endif
+
+      // MQTT连接状态和配置信息
+#ifndef DISABLE_MQTT
+      MqttState mqttState = mqttManager.getMqttState();
+      String stateStr = "未知";
+      switch (mqttState)
+      {
+      case MqttState::CONNECTED:
+        stateStr = "✅ 已连接";
+        break;
+      case MqttState::DISCONNECTED:
+        stateStr = "❌ 未连接";
+        break;
+      case MqttState::CONNECTING:
+        stateStr = "🔄 连接中";
+        break;
+      case MqttState::ERROR:
+        stateStr = "⚠️ 错误";
+        break;
+      }
+      Serial.println("MQTT状态: " + stateStr);
+      Serial.println("MQTT服务器: " + String(MQTT_BROKER) + ":" + String(MQTT_PORT));
+
+      // 显示已注册的主题
+      Serial.println("--- MQTT主题配置 ---");
+      String deviceId = device_state.device_id;
+      String baseTopic = "vehicle/v1/" + deviceId;
+      Serial.println("基础主题: " + baseTopic);
+      Serial.println("设备信息: " + baseTopic + "/telemetry/device");
+      Serial.println("位置信息: " + baseTopic + "/telemetry/location");
+      Serial.println("运动信息: " + baseTopic + "/telemetry/motion");
+      Serial.println("控制命令: " + baseTopic + "/ctrl/#");
+#else
+      Serial.println("MQTT功能: ❌ 已禁用");
+#endif
+#endif
+      Serial.println("");
+      Serial.println("--- 传感器状态 ---");
+      Serial.println("GPS状态: " + String(device_state.gpsReady ? "就绪" : "未就绪"));
+      Serial.println("IMU状态: " + String(device_state.imuReady ? "就绪" : "未就绪"));
+      Serial.println("");
+      Serial.println("--- 音频设备状态 ---");
+#ifdef ENABLE_AUDIO
+      Serial.println("音频系统: " + String(device_state.audioReady ? "✅ 就绪" : "❌ 未就绪"));
+      if (device_state.audioReady)
+      {
+        Serial.printf("音频引脚: WS=%d, BCLK=%d, DATA=%d\n", IIS_S_WS_PIN, IIS_S_BCLK_PIN, IIS_S_DATA_PIN);
+        Serial.println("音频芯片: NS4168 功率放大器");
+        Serial.println("采样率: 16kHz");
+        Serial.println("位深度: 16位");
+        Serial.println("声道: 单声道");
+        Serial.println("支持事件: 开机音/WiFi连接音/GPS定位音/低电量音/睡眠音");
+      }
+      else
+      {
+        Serial.println("⚠️ 音频系统未就绪，请检查:");
+        Serial.println("  1. I2S引脚连接是否正确");
+        Serial.println("  2. NS4168芯片是否正常工作");
+        Serial.println("  3. 音频引脚是否与其他功能冲突");
+      }
+#else
+      Serial.println("音频系统: ❌ 未启用 (编译时禁用)");
+#endif
+      Serial.println("");
+      Serial.println("--- 电源状态 ---");
+      Serial.println("电池电压: " + String(device_state.battery_voltage) + " mV");
+      Serial.println("电池电量: " + String(device_state.battery_percentage) + "%");
+      Serial.println("充电状态: " + String(device_state.is_charging ? "充电中" : "未充电"));
+      Serial.println("外部电源: " + String(device_state.external_power ? "已连接" : "未连接"));
+      Serial.println("");
+#ifdef ENABLE_SDCARD
+      Serial.println("--- SD卡状态 ---");
+      if (device_state.sdCardReady)
+      {
+        Serial.println("SD卡状态: 就绪");
+        Serial.println("SD卡容量: " + String((unsigned long)device_state.sdCardSizeMB) + " MB");
+        Serial.println("SD卡剩余: " + String((unsigned long)device_state.sdCardFreeMB) + " MB");
+      }
+      else
+      {
+        Serial.println("SD卡状态: 未就绪");
+        Serial.println("⚠️ 请检查SD卡是否正确插入");
+      }
+#endif
+    }
+    else if (command == "status")
+    {
+      Serial.println("=== 系统状态 ===");
+      Serial.println("系统正常运行");
+      Serial.println("空闲内存: " + String(ESP.getFreeHeap()) + " 字节");
+      Serial.println("最小空闲内存: " + String(ESP.getMinFreeHeap()) + " 字节");
+      Serial.println("芯片温度: " + String(temperatureRead(), 1) + "°C");
+      Serial.println("CPU频率: " + String(ESP.getCpuFreqMHz()) + " MHz");
+    }
+    else if (command.startsWith("mqtt."))
+    {
+#ifndef DISABLE_MQTT
+      if (command == "mqtt.status")
+      {
+        Serial.println("=== MQTT状态 ===");
+        Serial.println("MQTT服务器: " + String(MQTT_BROKER));
+        Serial.println("MQTT端口: " + String(MQTT_PORT));
+        Serial.println("保持连接: " + String(MQTT_KEEP_ALIVE) + "秒");
+
+#ifdef USE_AIR780EG_GSM
+        Serial.println("连接方式: Air780EG GSM");
+        Serial.println("GSM状态: " + String(device_state.gsmReady ? "就绪" : "未就绪"));
+        if (device_state.gsmReady)
+        {
+          Serial.println("网络状态: " + String(air780eg_modem.isNetworkReady() ? "已连接" : "未连接"));
+          Serial.println("信号强度: " + String(air780eg_modem.getCSQ()));
+        }
+#elif defined(ENABLE_WIFI)
+        Serial.println("连接方式: WiFi");
+        Serial.println("WiFi状态: " + String(device_state.wifiConnected ? "已连接" : "未连接"));
+#endif
+
+        // MQTT连接状态
+        MqttState mqttState = mqttManager.getMqttState();
+        String stateStr = "未知";
+        switch (mqttState)
+        {
+        case MqttState::CONNECTED:
+          stateStr = "已连接";
+          break;
+        case MqttState::DISCONNECTED:
+          stateStr = "未连接";
+          break;
+        case MqttState::CONNECTING:
+          stateStr = "连接中";
+          break;
+        case MqttState::ERROR:
+          stateStr = "错误";
+          break;
+        }
+        Serial.println("MQTT连接: " + stateStr);
+      }
+      else if (command == "mqtt.connect")
+      {
+        Serial.println("尝试连接MQTT...");
+        Serial.println("当前网络状态:");
+#ifdef USE_AIR780EG_GSM
+        Serial.println("- GSM网络: " + String(air780eg_modem.isNetworkReady() ? "就绪" : "未就绪"));
+        Serial.println("- 信号强度: " + String(air780eg_modem.getCSQ()));
+#endif
+        Serial.println("- MQTT状态: " + String((int)mqttManager.getMqttState()));
+
+        // 强制重新连接
+        bool result = mqttManager.forceReconnect();
+        Serial.println("连接结果: " + String(result ? "成功" : "失败"));
+      }
+      else if (command == "mqtt.test")
+      {
+        Serial.println("发送MQTT测试消息...");
+        MqttState mqttState = mqttManager.getMqttState();
+        if (mqttState == MqttState::CONNECTED)
+        {
+          String testTopic = "device/" + device_state.device_id + "/test";
+          String testMessage = "{\"test\":\"mqtt_test\",\"timestamp\":" + String(millis()) + "}";
+          mqttManager.publish(testTopic.c_str(), testMessage.c_str());
+          Serial.println("测试消息已发送到: " + testTopic);
+        }
+        else
+        {
+          Serial.println("❌ MQTT未连接，无法发送测试消息");
+        }
+      }
+      else if (command == "mqtt.help")
+      {
+        Serial.println("=== MQTT命令帮助 ===");
+        Serial.println("mqtt.status     - 显示MQTT状态");
+        Serial.println("mqtt.connect    - 尝试连接MQTT");
+        Serial.println("mqtt.test       - 发送测试消息");
+        Serial.println("mqtt.help       - 显示此帮助信息");
+      }
+      else
+      {
+        Serial.println("未知MQTT命令，输入 'mqtt.help' 查看帮助");
+      }
+#else
+      Serial.println("MQTT功能已禁用");
+#endif
+    }
+    else if (command.startsWith("audio."))
+    {
+#ifdef ENABLE_AUDIO
+      if (command == "audio.test")
+      {
+        Serial.println("=== 音频系统测试 ===");
+        if (device_state.audioReady)
+        {
+          Serial.println("播放测试音频序列...");
+          audioManager.testAudio();
+        }
+        else
+        {
+          Serial.println("❌ 音频系统未就绪，无法测试");
+        }
+      }
+      else if (command == "audio.boot")
+      {
+        Serial.println("播放开机成功音...");
+        if (device_state.audioReady)
+        {
+          audioManager.playBootSuccessSound();
+        }
+        else
+        {
+          Serial.println("❌ 音频系统未就绪");
+        }
+      }
+      else if (command == "audio.wifi")
+      {
+        Serial.println("播放WiFi连接音...");
+        if (device_state.audioReady)
+        {
+          audioManager.playWiFiConnectedSound();
+        }
+        else
+        {
+          Serial.println("❌ 音频系统未就绪");
+        }
+      }
+      else if (command == "audio.gps")
+      {
+        Serial.println("播放GPS定位音...");
+        if (device_state.audioReady)
+        {
+          audioManager.playGPSFixedSound();
+        }
+        else
+        {
+          Serial.println("❌ 音频系统未就绪");
+        }
+      }
+      else if (command == "audio.battery")
+      {
+        Serial.println("播放低电量音...");
+        if (device_state.audioReady)
+        {
+          audioManager.playLowBatterySound();
+        }
+        else
+        {
+          Serial.println("❌ 音频系统未就绪");
+        }
+      }
+      else if (command == "audio.sleep")
+      {
+        Serial.println("播放睡眠音...");
+        if (device_state.audioReady)
+        {
+          audioManager.playSleepModeSound();
+        }
+        else
+        {
+          Serial.println("❌ 音频系统未就绪");
+        }
+      }
+      else if (command == "audio.help")
+      {
+        Serial.println("=== 音频命令帮助 ===");
+        Serial.println("audio.test    - 播放测试音频序列");
+        Serial.println("audio.boot    - 播放开机成功音");
+        Serial.println("audio.wifi    - 播放WiFi连接音");
+        Serial.println("audio.gps     - 播放GPS定位音");
+        Serial.println("audio.battery - 播放低电量音");
+        Serial.println("audio.sleep   - 播放睡眠音");
+        Serial.println("audio.help    - 显示此帮助信息");
+      }
+      else
+      {
+        Serial.println("未知音频命令，输入 'audio.help' 查看帮助");
+      }
+#else
+      Serial.println("音频功能未启用");
+#endif
+    }
+    else if (command == "restart" || command == "reboot")
+    {
+      Serial.println("正在重启设备...");
+      Serial.flush();
+      delay(1000);
+      ESP.restart();
+    }
+    else if (command == "help")
+    {
+      Serial.println("=== 可用命令 ===");
+      Serial.println("基本命令:");
+      Serial.println("  info     - 显示详细设备信息");
+      Serial.println("  status   - 显示系统状态");
+      Serial.println("  restart  - 重启设备");
+      Serial.println("  help     - 显示此帮助信息");
+      Serial.println("");
+#ifdef ENABLE_SDCARD
+      Serial.println("SD卡命令:");
+      Serial.println("  sd.info    - 显示SD卡详细信息");
+      Serial.println("  sd.test    - 测试GPS数据记录");
+      Serial.println("  sd.status  - 检查SD卡状态");
+      Serial.println("  sd.session - 显示当前GPS会话信息");
+      Serial.println("  sd.finish  - 结束当前GPS会话");
+      Serial.println("  sd.dirs    - 检查和创建目录结构");
+      Serial.println("");
+#endif
+#ifdef USE_AIR780EG_GSM
+      Serial.println("Air780EG命令:");
+      Serial.println("  gsm.test   - 测试AT命令和波特率");
+      Serial.println("  gsm.reset  - 重置Air780EG模块");
+      Serial.println("  gsm.info   - 显示模块状态信息");
+      Serial.println("  gsm.mqtt   - 测试MQTT功能支持");
+      Serial.println("  gsm.mqtt.debug - MQTT连接详细调试");
+      Serial.println("");
+#endif
+      Serial.println("提示: 命令不区分大小写");
+    }
+    else
+    {
+      Serial.println("❌ 未知命令: " + command);
+      Serial.println("输入 'help' 查看可用命令");
+    }
+
+    Serial.println(""); // 添加空行分隔
   }
 }

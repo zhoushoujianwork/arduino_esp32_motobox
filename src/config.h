@@ -93,10 +93,17 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 #define TFT_ROTATION       1 // 0: 0度, 1: 90度, 2: 180度, 3: 270度
 #define UI_MAX_SPEED       199    /* Maximum speed in km/h */
 
-// GNSS和LBS默认配置
+// GNSS和LBS配置 - GPS和GNSS互斥
 #ifdef ENABLE_GSM
+// 默认启用GNSS（与GPS互斥）
+#ifndef ENABLE_GPS
 #define ENABLE_GNSS   // 启用GNSS
-// #define ENABLE_LBS     // 启用LBS
+#endif
+
+// LBS可以与GNSS同时启用作为辅助定位
+#ifdef ENABLE_GNSS
+#define ENABLE_LBS     // 启用LBS辅助定位
+#endif
 #endif
 
 #ifdef ENABLE_SDCARD
