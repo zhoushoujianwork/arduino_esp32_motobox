@@ -108,6 +108,9 @@ public:
     // MQTT初始化，需要在网络就绪后调用
     bool initializeMQTT();
     
+    // GSM初始化
+    void initializeGSM();
+    
 private:
     
 };

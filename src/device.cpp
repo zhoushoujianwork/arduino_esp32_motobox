@@ -391,17 +391,19 @@ void Device::begin()
     ml307_at.begin(115200);
 #endif
 
+    initializeGSM();
+
+    // 先完成 mqtt 连接，再初始化其他功能
+    initializeMQTT();
+
 #ifdef ENABLE_GNSS
-    gpsManager.setGNSSEnabled(true);
+    gpsManager.setGNSSEnabled(false);
 #endif
 
 #ifdef ENABLE_LBS
     gpsManager.setLBSEnabled(true);
 #endif
 #endif
-
-    // 注意：MQTT初始化已移到网络就绪后进行，见 initializeMQTT() 函数
-
     gpsManager.init();
     Serial.println("GPS初始化完成!");
 
@@ -607,6 +609,39 @@ void device_loop()
 {
     // Implementation of device_loop function
 }
+
+void Device::initializeGSM() {
+//================ GSM模块初始化开始 ================
+#ifdef USE_AIR780EG_GSM
+  Serial.println("step 6.5");
+  Serial.println("[GSM] 初始化Air780EG模块...");
+
+  Serial.printf("[GSM] 引脚配置 - RX:%d, TX:%d, EN:%d\n", GSM_RX_PIN, GSM_TX_PIN, GSM_EN);
+
+  air780eg_modem.setDebug(true);
+  if (air780eg_modem.begin())
+  {
+    Serial.println("[GSM] ✅ Air780EG基础初始化成功");
+    device_state.gsmReady = true;
+
+    // 检查GSM_EN引脚状态
+    Serial.printf("[GSM] GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
+
+    Serial.println("[GSM] 📡 网络注册和GNSS启用将在后台任务中完成");
+  }
+  else
+  {
+    Serial.println("[GSM] ❌ Air780EG基础初始化失败");
+    device_state.gsmReady = false;
+
+    // 调试信息
+    Serial.printf("[GSM] GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
+  }
+#endif
+  //================ GSM模块初始化结束 ================
+}
+
+
 
 bool Device::initializeMQTT() {
 #if (defined(ENABLE_WIFI) || defined(ENABLE_GSM)) && !defined(DISABLE_MQTT)
