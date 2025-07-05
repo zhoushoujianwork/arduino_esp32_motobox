@@ -83,7 +83,7 @@ bool MqttManager::initWifi()
 
     // 创建 MQTT 客户端
     _wifiMqttClient = new PubSubClient(_wifiClient);
-    _wifiMqttClient->setServer(_config.broker, _config.port);
+    _wifiMqttClient->setServer(_config.broker.c_str(), _config.port);
     _wifiMqttClient->setCallback(wifiMqttCallback);
     _wifiMqttClient->setKeepAlive(_config.keepAlive);
 
@@ -196,9 +196,9 @@ bool MqttManager::connect()
     }
 
     success = _wifiMqttClient->connect(
-        _config.clientId,
-        _config.username,
-        _config.password,
+        _config.clientId.c_str(),
+        _config.username.c_str(),
+        _config.password.c_str(),
         nullptr, // will topic
         0,       // will qos
         false,   // will retain
@@ -302,9 +302,9 @@ bool MqttManager::reconnect()
     return connect();
 }
 
-// bool MqttManager::isConnected() {
-//     return _MqttState == MqttState::CONNECTED;
-// }
+bool MqttManager::isConnected() {
+    return _MqttState == MqttState::CONNECTED;
+}
 
 void MqttManager::setMqttState(MqttState newState)
 {
@@ -373,12 +373,18 @@ void MqttManager::loop()
             lastDebugTime = millis();
             debugPrint("=== MQTT状态详情 ===");
             debugPrint("当前状态: " + String((int)_MqttState));
-            debugPrint("网络就绪: " + String(air780eg_modem.isNetworkReady()));
             debugPrint("MQTT连接: " + String(isMqttConnected()));
+            
+#ifdef USE_AIR780EG_GSM
+            debugPrint("网络就绪: " + String(air780eg_modem.isNetworkReady()));
             debugPrint("Air780EG客户端: " + String(_air780egMqtt != nullptr));
             if (_air780egMqtt) {
                 debugPrint("客户端连接状态: " + String(_air780egMqtt->isConnected()));
             }
+#elif defined(USE_ML307_GSM)
+            debugPrint("ML307 MQTT连接: " + String(ml307Mqtt.connected()));
+            debugPrint("ML307 MQTT可发布: " + String(ml307Mqtt.canPublish()));
+#endif
             debugPrint("==================");
         }
         
@@ -774,12 +780,12 @@ void MqttManager::testMQTTSupport() {
         debugPrint("❌ Air780EG MQTT对象未初始化");
     }
 #elif defined(USE_ML307_GSM)
-    if (_ml307Mqtt) {
+    if (ml307Mqtt.connected()) {
         debugPrint("使用ML307 MQTT实现");
-        // ML307的测试函数可以后续添加
-        debugPrint("ML307 MQTT测试功能待实现");
+        debugPrint("✅ ML307 MQTT连接正常");
     } else {
-        debugPrint("❌ ML307 MQTT对象未初始化");
+        debugPrint("使用ML307 MQTT实现");
+        debugPrint("❌ ML307 MQTT未连接");
     }
 #elif defined(ENABLE_WIFI)
     debugPrint("使用WiFi MQTT实现");

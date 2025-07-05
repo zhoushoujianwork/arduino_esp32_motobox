@@ -44,20 +44,20 @@ enum class MqttState {
 struct MqttManagerConfig {
     
     // MQTT 配置
-    const char* broker;
+    String broker;
     uint16_t port;
-    const char* clientId;
-    const char* username;
-    const char* password;
+    String clientId;
+    String username;
+    String password;
     uint16_t keepAlive;
     bool cleanSession;
     
     MqttManagerConfig() 
-        : broker(nullptr)
+        : broker("")
         , port(1883)
-        , clientId(nullptr)
-        , username(nullptr)
-        , password(nullptr)
+        , clientId("")
+        , username("")
+        , password("")
         , keepAlive(60)
         , cleanSession(true) {}
 };
@@ -83,7 +83,7 @@ public:
     bool connect();
     bool forceReconnect(); // 强制重新连接
     // void disconnect();
-    // bool isConnected();
+    bool isConnected();
     
     // MQTT 操作
     bool publish(const char* topic, const char* payload, bool retain = false);

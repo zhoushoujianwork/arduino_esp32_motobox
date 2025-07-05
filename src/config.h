@@ -95,8 +95,8 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 
 // GNSS和LBS默认配置
 #ifdef ENABLE_GSM
-// #define ENABLE_GNSS   // 启用GNSS
-#define ENABLE_LBS     // 启用LBS
+#define ENABLE_GNSS   // 启用GNSS
+// #define ENABLE_LBS     // 启用LBS
 #endif
 
 #ifdef ENABLE_SDCARD

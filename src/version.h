@@ -3,13 +3,13 @@
 
 // 自动生成的版本号宏
 #ifndef BUILD_NUMBER
-  #define BUILD_NUMBER "33"
+  #define BUILD_NUMBER "87"
 #endif
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION "v3.4.0+33"
+  #define FIRMWARE_VERSION "v3.4.0+87"
 #endif
 #ifndef HARDWARE_VERSION
-  #define HARDWARE_VERSION "server"
+  #define HARDWARE_VERSION "esp32-air780eg"
 #endif
 
 // 版本信息结构体

@@ -406,7 +406,10 @@ void Device::begin()
     // 通用 MQTT 配置
     config.broker = MQTT_BROKER;
     config.port = MQTT_PORT;
-    config.clientId = "";
+    
+    // 生成唯一的客户端ID，使用设备ID
+    config.clientId = "ESP32_" + device_state.device_id;
+    
     config.username = MQTT_USER;
     config.password = MQTT_PASSWORD;
     config.keepAlive = MQTT_KEEP_ALIVE;
@@ -414,10 +417,11 @@ void Device::begin()
 
     // 打印MQTT配置信息
     Serial.println("=== MQTT配置信息 ===");
-    Serial.printf("MQTT服务器: %s\n", config.broker);
+    Serial.printf("MQTT服务器: %s\n", config.broker.c_str());
     Serial.printf("MQTT端口: %d\n", config.port);
-    Serial.printf("MQTT用户名: %s\n", config.username);
-    Serial.printf("MQTT密码: %s\n", strlen(config.password) > 0 ? "***已设置***" : "***未设置***");
+    Serial.printf("MQTT客户端ID: %s\n", config.clientId.c_str());
+    Serial.printf("MQTT用户名: %s\n", config.username.c_str());
+    Serial.printf("MQTT密码: %s\n", config.password.length() > 0 ? "***已设置***" : "***未设置***");
     Serial.printf("保持连接: %d秒\n", config.keepAlive);
     Serial.printf("清除会话: %s\n", config.cleanSession ? "是" : "否");
     
@@ -494,6 +498,37 @@ void Device::begin()
                     ledManager.setLEDState(LED_BLINK_5_SECONDS);
                     break;
             } });
+
+        // 在初始化阶段等待MQTT连接成功
+        Serial.println("🔄 等待MQTT连接成功...");
+        unsigned long mqttConnectStart = millis();
+        const unsigned long MQTT_CONNECT_TIMEOUT = 30000; // 30秒超时
+        bool mqttConnected = false;
+        
+        while (!mqttConnected && (millis() - mqttConnectStart < MQTT_CONNECT_TIMEOUT)) {
+            mqttManager.loop(); // 处理MQTT连接
+            
+            // 检查连接状态
+            if (mqttManager.isConnected()) {
+                mqttConnected = true;
+                Serial.println("✅ MQTT连接成功！");
+                break;
+            }
+            
+            // 显示连接进度
+            static unsigned long lastProgress = 0;
+            if (millis() - lastProgress > 2000) {
+                lastProgress = millis();
+                unsigned long elapsed = millis() - mqttConnectStart;
+                Serial.printf("⏳ MQTT连接中... (%lu/%lu秒)\n", elapsed/1000, MQTT_CONNECT_TIMEOUT/1000);
+            }
+            
+            delay(100); // 短暂延时避免CPU占用过高
+        }
+        
+        if (!mqttConnected) {
+            Serial.println("⚠️ MQTT连接超时，将在运行时继续尝试");
+        }
     }
 
     Serial.println("完成底层网络配置，wifi/gsm/mqtt 初始化完成");

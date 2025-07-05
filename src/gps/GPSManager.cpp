@@ -64,6 +64,7 @@ void GPSManager::loop()
     // GPS信号弱时处理LBS- 简化版本
     if (gps_data.altitude <= 3)
     {
+        #ifdef ENABLE_LBS
         // LBS 都查询
         handleLBSUpdate();
         // 如果LBS有数据，则使用LBS数据
@@ -74,6 +75,7 @@ void GPSManager::loop()
         }else{
             // debugPrint("LBS定位失败，继续等待GPS定位");
         }
+        #endif
     }
    
 }

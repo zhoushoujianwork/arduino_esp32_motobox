@@ -70,21 +70,21 @@ class SerialMonitor:
         today = datetime.now().strftime("%Y-%m-%d")
         
         # 查找今天已有的文件
-        pattern = os.path.join(self.output_dir, f"{today}_*.log")
+        pattern = os.path.join(self.output_dir, "{}_*.log".format(today))
         existing_files = glob.glob(pattern)
         
         if existing_files:
             # 提取序号并找到最大值
             numbers = []
             for file in existing_files:
-                match = re.search(rf"{today}_(\d+)\.log", file)
+                match = re.search(r"{}_(\d+)\.log".format(today), file)
                 if match:
                     numbers.append(int(match.group(1)))
             next_num = max(numbers) + 1 if numbers else 1
         else:
             next_num = 1
         
-        filename = f"{today}_{next_num:02d}.log"
+        filename = "{}_{:02d}.log".format(today, next_num)
         return os.path.join(self.output_dir, filename)
     
     def colorize_line(self, line):

@@ -175,6 +175,16 @@ void taskSystem(void *parameter)
                         Serial.println("GSM模块未就绪，无法测试MQTT功能");
                     }
                 }
+                else if (command == "gsm.mqtt.debug") {
+                    Serial.println("=== Air780EG MQTT连接调试 ===");
+                    if (device_state.gsmReady) {
+                        // 包含调试头文件并调用调试函数
+                        extern void debugAir780EGMqtt(Air780EGModem* modem);
+                        debugAir780EGMqtt(&air780eg_modem);
+                    } else {
+                        Serial.println("GSM模块未就绪，无法进行MQTT调试");
+                    }
+                }
 #else
                 Serial.println("Air780EG模块未启用");
 #endif
@@ -446,6 +456,7 @@ void taskSystem(void *parameter)
                 Serial.println("  gsm.reset  - 重置Air780EG模块");
                 Serial.println("  gsm.info   - 显示模块状态信息");
                 Serial.println("  gsm.mqtt   - 测试MQTT功能支持");
+                Serial.println("  gsm.mqtt.debug - MQTT连接详细调试");
                 Serial.println("");
 #endif
                 Serial.println("提示: 命令不区分大小写");
