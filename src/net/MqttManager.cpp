@@ -121,7 +121,11 @@ bool MqttManager::initCellular()
     
     // 立即设置回调函数，确保消息处理正常
     if (_messageCallback) {
+        debugPrint("Air780EG MQTT: 初始化时发现已有回调，立即设置桥接");
         _air780egMqtt->setCallback(air780egMqttMessageBridge);
+        debugPrint("Air780EG MQTT: 初始化桥接回调设置完成");
+    } else {
+        debugPrint("Air780EG MQTT: 初始化时无回调函数，稍后通过onMessage设置");
     }
     
     debugPrint("Air780EG MQTT初始化成功，等待网络就绪后连接");
@@ -682,21 +686,49 @@ bool MqttManager::publish(const char *topic, const char *payload, bool retain)
 
 bool MqttManager::subscribe(const char *topic, uint8_t qos)
 {
+    debugPrint("=== MqttManager::subscribe 开始 ===");
+    debugPrint("MqttManager: 订阅请求 - 主题: " + String(topic));
+    debugPrint("MqttManager: 订阅请求 - QoS: " + String(qos));
     Serial.printf("[MqttManager] 订阅主题: %s, 质量: %d\n", topic, qos);
+    
 #ifdef ENABLE_WIFI
-    return _wifiMqttClient && _wifiMqttClient->subscribe(topic, qos);
+    debugPrint("MqttManager: 使用WiFi网络进行订阅");
+    if (_wifiMqttClient) {
+        debugPrint("MqttManager: WiFi MQTT客户端存在");
+        bool result = _wifiMqttClient->subscribe(topic, qos);
+        debugPrint("MqttManager: WiFi订阅结果: " + String(result ? "成功" : "失败"));
+        debugPrint("=== MqttManager::subscribe 结束 (WiFi) ===");
+        return result;
+    } else {
+        debugPrint("MqttManager: ❌ WiFi MQTT客户端不存在");
+        debugPrint("=== MqttManager::subscribe 结束 (WiFi客户端不存在) ===");
+        return false;
+    }
 #else
 #ifdef USE_AIR780EG_GSM
+    debugPrint("MqttManager: 使用Air780EG GSM网络进行订阅");
     if (_air780egMqtt) {
-        return _air780egMqtt->subscribe(String(topic), qos);
+        debugPrint("MqttManager: Air780EG MQTT客户端存在");
+        debugPrint("MqttManager: Air780EG连接状态: " + String(_air780egMqtt->isConnected() ? "已连接" : "未连接"));
+        debugPrint("MqttManager: 调用Air780EG订阅函数...");
+        bool result = _air780egMqtt->subscribe(String(topic), qos);
+        debugPrint("MqttManager: Air780EG订阅结果: " + String(result ? "成功" : "失败"));
+        debugPrint("=== MqttManager::subscribe 结束 (Air780EG) ===");
+        return result;
     } else {
-        debugPrint("Air780EG MQTT客户端未初始化");
+        debugPrint("MqttManager: ❌ Air780EG MQTT客户端未初始化");
+        debugPrint("=== MqttManager::subscribe 结束 (Air780EG未初始化) ===");
         return false;
     }
 #elif defined(USE_ML307_GSM)
-    return ml307Mqtt.subscribe(topic, qos);
+    debugPrint("MqttManager: 使用ML307 GSM网络进行订阅");
+    bool result = ml307Mqtt.subscribe(topic, qos);
+    debugPrint("MqttManager: ML307订阅结果: " + String(result ? "成功" : "失败"));
+    debugPrint("=== MqttManager::subscribe 结束 (ML307) ===");
+    return result;
 #else
-    debugPrint("未定义GSM模块类型");
+    debugPrint("MqttManager: ❌ 未定义GSM模块类型");
+    debugPrint("=== MqttManager::subscribe 结束 (未定义GSM) ===");
     return false;
 #endif
 #endif
@@ -726,17 +758,27 @@ bool MqttManager::unsubscribe(const char *topic)
 
 void MqttManager::onMessage(MqttMessageCallback callback)
 {
+    debugPrint("=== MqttManager::onMessage 开始设置回调 ===");
     _messageCallback = callback;
+    debugPrint("MqttManager: 回调函数已存储，地址: " + String((unsigned long)&callback, HEX));
+    
 #ifdef ENABLE_GSM
 #ifdef USE_AIR780EG_GSM
+    debugPrint("MqttManager: 检测到Air780EG GSM配置");
     // 为Air780EG设置静态回调桥接函数
     if (_air780egMqtt) {
+        debugPrint("MqttManager: Air780EG MQTT客户端存在，设置桥接回调");
         _air780egMqtt->setCallback(air780egMqttMessageBridge);
+        debugPrint("MqttManager: Air780EG桥接回调设置完成");
+    } else {
+        debugPrint("MqttManager: 警告 - Air780EG MQTT客户端为空，无法设置回调");
     }
 #elif defined(USE_ML307_GSM)
+    debugPrint("MqttManager: 使用ML307 GSM，设置直接回调");
     ml307Mqtt.onMessage(callback);
 #endif
 #endif
+    debugPrint("=== MqttManager::onMessage 回调设置完成 ===");
 }
 
 void MqttManager::onConnect(std::function<void(bool)> callback)
@@ -845,10 +887,21 @@ void MqttManager::wifiMqttCallback(char *topic, byte *payload, unsigned int leng
 #ifdef USE_AIR780EG_GSM
 void MqttManager::air780egMqttMessageBridge(String topic, String payload)
 {
+    Serial.println("=== Air780EG MQTT 桥接回调触发 ===");
+    Serial.println("桥接回调 - 主题: " + topic);
+    Serial.println("桥接回调 - 负载: " + payload);
+    Serial.println("桥接回调 - 负载长度: " + String(payload.length()));
+    
     if (_messageCallback)
     {
+        Serial.println("桥接回调 - 应用层回调存在，开始转发消息");
+        Serial.println("桥接回调 - 回调函数地址: " + String((unsigned long)&_messageCallback, HEX));
         _messageCallback(topic, payload);
+        Serial.println("桥接回调 - 消息转发完成");
+    } else {
+        Serial.println("桥接回调 - 错误：应用层回调为空，消息丢失！");
     }
+    Serial.println("=== Air780EG MQTT 桥接回调结束 ===");
 }
 #endif
 

@@ -108,23 +108,31 @@ String device_state_to_json(device_state_t *state)
 void mqttMessageCallback(const String &topic, const String &payload)
 {
 #ifndef DISABLE_MQTT
+    Serial.println("=== MQTT消息回调触发 ===");
     Serial.printf("收到消息 [%s]: %s\n", topic.c_str(), payload.c_str());
+    Serial.printf("主题长度: %d, 负载长度: %d\n", topic.length(), payload.length());
 
     // 解析JSON
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, payload);
     if (error)
     {
-        Serial.println("解析JSON失败");
+        Serial.println("❌ 解析JSON失败: " + String(error.c_str()));
+        Serial.println("原始负载: " + payload);
+        Serial.println("=== MQTT消息回调结束 (JSON解析失败) ===");
         return;
     }
 
+    Serial.println("✅ JSON解析成功");
+    
     // 解析JSON
     // {"cmd": "enter_config"}
     const char *cmd = doc["cmd"];
     if (cmd)
     {
         Serial.printf("收到命令: %s\n", cmd);
+        Serial.println("开始执行命令处理...");
+        
         if (strcmp(cmd, "enter_ap_mode") == 0)
         {
 #ifdef ENABLE_WIFI
@@ -246,49 +254,86 @@ void mqttMessageCallback(const String &topic, const String &payload)
             String info = device.getWelcomeVoiceInfo();
             Serial.println(info);
         }
+        else
+        {
+            Serial.println("⚠️ 未知命令: " + String(cmd));
+        }
+        Serial.println("✅ 命令处理完成");
 #endif
+    } else {
+        Serial.println("❌ 消息中未找到cmd字段");
     }
+    Serial.println("=== MQTT消息回调结束 ===");
 #endif
 }
 
 void mqttConnectionCallback(bool connected)
 {
 #ifndef DISABLE_MQTT
+    Serial.println("=== MQTT连接回调触发 ===");
+    Serial.printf("MQTT连接状态: %s\n", connected ? "已连接" : "断开");
+    
     if (connected)
     {
-        MQTT_DEBUG_PRINTLN("MQTT连接成功，订阅主题");
+        MQTT_DEBUG_PRINTLN("MQTT连接成功，开始配置订阅主题");
 
-        
         static bool firstConnect = true; // 添加静态变量标记首次连接
-                                         // 配置主题
+        Serial.printf("首次连接标志: %s\n", firstConnect ? "是" : "否");
+        
+        // 配置主题
         String baseTopic = String("vehicle/v1/") + device_state.device_id;
         String telemetryTopic = baseTopic + "/telemetry/"; // telemetry: 遥测数据
+        Serial.println("基础主题: " + baseTopic);
+        Serial.println("遥测主题: " + telemetryTopic);
 
         // 构建具体主题
         String deviceInfoTopic = telemetryTopic + "device";
         String gpsTopic = telemetryTopic + "location";
         String imuTopic = telemetryTopic + "motion";
         String controlTopic = baseTopic + "/ctrl/#"; // ctrl: 控制命令
+        
+        Serial.println("设备信息主题: " + deviceInfoTopic);
+        Serial.println("GPS主题: " + gpsTopic);
+        Serial.println("IMU主题: " + imuTopic);
+        Serial.println("控制命令主题: " + controlTopic);
 
         if (firstConnect)
         {
+            Serial.println("执行首次连接初始化...");
             firstConnect = false;
 
+            Serial.println("添加发布主题...");
             mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 30000);
+            Serial.println("✅ 设备信息主题已添加");
 
 #ifdef ENABLE_IMU
             // mqttManager.addTopic("imu", imuTopic.c_str(), 1000);
+            Serial.println("IMU主题已跳过（被注释）");
 #endif
 
             mqttManager.addTopic("gps", gpsTopic.c_str(), 1000);
+            Serial.println("✅ GPS主题已添加");
+            
             // 订阅主题 - 使用QoS=0
-            mqttManager.subscribe(controlTopic.c_str(), 0);
+            Serial.println("开始订阅控制命令主题: " + controlTopic);
+            bool subscribeResult = mqttManager.subscribe(controlTopic.c_str(), 0);
+            Serial.printf("订阅结果: %s\n", subscribeResult ? "成功" : "失败");
+            
+            if (subscribeResult) {
+                Serial.println("✅ MQTT订阅链路配置完成");
+            } else {
+                Serial.println("❌ MQTT订阅失败，消息接收可能不正常");
+            }
+        } else {
+            Serial.println("非首次连接，跳过主题配置");
         }
     }
     else
     {
         MQTT_DEBUG_PRINTLN("MQTT连接失败");
+        Serial.println("❌ MQTT连接断开，订阅功能不可用");
     }
+    Serial.println("=== MQTT连接回调结束 ===");
 #endif
 }
 
