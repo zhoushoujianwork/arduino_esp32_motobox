@@ -147,6 +147,23 @@ bool Air780EGMqtt::connect(const String& server, int port, const String& clientI
         } else if (mqttResp.indexOf("OK") >= 0) {
             connectSuccess = true;
             debugPrint("Air780EG MQTT: MQTT连接成功");
+            
+            // 5. 设置MQTT消息编码格式为ASCII模式 (关键修复!)
+            debugPrint("Air780EG MQTT: 设置消息编码格式为ASCII模式...");
+            String modeResp = _modem.sendATWithResponse("AT+MQTTMODE=0", 3000);
+            debugPrint("Air780EG MQTT: 模式设置响应: " + modeResp);
+            
+            if (modeResp.indexOf("OK") >= 0) {
+                debugPrint("Air780EG MQTT: ✅ ASCII模式设置成功");
+            } else {
+                debugPrint("Air780EG MQTT: ⚠️ ASCII模式设置失败，可能影响消息发布");
+            }
+            
+            // 6. 可选：设置消息上报模式为直接上报
+            debugPrint("Air780EG MQTT: 设置消息上报模式...");
+            String msgSetResp = _modem.sendATWithResponse("AT+MQTTMSGSET=0", 3000);
+            debugPrint("Air780EG MQTT: 消息模式设置响应: " + msgSetResp);
+            
             break;
         } else if (mqttResp.length() == 0) {
             debugPrint("Air780EG MQTT: 连接超时，将重试");
@@ -233,41 +250,104 @@ bool Air780EGMqtt::checkConnection() {
     return false;
 }
 
+/**
+ * 发布MQTT消息
+ * 按照官方文档格式：
+ * AT+MPUB="topic",qos,retain,"payload"
+ * 注意：需要先设置 AT+MQTTMODE=0 (ASCII模式)
+ */
 bool Air780EGMqtt::publish(const String& topic, const String& payload, int qos) {
     if (!_connected) {
         debugPrint("Air780EG MQTT: 未连接，无法发布消息");
         return false;
     }
-    
+
     debugPrint("Air780EG MQTT: 发布到 " + topic + " -> " + payload.substring(0, 50) + "...");
-    
-    // 使用正确的AT指令格式：AT+MPUB="topic","message",qos,retain
-    String cmd = "AT+MPUB=\"" + topic + "\",\"" + payload + "\"," + String(qos) + ",0";
-    
-    debugPrint("Air780EG MQTT: 发布命令: " + cmd);
-    
-    if (_modem.sendAT(cmd, "OK", 10000)) {
-        debugPrint("Air780EG MQTT: 消息发布成功");
-        return true;
-    } else {
-        debugPrint("Air780EG MQTT: 消息发布失败");
-        return false;
+    debugPrint("Air780EG MQTT: 消息长度: " + String(payload.length()) + " 字节");
+
+    // 检查消息长度限制
+    if (payload.length() > 1024) {
+        debugPrint("Air780EG MQTT: ⚠️ 消息过长 (" + String(payload.length()) + " > 1024)，可能发布失败");
     }
+
+    // 确保处于ASCII模式
+    debugPrint("Air780EG MQTT: 确保ASCII模式...");
+    _modem.sendAT("AT+MQTTMODE=0", "OK", 2000);
+
+    // 构建发布命令 - ASCII模式下直接使用JSON字符串
+    // 注意：JSON中的双引号需要转义，但要保持JSON结构完整
+    String cleanPayload = payload;
+    // 移除可能的换行符和回车符
+    cleanPayload.replace("\r", "");
+    cleanPayload.replace("\n", "");
+    
+    String cmd = "AT+MPUB=\"" + topic + "\"," + String(qos) + ",0,\"" + cleanPayload + "\"";
+    
+    debugPrint("Air780EG MQTT: 发布命令长度: " + String(cmd.length()));
+    debugPrint("Air780EG MQTT: 发布命令: " + cmd.substring(0, 100) + "...");
+
+    // 尝试发布
+    if (_modem.sendAT(cmd, "OK", 15000)) {
+        debugPrint("Air780EG MQTT: ✅ 消息发布成功");
+        return true;
+    }
+
+    debugPrint("Air780EG MQTT: ❌ 首次发布失败，开始重试...");
+
+    // 重试机制
+    int maxRetries = 3;
+    for (int retry = 0; retry < maxRetries; retry++) {
+        debugPrint("Air780EG MQTT: 重试发布 (" + String(retry + 1) + "/" + String(maxRetries) + ")");
+        delay(2000); // 重试前等待2秒
+
+        // 检查连接状态
+        if (!checkConnection()) {
+            debugPrint("Air780EG MQTT: 连接已断开，停止重试");
+            _connected = false;
+            break;
+        }
+
+        // 重新确保ASCII模式
+        _modem.sendAT("AT+MQTTMODE=0", "OK", 2000);
+
+        // 重试发布
+        if (_modem.sendAT(cmd, "OK", 15000)) {
+            debugPrint("Air780EG MQTT: ✅ 重试成功 - 消息发布成功");
+            return true;
+        } else {
+            debugPrint("Air780EG MQTT: 消息发布失败，尝试: " + String(retry + 1));
+
+            // 检查连接状态
+            if (!checkConnection()) {
+                debugPrint("Air780EG MQTT: 连接已断开，停止重试");
+                _connected = false;
+                break;
+            }
+        }
+    }
+
+    debugPrint("Air780EG MQTT: 消息发布失败，已达到最大重试次数");
+    return false;
 }
 
+/**
+ * 订阅MQTT主题
+ * 按照官方文档格式：
+ * AT+MSUB="topic",qos
+ */
 bool Air780EGMqtt::subscribe(const String& topic, int qos) {
     if (!_connected) {
         debugPrint("Air780EG MQTT: 未连接，无法订阅");
         return false;
     }
-    
+
     debugPrint("Air780EG MQTT: 订阅主题 " + topic);
-    
-    // 使用正确的AT指令格式：AT+MSUB="topic",qos
+
+    // 按照文档格式：AT+MSUB="topic",qos
     String cmd = "AT+MSUB=\"" + topic + "\"," + String(qos);
-    
+
     debugPrint("Air780EG MQTT: 订阅命令: " + cmd);
-    
+
     if (_modem.sendAT(cmd, "OK", 5000)) {
         debugPrint("Air780EG MQTT: 订阅成功");
         return true;
