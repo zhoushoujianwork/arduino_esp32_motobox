@@ -4,6 +4,7 @@
  */
 
 #include "Air780EGMqtt.h"
+#include "../config.h"
 
 Air780EGMqtt::Air780EGMqtt(Air780EGModem& modem) 
     : _modem(modem), _debug(true), _connected(false), 
@@ -253,7 +254,7 @@ bool Air780EGMqtt::checkConnection() {
 /**
  * 发布MQTT消息
  * 使用HEX编码模式：AT+MQTTMODE=1
- * 格式：AT+MPUB="topic",qos,retain,length,"hex_payload"
+ * 格式：AT+MPUB="topic",qos,retain,"hex_payload"
  */
 bool Air780EGMqtt::publish(const String& topic, const String& payload, int qos) {
     if (!_connected) {
@@ -285,8 +286,8 @@ bool Air780EGMqtt::publish(const String& topic, const String& payload, int qos) 
     }
     
     // 构建HEX模式的发布命令
-    // 格式：AT+MPUB="topic",qos,retain,length,"hex_payload"
-    String cmd = "AT+MPUB=\"" + topic + "\"," + String(qos) + ",0," + String(payload.length()) + ",\"" + hexPayload + "\"";
+    // 格式：AT+MPUB="topic",qos,retain,"hex_payload"
+    String cmd = "AT+MPUB=\"" + topic + "\"," + String(qos) + ",0,\"" + hexPayload + "\"";
     
     debugPrint("Air780EG MQTT: HEX载荷长度: " + String(hexPayload.length()));
     debugPrint("Air780EG MQTT: 原始消息: " + payload.substring(0, 30) + "...");
@@ -457,7 +458,7 @@ void Air780EGMqtt::setDebug(bool debug) {
 
 void Air780EGMqtt::debugPrint(const String& msg) {
     if (_debug) {
-        Serial.println("[Air780EG MQTT] " + msg);
+        MQTT_DEBUG_PRINTLN("[Air780EG MQTT] " + msg);
     }
 }
 

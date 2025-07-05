@@ -10,6 +10,8 @@
  * - MODE_CLIENT: 客户端模式，通过BLE接收服务器数据并显示
  */
 
+#include "config.h"
+
 #include "Arduino.h"
 #include "config.h"
 #include "power/PowerManager.h"
@@ -469,9 +471,9 @@ void loop()
 #ifndef DISABLE_MQTT
     if (mqttInitialized && mqttManager.isConnected())
     {
-      Serial.println("[MQTT] 准备发送设备状态消息...");
+      MQTT_DEBUG_PRINTLN("[MQTT] 准备发送设备状态消息...");
       bool publishResult = mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
-      Serial.printf("[MQTT] 设备状态消息发送结果: device_info=%s\n",
+      MQTT_DEBUG_PRINTF("[MQTT] 设备状态消息发送结果: device_info=%s\n",
                     publishResult ? "成功" : "失败");
     }
     else if (!mqttInitialized)
@@ -481,7 +483,7 @@ void loop()
       if (millis() - lastMqttWarning > 10000)
       { // 每10秒提示一次
         lastMqttWarning = millis();
-        Serial.println("[MQTT] 等待网络就绪后初始化MQTT...");
+        MQTT_DEBUG_PRINTLN("[MQTT] 等待网络就绪后初始化MQTT...");
       }
     }
 #endif
@@ -542,7 +544,7 @@ void handleSerialCommand()
       }
       else if (command == "gsm.mqtt")
       {
-        Serial.println("=== Air780EG MQTT测试 ===");
+        SYSTEM_DEBUG_PRINTLN("=== Air780EG MQTT测试 ===");
         if (device_state.gsmReady)
         {
           // 测试MQTT功能支持
@@ -550,12 +552,12 @@ void handleSerialCommand()
         }
         else
         {
-          Serial.println("GSM模块未就绪，无法测试MQTT功能");
+          SYSTEM_DEBUG_PRINTLN("GSM模块未就绪，无法测试MQTT功能");
         }
       }
       else if (command == "gsm.mqtt.debug")
       {
-        Serial.println("=== Air780EG MQTT连接调试 ===");
+        SYSTEM_DEBUG_PRINTLN("=== Air780EG MQTT连接调试 ===");
         if (device_state.gsmReady)
         {
           // 包含调试头文件并调用调试函数
@@ -564,11 +566,11 @@ void handleSerialCommand()
         }
         else
         {
-          Serial.println("GSM模块未就绪，无法进行MQTT调试");
+          SYSTEM_DEBUG_PRINTLN("GSM模块未就绪，无法进行MQTT调试");
         }
       }
 #else
-      Serial.println("Air780EG模块未启用");
+      SYSTEM_DEBUG_PRINTLN("Air780EG模块未启用");
 #endif
     }
     else
@@ -614,20 +616,20 @@ void handleSerialCommand()
         stateStr = "⚠️ 错误";
         break;
       }
-      Serial.println("MQTT状态: " + stateStr);
-      Serial.println("MQTT服务器: " + String(MQTT_BROKER) + ":" + String(MQTT_PORT));
+      MQTT_DEBUG_PRINTLN("MQTT状态: " + stateStr);
+      MQTT_DEBUG_PRINTLN("MQTT服务器: " + String(MQTT_BROKER) + ":" + String(MQTT_PORT));
 
       // 显示已注册的主题
-      Serial.println("--- MQTT主题配置 ---");
+      MQTT_DEBUG_PRINTLN("--- MQTT主题配置 ---");
       String deviceId = device_state.device_id;
       String baseTopic = "vehicle/v1/" + deviceId;
-      Serial.println("基础主题: " + baseTopic);
-      Serial.println("设备信息: " + baseTopic + "/telemetry/device");
-      Serial.println("位置信息: " + baseTopic + "/telemetry/location");
-      Serial.println("运动信息: " + baseTopic + "/telemetry/motion");
-      Serial.println("控制命令: " + baseTopic + "/ctrl/#");
+      MQTT_DEBUG_PRINTLN("基础主题: " + baseTopic);
+      MQTT_DEBUG_PRINTLN("设备信息: " + baseTopic + "/telemetry/device");
+      MQTT_DEBUG_PRINTLN("位置信息: " + baseTopic + "/telemetry/location");
+      MQTT_DEBUG_PRINTLN("运动信息: " + baseTopic + "/telemetry/motion");
+      MQTT_DEBUG_PRINTLN("控制命令: " + baseTopic + "/ctrl/#");
 #else
-      Serial.println("MQTT功能: ❌ 已禁用");
+      MQTT_DEBUG_PRINTLN("MQTT功能: ❌ 已禁用");
 #endif
 #endif
       Serial.println("");
@@ -693,22 +695,22 @@ void handleSerialCommand()
 #ifndef DISABLE_MQTT
       if (command == "mqtt.status")
       {
-        Serial.println("=== MQTT状态 ===");
-        Serial.println("MQTT服务器: " + String(MQTT_BROKER));
-        Serial.println("MQTT端口: " + String(MQTT_PORT));
-        Serial.println("保持连接: " + String(MQTT_KEEP_ALIVE) + "秒");
+        MQTT_DEBUG_PRINTLN("=== MQTT状态 ===");
+        MQTT_DEBUG_PRINTLN("MQTT服务器: " + String(MQTT_BROKER));
+        MQTT_DEBUG_PRINTLN("MQTT端口: " + String(MQTT_PORT));
+        MQTT_DEBUG_PRINTLN("保持连接: " + String(MQTT_KEEP_ALIVE) + "秒");
 
 #ifdef USE_AIR780EG_GSM
-        Serial.println("连接方式: Air780EG GSM");
-        Serial.println("GSM状态: " + String(device_state.gsmReady ? "就绪" : "未就绪"));
+        MQTT_DEBUG_PRINTLN("连接方式: Air780EG GSM");
+        MQTT_DEBUG_PRINTLN("GSM状态: " + String(device_state.gsmReady ? "就绪" : "未就绪"));
         if (device_state.gsmReady)
         {
-          Serial.println("网络状态: " + String(air780eg_modem.isNetworkReady() ? "已连接" : "未连接"));
-          Serial.println("信号强度: " + String(air780eg_modem.getCSQ()));
+          MQTT_DEBUG_PRINTLN("网络状态: " + String(air780eg_modem.isNetworkReady() ? "已连接" : "未连接"));
+          MQTT_DEBUG_PRINTLN("信号强度: " + String(air780eg_modem.getCSQ()));
         }
 #elif defined(ENABLE_WIFI)
-        Serial.println("连接方式: WiFi");
-        Serial.println("WiFi状态: " + String(device_state.wifiConnected ? "已连接" : "未连接"));
+        MQTT_DEBUG_PRINTLN("连接方式: WiFi");
+        MQTT_DEBUG_PRINTLN("WiFi状态: " + String(device_state.wifiConnected ? "已连接" : "未连接"));
 #endif
 
         // MQTT连接状态
@@ -729,52 +731,52 @@ void handleSerialCommand()
           stateStr = "错误";
           break;
         }
-        Serial.println("MQTT连接: " + stateStr);
+        MQTT_DEBUG_PRINTLN("MQTT连接: " + stateStr);
       }
       else if (command == "mqtt.connect")
       {
-        Serial.println("尝试连接MQTT...");
-        Serial.println("当前网络状态:");
+        MQTT_DEBUG_PRINTLN("尝试连接MQTT...");
+        MQTT_DEBUG_PRINTLN("当前网络状态:");
 #ifdef USE_AIR780EG_GSM
-        Serial.println("- GSM网络: " + String(air780eg_modem.isNetworkReady() ? "就绪" : "未就绪"));
-        Serial.println("- 信号强度: " + String(air780eg_modem.getCSQ()));
+        MQTT_DEBUG_PRINTLN("- GSM网络: " + String(air780eg_modem.isNetworkReady() ? "就绪" : "未就绪"));
+        MQTT_DEBUG_PRINTLN("- 信号强度: " + String(air780eg_modem.getCSQ()));
 #endif
-        Serial.println("- MQTT状态: " + String((int)mqttManager.getMqttState()));
+        MQTT_DEBUG_PRINTLN("- MQTT状态: " + String((int)mqttManager.getMqttState()));
 
         // 强制重新连接
         bool result = mqttManager.forceReconnect();
-        Serial.println("连接结果: " + String(result ? "成功" : "失败"));
+        MQTT_DEBUG_PRINTLN("连接结果: " + String(result ? "成功" : "失败"));
       }
       else if (command == "mqtt.test")
       {
-        Serial.println("发送MQTT测试消息...");
+        MQTT_DEBUG_PRINTLN("发送MQTT测试消息...");
         MqttState mqttState = mqttManager.getMqttState();
         if (mqttState == MqttState::CONNECTED)
         {
           String testTopic = "device/" + device_state.device_id + "/test";
           String testMessage = "{\"test\":\"mqtt_test\",\"timestamp\":" + String(millis()) + "}";
           mqttManager.publish(testTopic.c_str(), testMessage.c_str());
-          Serial.println("测试消息已发送到: " + testTopic);
+          MQTT_DEBUG_PRINTLN("测试消息已发送到: " + testTopic);
         }
         else
         {
-          Serial.println("❌ MQTT未连接，无法发送测试消息");
+          MQTT_DEBUG_PRINTLN("❌ MQTT未连接，无法发送测试消息");
         }
       }
       else if (command == "mqtt.help")
       {
-        Serial.println("=== MQTT命令帮助 ===");
-        Serial.println("mqtt.status     - 显示MQTT状态");
-        Serial.println("mqtt.connect    - 尝试连接MQTT");
-        Serial.println("mqtt.test       - 发送测试消息");
-        Serial.println("mqtt.help       - 显示此帮助信息");
+        MQTT_DEBUG_PRINTLN("=== MQTT命令帮助 ===");
+        MQTT_DEBUG_PRINTLN("mqtt.status     - 显示MQTT状态");
+        MQTT_DEBUG_PRINTLN("mqtt.connect    - 尝试连接MQTT");
+        MQTT_DEBUG_PRINTLN("mqtt.test       - 发送测试消息");
+        MQTT_DEBUG_PRINTLN("mqtt.help       - 显示此帮助信息");
       }
       else
       {
-        Serial.println("未知MQTT命令，输入 'mqtt.help' 查看帮助");
+        MQTT_DEBUG_PRINTLN("未知MQTT命令，输入 'mqtt.help' 查看帮助");
       }
 #else
-      Serial.println("MQTT功能已禁用");
+      MQTT_DEBUG_PRINTLN("MQTT功能已禁用");
 #endif
     }
     else if (command.startsWith("audio."))
@@ -903,8 +905,8 @@ void handleSerialCommand()
       Serial.println("  gsm.test   - 测试AT命令和波特率");
       Serial.println("  gsm.reset  - 重置Air780EG模块");
       Serial.println("  gsm.info   - 显示模块状态信息");
-      Serial.println("  gsm.mqtt   - 测试MQTT功能支持");
-      Serial.println("  gsm.mqtt.debug - MQTT连接详细调试");
+      SYSTEM_DEBUG_PRINTLN("  gsm.mqtt   - 测试MQTT功能支持");
+      SYSTEM_DEBUG_PRINTLN("  gsm.mqtt.debug - MQTT连接详细调试");
       Serial.println("");
 #endif
       Serial.println("提示: 命令不区分大小写");

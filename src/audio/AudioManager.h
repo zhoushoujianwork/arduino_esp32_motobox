@@ -27,7 +27,7 @@ enum AudioEvent {
 // 欢迎语音类型
 enum WelcomeVoiceType {
     WELCOME_VOICE_DEFAULT,      // 默认语音："大菠萝车机,扎西德勒"
-    WELCOME_VOICE_LIFAN_MOTUO   // 力帆摩托语音
+    WELCOME_VOICE_LIFAN_MOTUO,  // 力帆摩托专用语音
 };
 
 class AudioManager {

@@ -5,6 +5,7 @@
  */
 
 #include "Ml307Mqtt.h"
+#include "../config.h"
 
 Ml307Mqtt ml307Mqtt(ml307_at);
 
@@ -543,7 +544,7 @@ void Ml307Mqtt::debugPrint(const String &msg)
 {
     if (_debug)
     {
-        Serial.println("[ml307mqtt] [debug] " + msg);
+        MQTT_DEBUG_PRINTLN("[ml307mqtt] [debug] " + msg);
     }
 }
 

@@ -3,7 +3,6 @@
 #include "FS.h"
 #include "SPIFFS.h"
 #include "welcome_voice.h"  // 默认语音数据
-#include "lifanmotuo_welcome_voice.h"  // 力帆摩托语音数据
 
 static const char* TAG = "AudioManager";
 
@@ -419,8 +418,6 @@ const char* AudioManager::getWelcomeVoiceDescription() const {
     switch (currentWelcomeVoice) {
         case WELCOME_VOICE_DEFAULT:
             return WELCOME_VOICE_DATA_INFO.description;
-        case WELCOME_VOICE_LIFAN_MOTUO:
-            return LIFANMOTUO_WELCOME_VOICE_DATA_INFO.description;
         default:
             return "Unknown";
     }
@@ -432,9 +429,6 @@ bool AudioManager::playWelcomeVoice(WelcomeVoiceType voiceType) {
     switch (voiceType) {
         case WELCOME_VOICE_DEFAULT:
             voiceInfo = &WELCOME_VOICE_DATA_INFO;
-            break;
-        case WELCOME_VOICE_LIFAN_MOTUO:
-            voiceInfo = &LIFANMOTUO_WELCOME_VOICE_DATA_INFO;
             break;
         default:
             ESP_LOGE(TAG, "Unknown welcome voice type: %d", voiceType);

@@ -127,5 +127,52 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 #define AUDIO_LOW_BATTERY_ENABLED     true
 #define AUDIO_SLEEP_MODE_ENABLED      true
 
+/* Debug Configuration */
+// MQTT调试输出控制
+#ifndef MQTT_DEBUG_ENABLED
+#define MQTT_DEBUG_ENABLED            false
+#endif
+
+// 网络调试输出控制
+#ifndef NETWORK_DEBUG_ENABLED
+#define NETWORK_DEBUG_ENABLED         false
+#endif
+
+// 系统调试输出控制
+#ifndef SYSTEM_DEBUG_ENABLED
+#define SYSTEM_DEBUG_ENABLED          true
+#endif
+
+/* Debug Macros */
+#if MQTT_DEBUG_ENABLED
+#define MQTT_DEBUG_PRINT(x)           Serial.print(x)
+#define MQTT_DEBUG_PRINTLN(x)         Serial.println(x)
+#define MQTT_DEBUG_PRINTF(fmt, ...)   Serial.printf(fmt, ##__VA_ARGS__)
+#else
+#define MQTT_DEBUG_PRINT(x)           do {} while(0)
+#define MQTT_DEBUG_PRINTLN(x)         do {} while(0)
+#define MQTT_DEBUG_PRINTF(fmt, ...)   do {} while(0)
+#endif
+
+#if NETWORK_DEBUG_ENABLED
+#define NETWORK_DEBUG_PRINT(x)        Serial.print(x)
+#define NETWORK_DEBUG_PRINTLN(x)      Serial.println(x)
+#define NETWORK_DEBUG_PRINTF(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)
+#else
+#define NETWORK_DEBUG_PRINT(x)        do {} while(0)
+#define NETWORK_DEBUG_PRINTLN(x)      do {} while(0)
+#define NETWORK_DEBUG_PRINTF(fmt, ...) do {} while(0)
+#endif
+
+#if SYSTEM_DEBUG_ENABLED
+#define SYSTEM_DEBUG_PRINT(x)         Serial.print(x)
+#define SYSTEM_DEBUG_PRINTLN(x)       Serial.println(x)
+#define SYSTEM_DEBUG_PRINTF(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)
+#else
+#define SYSTEM_DEBUG_PRINT(x)         do {} while(0)
+#define SYSTEM_DEBUG_PRINTLN(x)       do {} while(0)
+#define SYSTEM_DEBUG_PRINTF(fmt, ...) do {} while(0)
+#endif
+
 
 #endif /* CONFIG_H */

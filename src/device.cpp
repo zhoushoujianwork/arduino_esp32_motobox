@@ -1,4 +1,5 @@
 #include "device.h"
+#include "config.h"
 #include "tft/TFT.h"
 #include "gps/GPSManager.h"
 #include "imu/qmi8658.h"
@@ -255,7 +256,7 @@ void mqttConnectionCallback(bool connected)
 #ifndef DISABLE_MQTT
     if (connected)
     {
-        Serial.println("MQTT连接成功，订阅主题");
+        MQTT_DEBUG_PRINTLN("MQTT连接成功，订阅主题");
 
         
         static bool firstConnect = true; // 添加静态变量标记首次连接
@@ -286,7 +287,7 @@ void mqttConnectionCallback(bool connected)
     }
     else
     {
-        Serial.println("MQTT连接失败");
+        MQTT_DEBUG_PRINTLN("MQTT连接失败");
     }
 #endif
 }
@@ -659,7 +660,7 @@ void Device::initializeGSM() {
 
 bool Device::initializeMQTT() {
 #if (defined(ENABLE_WIFI) || defined(ENABLE_GSM)) && !defined(DISABLE_MQTT)
-    Serial.println("🔄 开始MQTT初始化...");
+    MQTT_DEBUG_PRINTLN("🔄 开始MQTT初始化...");
     
     // 创建 MQTT 配置
     MqttManagerConfig config;
@@ -678,43 +679,43 @@ bool Device::initializeMQTT() {
     config.cleanSession = true; // 是否清除会话，true: 清除，false: 保留
 
     // 打印MQTT配置信息
-    Serial.println("=== MQTT配置信息 ===");
-    Serial.printf("MQTT服务器: %s\n", config.broker.c_str());
-    Serial.printf("MQTT端口: %d\n", config.port);
-    Serial.printf("MQTT客户端ID: %s\n", config.clientId.c_str());
-    Serial.printf("MQTT用户名: %s\n", config.username.c_str());
-    Serial.printf("MQTT密码: %s\n", config.password.length() > 0 ? "***已设置***" : "***未设置***");
-    Serial.printf("保持连接: %d秒\n", config.keepAlive);
-    Serial.printf("清除会话: %s\n", config.cleanSession ? "是" : "否");
+    MQTT_DEBUG_PRINTLN("=== MQTT配置信息 ===");
+    MQTT_DEBUG_PRINTF("MQTT服务器: %s\n", config.broker.c_str());
+    MQTT_DEBUG_PRINTF("MQTT端口: %d\n", config.port);
+    MQTT_DEBUG_PRINTF("MQTT客户端ID: %s\n", config.clientId.c_str());
+    MQTT_DEBUG_PRINTF("MQTT用户名: %s\n", config.username.c_str());
+    MQTT_DEBUG_PRINTF("MQTT密码: %s\n", config.password.length() > 0 ? "***已设置***" : "***未设置***");
+    MQTT_DEBUG_PRINTF("保持连接: %d秒\n", config.keepAlive);
+    MQTT_DEBUG_PRINTF("清除会话: %s\n", config.cleanSession ? "是" : "否");
     
 #ifdef USE_AIR780EG_GSM
-    Serial.println("连接方式: Air780EG 4G网络");
+    MQTT_DEBUG_PRINTLN("连接方式: Air780EG 4G网络");
 #elif defined(USE_ML307_GSM)
-    Serial.println("连接方式: ML307 4G网络");
+    MQTT_DEBUG_PRINTLN("连接方式: ML307 4G网络");
 #elif defined(ENABLE_WIFI)
-    Serial.println("连接方式: WiFi网络");
+    MQTT_DEBUG_PRINTLN("连接方式: WiFi网络");
 #else
-    Serial.println("连接方式: 未定义");
+    MQTT_DEBUG_PRINTLN("连接方式: 未定义");
 #endif
-    Serial.println("=== MQTT配置信息结束 ===");
+    MQTT_DEBUG_PRINTLN("=== MQTT配置信息结束 ===");
 
     // 初始化 MQTT 管理器
-    mqttManager.setDebug(true);
+    mqttManager.setDebug(MQTT_DEBUG_ENABLED);
     
     // 根据使用的GSM模块设置调试
 #ifdef USE_AIR780EG_GSM
-    air780eg_modem.setDebug(true);
+    air780eg_modem.setDebug(MQTT_DEBUG_ENABLED);
 #elif defined(USE_ML307_GSM)
-    ml307Mqtt.setDebug(true);
+    ml307Mqtt.setDebug(MQTT_DEBUG_ENABLED);
 #endif
     
     if (!mqttManager.begin(config))
     {
-        Serial.println("❌ MQTT 初始化失败");
+        MQTT_DEBUG_PRINTLN("❌ MQTT 初始化失败");
         return false;
     }
     
-    Serial.println("✅ MQTT 管理器初始化成功");
+    MQTT_DEBUG_PRINTLN("✅ MQTT 管理器初始化成功");
     
     // 设置回调
     mqttManager.onMessage(mqttMessageCallback);
@@ -726,7 +727,7 @@ bool Device::initializeMQTT() {
 #ifdef ENABLE_WIFI
                 // WiFi模式下可以同时更新WiFi状态
                 device_state.wifiConnected = true;
-                Serial.println("MQTT连接成功");
+                MQTT_DEBUG_PRINTLN("MQTT连接成功");
 #ifdef ENABLE_AUDIO
                 // 播放WiFi连接成功音
                 if (device_state.audioReady && AUDIO_WIFI_CONNECTED_ENABLED) {
@@ -735,32 +736,32 @@ bool Device::initializeMQTT() {
 #endif
 #else
                 // GSM模式下只更新MQTT状态
-                Serial.println("MQTT连接成功");
+                MQTT_DEBUG_PRINTLN("MQTT连接成功");
 #endif
                 ledManager.setLEDState(LED_BLINK_DUAL);
                 break;
             case MqttState::DISCONNECTED:
 #ifdef ENABLE_WIFI
                 device_state.wifiConnected = false;
-                Serial.println("MQTT连接断开");
+                MQTT_DEBUG_PRINTLN("MQTT连接断开");
 #else
-                Serial.println("MQTT连接断开");
+                MQTT_DEBUG_PRINTLN("MQTT连接断开");
 #endif
                 ledManager.setLEDState(LED_OFF);
                 break;
             case MqttState::ERROR:
 #ifdef ENABLE_WIFI
                 device_state.wifiConnected = false;
-                Serial.println("MQTT连接错误");
+                MQTT_DEBUG_PRINTLN("MQTT连接错误");
 #else
-                Serial.println("MQTT连接错误");
+                MQTT_DEBUG_PRINTLN("MQTT连接错误");
 #endif
                 ledManager.setLEDState(LED_BLINK_5_SECONDS);
                 break;
         } });
 
     // 等待MQTT连接成功
-    Serial.println("🔄 等待MQTT连接成功...");
+    MQTT_DEBUG_PRINTLN("🔄 等待MQTT连接成功...");
     unsigned long mqttConnectStart = millis();
     const unsigned long MQTT_CONNECT_TIMEOUT = 30000; // 30秒超时
     bool mqttConnected = false;
@@ -771,7 +772,7 @@ bool Device::initializeMQTT() {
         // 检查连接状态
         if (mqttManager.isConnected()) {
             mqttConnected = true;
-            Serial.println("✅ MQTT连接成功！");
+            MQTT_DEBUG_PRINTLN("✅ MQTT连接成功！");
             break;
         }
         
@@ -780,22 +781,22 @@ bool Device::initializeMQTT() {
         if (millis() - lastProgress > 2000) {
             lastProgress = millis();
             unsigned long elapsed = millis() - mqttConnectStart;
-            Serial.printf("⏳ MQTT连接中... (%lu/%lu秒)\n", elapsed/1000, MQTT_CONNECT_TIMEOUT/1000);
+            MQTT_DEBUG_PRINTF("⏳ MQTT连接中... (%lu/%lu秒)\n", elapsed/1000, MQTT_CONNECT_TIMEOUT/1000);
         }
         
         delay(100); // 短暂延时避免CPU占用过高
     }
     
     if (!mqttConnected) {
-        Serial.println("⚠️ MQTT连接超时，将在运行时继续尝试");
+        MQTT_DEBUG_PRINTLN("⚠️ MQTT连接超时，将在运行时继续尝试");
         return false;
     }
     
-    Serial.println("✅ MQTT初始化完成");
+    MQTT_DEBUG_PRINTLN("✅ MQTT初始化完成");
     return true;
     
 #else
-    Serial.println("⚠️ MQTT功能已禁用");
+    MQTT_DEBUG_PRINTLN("⚠️ MQTT功能已禁用");
     return false;
 #endif
 }
