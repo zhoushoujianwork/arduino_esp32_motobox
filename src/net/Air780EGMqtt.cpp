@@ -349,18 +349,25 @@ bool Air780EGMqtt::subscribe(const String& topic, int qos) {
         return false;
     }
 
-    debugPrint("Air780EG MQTT: 订阅主题 " + topic);
+    debugPrint("Air780EG MQTT: 订阅主题 " + topic + " (QoS=" + String(qos) + ")");
 
     // 按照文档格式：AT+MSUB="topic",qos
     String cmd = "AT+MSUB=\"" + topic + "\"," + String(qos);
 
     debugPrint("Air780EG MQTT: 订阅命令: " + cmd);
 
-    if (_modem.sendAT(cmd, "OK", 5000)) {
-        debugPrint("Air780EG MQTT: 订阅成功");
+    // 使用更详细的响应检查
+    String response = _modem.sendATWithResponse(cmd, 8000);
+    debugPrint("Air780EG MQTT: 订阅响应: " + response);
+    
+    if (response.indexOf("OK") >= 0) {
+        debugPrint("Air780EG MQTT: 订阅成功 - " + topic);
         return true;
+    } else if (response.indexOf("ERROR") >= 0) {
+        debugPrint("Air780EG MQTT: 订阅失败 - ERROR响应");
+        return false;
     } else {
-        debugPrint("Air780EG MQTT: 订阅失败");
+        debugPrint("Air780EG MQTT: 订阅超时或未知响应");
         return false;
     }
 }
@@ -389,21 +396,30 @@ bool Air780EGMqtt::unsubscribe(const String& topic) {
 void Air780EGMqtt::loop() {
     if (!_connected) return;
     
-    // 限制消息检查频率，避免过于频繁的AT命令
+    // 限制消息检查频率，但不要太慢以免影响实时性
     static unsigned long lastMsgCheck = 0;
     unsigned long now = millis();
     
-    // 每5秒检查一次消息，避免过于频繁
-    if (now - lastMsgCheck < 5000) {
+    // 每2秒检查一次消息，提高响应速度
+    if (now - lastMsgCheck < 2000) {
         return;
     }
     lastMsgCheck = now;
     
     // 检查是否有新消息 - 使用正确的AT指令
     try {
-        String response = _modem.sendATWithResponse("AT+MQTTMSGGET", 2000);
-        if (response.length() > 0 && response.indexOf("+MQTTMSGGET:") >= 0) {
-            handleIncomingMessage(response);
+        String response = _modem.sendATWithResponse("AT+MQTTMSGGET", 3000);
+        debugPrint("Air780EG MQTT: 消息检查响应: " + response);
+        
+        if (response.length() > 0) {
+            if (response.indexOf("+MQTTMSGGET:") >= 0) {
+                handleIncomingMessage(response);
+            } else if (response.indexOf("OK") >= 0) {
+                // OK响应表示没有新消息，这是正常的
+                debugPrint("Air780EG MQTT: 无新消息");
+            } else {
+                debugPrint("Air780EG MQTT: 未知响应格式: " + response);
+            }
         }
     } catch (...) {
         debugPrint("Air780EG MQTT: 消息检查异常");
@@ -416,7 +432,7 @@ void Air780EGMqtt::setCallback(void (*callback)(String topic, String payload)) {
 
 void Air780EGMqtt::handleIncomingMessage(const String& response) {
     // 解析收到的MQTT消息
-    // 格式可能是: +MQTTMSGGET: "topic","payload"
+    // 格式: +MQTTMSGGET: "topic","payload"
     debugPrint("Air780EG MQTT: 收到消息: " + response);
     
     // 安全检查：确保response不为空且包含有效数据
@@ -438,14 +454,54 @@ void Air780EGMqtt::handleIncomingMessage(const String& response) {
     }
     
     try {
-        // 简单的消息处理，避免复杂的字符串解析
-        String topic = "air780eg/message";
-        String payload = response.substring(response.indexOf(":") + 1);
-        payload.trim();
+        // 解析消息格式: +MQTTMSGGET: "topic","payload"
+        int colonPos = response.indexOf(":");
+        if (colonPos < 0) {
+            debugPrint("Air780EG MQTT: 找不到冒号分隔符");
+            return;
+        }
         
-        // 确保payload不为空
-        if (payload.length() > 0) {
+        String msgPart = response.substring(colonPos + 1);
+        msgPart.trim();
+        
+        // 查找第一个引号对 (topic)
+        int firstQuote = msgPart.indexOf('"');
+        if (firstQuote < 0) {
+            debugPrint("Air780EG MQTT: 找不到topic的起始引号");
+            return;
+        }
+        
+        int secondQuote = msgPart.indexOf('"', firstQuote + 1);
+        if (secondQuote < 0) {
+            debugPrint("Air780EG MQTT: 找不到topic的结束引号");
+            return;
+        }
+        
+        String topic = msgPart.substring(firstQuote + 1, secondQuote);
+        
+        // 查找第二个引号对 (payload)
+        int thirdQuote = msgPart.indexOf('"', secondQuote + 1);
+        if (thirdQuote < 0) {
+            debugPrint("Air780EG MQTT: 找不到payload的起始引号");
+            return;
+        }
+        
+        int fourthQuote = msgPart.indexOf('"', thirdQuote + 1);
+        if (fourthQuote < 0) {
+            debugPrint("Air780EG MQTT: 找不到payload的结束引号");
+            return;
+        }
+        
+        String payload = msgPart.substring(thirdQuote + 1, fourthQuote);
+        
+        debugPrint("Air780EG MQTT: 解析到主题: " + topic);
+        debugPrint("Air780EG MQTT: 解析到负载: " + payload);
+        
+        // 确保topic和payload都不为空
+        if (topic.length() > 0 && payload.length() > 0) {
             _messageCallback(topic, payload);
+        } else {
+            debugPrint("Air780EG MQTT: 主题或负载为空，忽略消息");
         }
     } catch (...) {
         debugPrint("Air780EG MQTT: 消息处理异常，忽略");

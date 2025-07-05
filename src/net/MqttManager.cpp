@@ -880,7 +880,7 @@ bool MqttManager::publishToTopic(const String &name, const char *payload, bool r
     if (result)
     {
         it->second.lastPublishTime = now;
-        debugPrint("MqttManager 发布成功 - 主题: " + it->second.topic + ", 负载长度: " + String(strlen(payload)));
+        Serial.println("MqttManager 发布成功 - 主题: " + it->second.topic + ", 负载长度: " + String(strlen(payload)));
     }
     else
     {

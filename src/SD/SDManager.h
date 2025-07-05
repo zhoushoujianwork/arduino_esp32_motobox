@@ -38,6 +38,23 @@ public:
     // 串口命令处理
     bool handleSerialCommand(const String& command);
 
+    // ========== 简单语音文件支持 ==========
+    /**
+     * @brief 检查SD卡上是否存在自定义欢迎语音文件
+     * @return 是否存在 /voice/welcome.wav
+     */
+    bool hasCustomWelcomeVoice();
+    /**
+     * @brief 获取自定义欢迎语音文件路径
+     * @return 文件路径 "/voice/welcome.wav"
+     */
+    String getCustomWelcomeVoicePath();
+    /**
+     * @brief 检查语音文件是否有效（WAV格式）
+     * @return 是否有效
+     */
+    bool isValidWelcomeVoiceFile();
+
 private:
     bool _initialized;
 
