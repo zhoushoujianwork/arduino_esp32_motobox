@@ -1,12 +1,15 @@
 /*
  * Air780EG 集成示例
  * 展示如何将Air780EG集成到现有的MotoBox系统中
+ * 
+ * 注意：此文件是示例代码，默认不编译
+ * 如需使用，请将 ENABLE_AIR780EG_INTEGRATION 改为 ENABLE_AIR780EG
  */
 
 #include "Air780EGModem.h"
 #include "Air780EGMqtt.h"
 
-#ifdef ENABLE_AIR780EG
+#ifdef ENABLE_AIR780EG_INTEGRATION  // 改为不会被定义的宏，禁用编译
 
 // 前置声明
 void handleMQTTMessage(String topic, String payload);
@@ -71,6 +74,9 @@ bool initializeAir780EG() {
         Serial.println("GNSS启用失败");
     }
     
+    // 设置MQTT消息回调到modem
+    air780eg_modem.setMQTTCallback(handleMQTTMessage);
+    
     // 初始化MQTT
     air780eg_mqtt = new Air780EGMqtt(air780eg_modem);
     air780eg_mqtt->setDebug(true);
@@ -82,9 +88,6 @@ bool initializeAir780EG() {
             // 订阅控制主题
             air780eg_mqtt->subscribe("motobox/control", 1);
             air780eg_mqtt->subscribe("motobox/config", 1);
-            
-            // 设置消息回调
-            air780eg_mqtt->setCallback(handleMQTTMessage);
             
             air780eg_initialized = true;
             return true;

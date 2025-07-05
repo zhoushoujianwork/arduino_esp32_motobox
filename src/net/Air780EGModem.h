@@ -86,14 +86,18 @@ public:
     // 状态检查
     bool isReady();
     
+    // MQTT 回调管理 - 由 Air780EGMqtt 使用
+    void setMQTTMessageHandler(void (*callback)(String topic, String payload));
+    
     // 线程安全的AT命令方法
     bool sendATThreadSafe(const String& cmd, const String& expected = "OK", uint32_t timeout = 1000);
     String sendATWithResponseThreadSafe(const String& cmd, uint32_t timeout = 1000);
     bool sendATWithRetryThreadSafe(const String &cmd, const String &expected = "OK", int maxRetry = 3, uint32_t timeout = 2000);
 
-    // GNSS URC处理
+    // URC处理
     void processURC();                          // 处理未请求的结果代码
     bool handleGNSSURC(const String& urc);      // 处理GNSS自动上报数据
+    void handleMQTTURC(const String& data);     // 处理MQTT URC消息
     void analyzeGNSSFields(const String& data); // 分析GNSS数据字段（调试用）
     
     // 调试功能
@@ -146,6 +150,9 @@ private:
     String _lastGNSSRaw;
     int _gnssUpdateRate;  // Hz
     
+    // MQTT消息处理器 - 由 Air780EGMqtt 注册
+    void (*_mqttMessageHandler)(String topic, String payload);
+    
     // 私有方法
     void flushInput();
     unsigned long calculateBackoffDelay();
@@ -164,8 +171,7 @@ private:
     
     // GNSS解析方法
     bool parseGNSSResponse(const String& response);
-    bool parseNMEA(const String& nmea);
-    
+
     // 互斥锁
     std::mutex _atMutex;
 };

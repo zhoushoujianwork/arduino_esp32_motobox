@@ -29,6 +29,9 @@ public:
     void loop();
     void setCallback(void (*callback)(String topic, String payload));
     
+    // 内部消息处理方法 - 由 Air780EGModem 调用
+    void handleMQTTMessage(String topic, String payload);
+    
     // 状态检查
     bool checkConnection();
     void setDebug(bool debug);
@@ -48,8 +51,6 @@ private:
     
     void debugPrint(const String& msg);
     bool setupMQTT();
-    void handleIncomingMessage(const String& data);
-    void parseMSUBMessage(const String& data);  // 新增：解析MSUB消息
 };
 
 #endif // AIR780EG_MQTT_H

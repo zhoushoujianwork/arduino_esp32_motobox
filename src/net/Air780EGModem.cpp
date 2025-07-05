@@ -19,7 +19,8 @@ Air780EGModem::Air780EGModem(HardwareSerial& serial, int rxPin, int txPin, int e
       _lastLBSUpdate(0), _isLBSLoading(false),
       _lastCMEErrorTime(0), _cmeErrorCount(0), _backoffDelay(0),
       _lastGNSSUpdate(0), _gnssUpdateRate(1),
-      _lastLoopTime(0), _loopTimeoutCount(0) {
+      _lastLoopTime(0), _loopTimeoutCount(0),
+      _mqttMessageHandler(nullptr) {
 }
 
 bool Air780EGModem::begin(uint32_t baudrate) {
@@ -127,7 +128,6 @@ bool Air780EGModem::initModem() {
     _initState = INIT_IDLE;
     _initStartTime = millis();
     _lastInitCheck = 0;
-    
     return true;
 }
 
@@ -167,6 +167,11 @@ bool Air780EGModem::reset() {
 
 void Air780EGModem::setDebug(bool debug) {
     _debug = debug;
+}
+
+void Air780EGModem::setMQTTMessageHandler(void (*callback)(String topic, String payload)) {
+    _mqttMessageHandler = callback;
+    debugPrint("Air780EG: MQTT消息处理器已注册");
 }
 
 void Air780EGModem::debugPrint(const String& msg) {
@@ -1021,7 +1026,12 @@ void Air780EGModem::processURC() {
                 if (buffer.startsWith("+UGNSINF:")) {
                     handleGNSSURC(buffer);
                 }
+                // 判断是否是 mqtt 上报
+                if (buffer.startsWith("+MSUB:")) {
+                    handleMQTTURC(buffer);
+                }
                 // 可以在这里添加其他URC处理
+
             }
             buffer = "";
         }
@@ -1104,6 +1114,144 @@ void Air780EGModem::analyzeGNSSFields(const String& data) {
         GNSS_DEBUG_PRINTLN("• 可见卫星: " + (fields[14].length() > 0 ? fields[14] : String("0")));
         GNSS_DEBUG_PRINTLN("• 使用卫星: " + (fields[15].length() > 0 ? fields[15] : String("0")));
         GNSS_DEBUG_PRINTLN("• HDOP值: " + (fields[10].length() > 0 ? fields[10] : String("99.9")));
+    }
+}
+
+// 处理MQTT URC消息
+void Air780EGModem::handleMQTTURC(const String& data) {
+    MQTT_DEBUG_PRINTLN("[Air780EG] 收到MQTT URC: " + data);
+    
+    // 安全检查：确保data不为空且包含有效数据
+    if (data.length() == 0) {
+        MQTT_DEBUG_PRINTLN("[Air780EG] ❌ 收到空消息，忽略");
+        return;
+    }
+    
+    // 检查消息格式
+    if (data.indexOf("+MSUB:") < 0) {
+        MQTT_DEBUG_PRINTLN("[Air780EG] ❌ 消息格式不正确，缺少+MSUB:标识");
+        return;
+    }
+    
+    // 安全检查回调函数
+    if (_mqttMessageHandler == nullptr) {
+        MQTT_DEBUG_PRINTLN("[Air780EG] ❌ MQTT消息处理器未设置，消息将被丢弃");
+        return;
+    }
+    
+    MQTT_DEBUG_PRINTLN("[Air780EG] 开始解析MQTT消息内容...");
+    
+    try {
+        // 解析MSUB消息格式: +MSUB: <topic>,<len>,<message>
+        // 查找+MSUB:标识
+        int msubPos = data.indexOf("+MSUB:");
+        if (msubPos < 0) {
+            MQTT_DEBUG_PRINTLN("[Air780EG] ❌ 找不到+MSUB:标识");
+            return;
+        }
+        
+        // 提取消息部分
+        String msgPart = data.substring(msubPos + 6); // 跳过"+MSUB:"
+        msgPart.trim();
+        MQTT_DEBUG_PRINTLN("[Air780EG] 提取消息部分: " + msgPart);
+        
+        // 解析格式: <topic>,<len>,<message>
+        // 查找第一个逗号 (topic结束位置)
+        int firstComma = msgPart.indexOf(',');
+        if (firstComma < 0) {
+            MQTT_DEBUG_PRINTLN("[Air780EG] ❌ 找不到第一个逗号分隔符");
+            return;
+        }
+        
+        // 提取topic
+        String topic = msgPart.substring(0, firstComma);
+        topic.trim();
+        // 去除主题两端的引号
+        if (topic.startsWith("\"") && topic.endsWith("\"")) {
+            topic = topic.substring(1, topic.length() - 1);
+        }
+        MQTT_DEBUG_PRINTLN("[Air780EG] 解析到主题: '" + topic + "'");
+        
+        // 查找第二个逗号 (len结束位置)
+        int secondComma = msgPart.indexOf(',', firstComma + 1);
+        if (secondComma < 0) {
+            MQTT_DEBUG_PRINTLN("[Air780EG] ❌ 找不到第二个逗号分隔符");
+            return;
+        }
+        
+        // 提取len (消息长度)
+        String lenStr = msgPart.substring(firstComma + 1, secondComma);
+        lenStr.trim();
+        // 去除可能的"byte"后缀
+        if (lenStr.endsWith(" byte")) {
+            lenStr = lenStr.substring(0, lenStr.length() - 5);
+        }
+        int expectedLen = lenStr.toInt();
+        MQTT_DEBUG_PRINTLN("[Air780EG] 预期消息长度: " + String(expectedLen));
+        
+        // 提取message (十六进制数据)
+        String hexMessage = msgPart.substring(secondComma + 1);
+        hexMessage.trim();
+        
+        // 清理消息内容，移除换行符和"OK"
+        int okPos = hexMessage.indexOf("OK");
+        if (okPos >= 0) {
+            hexMessage = hexMessage.substring(0, okPos);
+        }
+        hexMessage.trim();
+        
+        MQTT_DEBUG_PRINTLN("[Air780EG] 解析到十六进制消息: '" + hexMessage + "'");
+        MQTT_DEBUG_PRINTLN("[Air780EG] 十六进制消息长度: " + String(hexMessage.length()));
+        
+        // 将十六进制字符串转换为实际字符串
+        String message = "";
+        if (hexMessage.length() % 2 != 0) {
+            MQTT_DEBUG_PRINTLN("[Air780EG] ⚠️ 十六进制消息长度不是偶数，可能有问题");
+        }
+        
+        for (int i = 0; i < hexMessage.length(); i += 2) {
+            if (i + 1 < hexMessage.length()) {
+                String hexByte = hexMessage.substring(i, i + 2);
+                // 验证是否为有效的十六进制字符
+                bool isValidHex = true;
+                for (int j = 0; j < hexByte.length(); j++) {
+                    char c = hexByte.charAt(j);
+                    if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))) {
+                        isValidHex = false;
+                        break;
+                    }
+                }
+                
+                if (isValidHex) {
+                    char c = (char)strtol(hexByte.c_str(), NULL, 16);
+                    message += c;
+                } else {
+                    MQTT_DEBUG_PRINTLN("[Air780EG] ⚠️ 无效的十六进制字符: " + hexByte);
+                }
+            }
+        }
+        
+        MQTT_DEBUG_PRINTLN("[Air780EG] 转换后的消息: '" + message + "'");
+        MQTT_DEBUG_PRINTLN("[Air780EG] 转换后消息长度: " + String(message.length()));
+        
+        // 验证消息长度
+        if (message.length() != expectedLen) {
+            MQTT_DEBUG_PRINTLN("[Air780EG] ⚠️ 消息长度不匹配，预期: " + String(expectedLen) + ", 实际: " + String(message.length()));
+        }
+        
+        // 确保topic和message都不为空
+        if (topic.length() > 0 && message.length() > 0) {
+            MQTT_DEBUG_PRINTLN("[Air780EG] ✅ MQTT消息解析成功，调用消息处理器");
+            _mqttMessageHandler(topic, message);
+            MQTT_DEBUG_PRINTLN("[Air780EG] 消息处理器执行完成");
+        } else {
+            MQTT_DEBUG_PRINTLN("[Air780EG] ❌ 主题或消息为空，忽略");
+            MQTT_DEBUG_PRINTLN("[Air780EG] 主题长度: " + String(topic.length()));
+            MQTT_DEBUG_PRINTLN("[Air780EG] 消息长度: " + String(message.length()));
+        }
+        
+    } catch (...) {
+        MQTT_DEBUG_PRINTLN("[Air780EG] ❌ MQTT消息解析异常");
     }
 }
 

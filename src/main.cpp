@@ -331,7 +331,6 @@ void setup()
 #endif
   //================ SD卡初始化结束 ================
   
-
   // 创建任务
   xTaskCreate(taskSystem, "TaskSystem", 1024 * 15, NULL, 1, NULL);
   xTaskCreate(taskDataProcessing, "TaskData", 1024 * 15, NULL, 2, NULL);
