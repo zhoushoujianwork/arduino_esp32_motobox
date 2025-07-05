@@ -18,7 +18,8 @@ Air780EGModem::Air780EGModem(HardwareSerial& serial, int rxPin, int txPin, int e
       _initState(INIT_IDLE), _initStartTime(0), _lastInitCheck(0),
       _lastLBSUpdate(0), _isLBSLoading(false),
       _lastCMEErrorTime(0), _cmeErrorCount(0), _backoffDelay(0),
-      _lastGNSSUpdate(0), _gnssUpdateRate(1) {
+      _lastGNSSUpdate(0), _gnssUpdateRate(1),
+      _lastLoopTime(0), _loopTimeoutCount(0) {
 }
 
 bool Air780EGModem::begin(uint32_t baudrate) {
@@ -279,7 +280,9 @@ bool Air780EGModem::enableGNSS(bool enable) {
         
         // 先查询当前GNSS状态
         String currentStatus = sendATWithResponse("AT+CGNSPWR?", 3000);
-        debugPrint("Air780EG: 当前GNSS状态: " + currentStatus);
+        if (currentStatus.length() > 0) {
+            debugPrint("Air780EG: 当前GNSS状态: " + currentStatus);
+        }
         
         // 1. 开启GNSS电源
         debugPrint("Air780EG: 发送GNSS开启命令...");
@@ -293,38 +296,45 @@ bool Air780EGModem::enableGNSS(bool enable) {
             
             // 3. 验证GNSS状态
             String verifyStatus = sendATWithResponse("AT+CGNSPWR?", 3000);
-            debugPrint("Air780EG: GNSS启用后状态: " + verifyStatus);
+            if (verifyStatus.length() > 0) {
+                debugPrint("Air780EG: GNSS启用后状态: " + verifyStatus);
+            }
             
-            // 4. 获取GNSS信息进行调试
+            // 4. 获取GNSS信息进行调试（简化版本）
             delay(1000);
             String gnssInfo = sendATWithResponse("AT+CGNSINF", 3000);
-            if (gnssInfo.length() > 0) {
-                debugPrint("Air780EG: GNSS信息: " + gnssInfo);
+            if (gnssInfo.length() > 0 && gnssInfo.indexOf("+CGNSINF:") >= 0) {
+                debugPrint("Air780EG: GNSS信息获取成功");
                 
-                // 简单解析GNSS信息
-                if (gnssInfo.indexOf("+CGNSINF:") >= 0) {
-                    String data = gnssInfo.substring(gnssInfo.indexOf(":") + 1);
+                // 简化的解析，避免复杂的字符串操作
+                int dataStart = gnssInfo.indexOf(":") + 1;
+                if (dataStart > 0 && dataStart < gnssInfo.length()) {
+                    String data = gnssInfo.substring(dataStart);
                     data.trim();
                     
-                    // 解析第一个和第二个字段（电源状态和定位状态）
+                    // 只检查前两个字段
                     int firstComma = data.indexOf(',');
-                    int secondComma = data.indexOf(',', firstComma + 1);
-                    
-                    if (firstComma > 0 && secondComma > firstComma) {
+                    if (firstComma > 0 && firstComma < data.length() - 1) {
                         String powerStatus = data.substring(0, firstComma);
-                        String fixStatus = data.substring(firstComma + 1, secondComma);
                         
-                        debugPrint("Air780EG: GNSS电源: " + String(powerStatus == "1" ? "开启" : "关闭"));
-                        debugPrint("Air780EG: 定位状态: " + String(fixStatus == "1" ? "已定位" : "未定位"));
-                        
-                        if (fixStatus == "0") {
-                            debugPrint("Air780EG: ⚠️ GNSS定位建议:");
-                            debugPrint("  • 确保设备在室外或靠近窗户");
-                            debugPrint("  • 检查GNSS天线连接");
-                            debugPrint("  • 冷启动可能需要5-15分钟");
+                        int secondComma = data.indexOf(',', firstComma + 1);
+                        if (secondComma > firstComma && secondComma < data.length()) {
+                            String fixStatus = data.substring(firstComma + 1, secondComma);
+                            
+                            debugPrint("Air780EG: GNSS电源: " + String(powerStatus == "1" ? "开启" : "关闭"));
+                            debugPrint("Air780EG: 定位状态: " + String(fixStatus == "1" ? "已定位" : "未定位"));
+                            
+                            if (fixStatus == "0") {
+                                debugPrint("Air780EG: ⚠️ GNSS定位建议:");
+                                debugPrint("  • 确保设备在室外或靠近窗户");
+                                debugPrint("  • 检查GNSS天线连接");
+                                debugPrint("  • 冷启动可能需要5-15分钟");
+                            }
                         }
                     }
                 }
+            } else {
+                debugPrint("Air780EG: ⚠️ 无法获取GNSS信息");
             }
             
             debugPrint("Air780EG: GNSS启用成功");
@@ -332,13 +342,17 @@ bool Air780EGModem::enableGNSS(bool enable) {
         } else {
             debugPrint("Air780EG: GNSS电源开启失败");
             
-            // 获取详细错误信息
+            // 获取详细错误信息（简化版本）
             String errorInfo = sendATWithResponse("AT+CMEE=2", 3000);
-            debugPrint("Air780EG: 启用详细错误信息: " + errorInfo);
+            if (errorInfo.length() > 0) {
+                debugPrint("Air780EG: 启用详细错误信息: " + errorInfo);
+            }
             
             // 再次尝试查询状态
             String statusAfterFail = sendATWithResponse("AT+CGNSPWR?", 3000);
-            debugPrint("Air780EG: 失败后GNSS状态: " + statusAfterFail);
+            if (statusAfterFail.length() > 0) {
+                debugPrint("Air780EG: 失败后GNSS状态: " + statusAfterFail);
+            }
             
             return false;
         }
@@ -674,10 +688,18 @@ void Air780EGModem::flushInput() {
 String Air780EGModem::waitResponse(uint32_t timeout) {
     String response = "";
     unsigned long start = millis();
+    const size_t MAX_RESPONSE_LENGTH = 2048; // 限制响应长度，防止内存溢出
     
     while (millis() - start < timeout) {
         if (_serial.available()) {
             char c = _serial.read();
+            
+            // 检查响应长度，防止内存溢出
+            if (response.length() >= MAX_RESPONSE_LENGTH) {
+                debugPrint("Air780EG: ⚠️ 响应过长，截断处理");
+                break;
+            }
+            
             response += c;
             
             if (response.endsWith("OK\r\n") || response.endsWith("ERROR\r\n") || 
@@ -689,7 +711,14 @@ String Air780EGModem::waitResponse(uint32_t timeout) {
     }
     
     if (_debug && response.length() > 0) {
-        Serial.println("<< " + response);
+        // 如果响应太长，只显示前面和后面的部分
+        if (response.length() > 200) {
+            String truncated = response.substring(0, 100) + "...[截断]..." + 
+                              response.substring(response.length() - 100);
+            Serial.println("<< " + truncated);
+        } else {
+            Serial.println("<< " + response);
+        }
     }
     
     return response;
@@ -772,12 +801,31 @@ void Air780EGModem::debugLBSConfig() {
 
 // 后台初始化处理
 void Air780EGModem::loop() {
+    unsigned long now = millis();
+    
+    // 看门狗检查 - 防止死锁
+    if (_lastLoopTime > 0 && (now - _lastLoopTime) > LOOP_TIMEOUT_MS) {
+        _loopTimeoutCount++;
+        debugPrint("Air780EG: ⚠️ 检测到超时，计数: " + String(_loopTimeoutCount));
+        
+        if (_loopTimeoutCount >= MAX_TIMEOUT_COUNT) {
+            debugPrint("Air780EG: ⚠️ 多次超时，重置初始化状态");
+            _initState = INIT_IDLE;
+            _loopTimeoutCount = 0;
+        }
+    }
+    _lastLoopTime = now;
+    
     // 如果已经完成初始化，直接返回
     if (_initState == INIT_COMPLETED) {
         return;
     }
     
-    unsigned long now = millis();
+    // 添加安全检查
+    if (!_serial) {
+        debugPrint("Air780EG: ⚠️ 串口未初始化");
+        return;
+    }
     
     // 每2秒检查一次
     if (now - _lastInitCheck < 2000) {
@@ -785,47 +833,74 @@ void Air780EGModem::loop() {
     }
     _lastInitCheck = now;
     
-    switch (_initState) {
-        case INIT_IDLE:
-            // 只有在网络未就绪时才开始后台初始化
-            if (!isNetworkReady()) {
-                debugPrint("Air780EG: 🔄 开始后台网络注册...");
-                _initState = INIT_WAITING_NETWORK;
-                _initStartTime = now;
-            } else {
-                // 网络已就绪，直接跳到GNSS初始化
-                debugPrint("Air780EG: ✅ 网络已就绪，跳过注册步骤");
-                debugPrint("Air780EG: 🛰️ 启用GNSS...");
-                _initState = INIT_ENABLING_GNSS;
-            }
-            break;
-            
-        case INIT_WAITING_NETWORK:
-            if (isNetworkReady()) {
-                debugPrint("Air780EG: ✅ 网络注册成功");
-                debugPrint("Air780EG: 🛰️ 启用GNSS...");
-                _initState = INIT_ENABLING_GNSS;
-            } else if (now - _initStartTime > 60000) { // 60秒超时
-                debugPrint("Air780EG: ⚠️ 网络注册超时，将继续重试");
-                _initStartTime = now; // 重置计时器
-            }
-            break;
-            
-        case INIT_ENABLING_GNSS:
-            if (enableGNSS(true)) {
-                debugPrint("Air780EG: ✅ GNSS启用成功");
-                setGNSSUpdateRate(1);
-                _initState = INIT_COMPLETED;
-                debugPrint("Air780EG: 🎉 完全初始化完成");
-            } else {
-                debugPrint("Air780EG: ⚠️ GNSS启用失败，将重试");
-                // 继续保持在这个状态，下次再试
-            }
-            break;
-            
-        case INIT_COMPLETED:
-            // 初始化完成，不需要做任何事
-            break;
+    // 添加异常处理
+    try {
+        switch (_initState) {
+            case INIT_IDLE:
+                // 只有在网络未就绪时才开始后台初始化
+                if (!isNetworkReady()) {
+                    debugPrint("Air780EG: 🔄 开始后台网络注册...");
+                    _initState = INIT_WAITING_NETWORK;
+                    _initStartTime = now;
+                } else {
+                    // 网络已就绪，直接跳到GNSS初始化
+                    debugPrint("Air780EG: ✅ 网络已就绪，跳过注册步骤");
+                    debugPrint("Air780EG: 🛰️ 启用GNSS...");
+                    _initState = INIT_ENABLING_GNSS;
+                }
+                break;
+                
+            case INIT_WAITING_NETWORK:
+                if (isNetworkReady()) {
+                    debugPrint("Air780EG: ✅ 网络注册成功");
+                    debugPrint("Air780EG: 🛰️ 启用GNSS...");
+                    _initState = INIT_ENABLING_GNSS;
+                } else if (now - _initStartTime > 60000) { // 60秒超时
+                    debugPrint("Air780EG: ⚠️ 网络注册超时，将继续重试");
+                    _initStartTime = now; // 重置计时器
+                }
+                break;
+                
+            case INIT_ENABLING_GNSS:
+                {
+                    // 添加安全检查，避免在GNSS启用过程中出现异常
+                    bool gnssResult = false;
+                    try {
+                        gnssResult = enableGNSS(true);
+                    } catch (...) {
+                        debugPrint("Air780EG: ⚠️ GNSS启用过程中发生异常");
+                        gnssResult = false;
+                    }
+                    
+                    if (gnssResult) {
+                        debugPrint("Air780EG: ✅ GNSS启用成功");
+                        // 安全地设置更新频率
+                        try {
+                            setGNSSUpdateRate(1);
+                        } catch (...) {
+                            debugPrint("Air780EG: ⚠️ 设置GNSS更新频率时发生异常");
+                        }
+                        _initState = INIT_COMPLETED;
+                        debugPrint("Air780EG: 🎉 完全初始化完成");
+                    } else {
+                        debugPrint("Air780EG: ⚠️ GNSS启用失败，将重试");
+                        // 继续保持在这个状态，下次再试
+                    }
+                }
+                break;
+                
+            case INIT_COMPLETED:
+                // 初始化完成，不需要做任何事
+                break;
+                
+            default:
+                debugPrint("Air780EG: ⚠️ 未知的初始化状态，重置为IDLE");
+                _initState = INIT_IDLE;
+                break;
+        }
+    } catch (...) {
+        debugPrint("Air780EG: ⚠️ loop函数中发生未捕获的异常，重置状态");
+        _initState = INIT_IDLE;
     }
 }
 

@@ -187,16 +187,26 @@ void taskDataProcessing(void *parameter)
   const unsigned long GPS_RECORD_INTERVAL = 5000; // 5秒记录一次GPS数据
   const unsigned long IMU_RECORD_INTERVAL = 1000; // 1秒记录一次IMU数据
 
-  // IMU数据处理
-#ifdef ENABLE_IMU
-  imu.setDebug(false);
-  imu.loop();
+  for (;;)
+  {
+    // Air780EG后台初始化处理 - 统一在这里处理，避免竞争条件
+#ifdef USE_AIR780EG_GSM
+    // 只有在网络未就绪或MQTT未连接时才执行后台初始化
+    if (!air780eg_modem.isNetworkReady() || !mqttInitialized) {
+      air780eg_modem.loop();
+    }
 #endif
 
-  // GPS数据处理 - 使用统一的GPS管理器
-  gpsManager.loop();
-  // 更新GPS状态到设备状态
-  device_state.gpsReady = gpsManager.isReady();
+    // IMU数据处理
+#ifdef ENABLE_IMU
+    imu.setDebug(false);
+    imu.loop();
+#endif
+
+    // GPS数据处理 - 使用统一的GPS管理器
+    gpsManager.loop();
+    // 更新GPS状态到设备状态
+    device_state.gpsReady = gpsManager.isReady();
 
 #ifdef ENABLE_SDCARD
   // 数据记录到SD卡
@@ -275,7 +285,8 @@ void taskDataProcessing(void *parameter)
   mqttManager.loop();
 #endif
 
-  delay(10); // 增加延时，减少CPU占用
+    delay(10); // 增加延时，减少CPU占用
+  } // for循环结束
 }
 
 #ifdef ENABLE_WIFI
@@ -395,12 +406,13 @@ void loop()
     }
   }
 
-  // Air780EG后台初始化处理 - 只在网络未就绪时执行
+  // Air780EG后台初始化处理 - 移到taskDataProcessing中统一处理
+  // 避免与gpsManager.loop()产生竞争条件
 #ifdef USE_AIR780EG_GSM
-  // 只有在网络未就绪或MQTT未连接时才执行后台初始化
-  if (!air780eg_modem.isNetworkReady() || !mqttInitialized) {
-    air780eg_modem.loop();
-  }
+  // 注释掉这里的调用，改为在taskDataProcessing中统一处理
+  // if (!air780eg_modem.isNetworkReady() || !mqttInitialized) {
+  //   air780eg_modem.loop();
+  // }
 #endif
 
   // 主循环留空，所有功能都在RTOS任务中处理

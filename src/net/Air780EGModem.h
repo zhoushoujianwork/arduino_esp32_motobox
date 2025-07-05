@@ -120,6 +120,12 @@ private:
     unsigned long _initStartTime;
     unsigned long _lastInitCheck;
     
+    // 看门狗和安全机制
+    unsigned long _lastLoopTime;
+    unsigned long _loopTimeoutCount;
+    static const unsigned long LOOP_TIMEOUT_MS = 30000; // 30秒超时
+    static const unsigned long MAX_TIMEOUT_COUNT = 3;   // 最大超时次数
+    
     // LBS相关私有成员
     unsigned long _lastLBSUpdate;
     bool _isLBSLoading;
