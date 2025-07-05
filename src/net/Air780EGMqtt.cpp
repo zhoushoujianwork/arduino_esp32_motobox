@@ -427,16 +427,44 @@ void Air780EGMqtt::loop() {
         return;
     }
     
-    // 在直接上报模式下，loop函数主要用于维护连接状态
-    // 实际的消息处理由URC回调完成，无需主动轮询
-    static unsigned long lastStatusCheck = 0;
+    // 限制消息检查频率，但不要太慢以免影响实时性
+    static unsigned long lastMsgCheck = 0;
     unsigned long now = millis();
-    
-    // 每30秒检查一次连接状态（减少日志输出）
-    if (now - lastStatusCheck > 30000) {
-        lastStatusCheck = now;
-        debugPrint("Air780EG MQTT: 连接状态正常，等待消息上报");
+    // 每2秒检查一次消息，提高响应速度
+    if (now - lastMsgCheck < 2000) {
+        return;
     }
+    lastMsgCheck = now;
+    
+    debugPrint("=== Air780EG MQTT 消息轮询开始 ===");
+    debugPrint("Air780EG MQTT: 连接状态正常，开始检查新消息");
+    debugPrint("Air780EG MQTT: 回调函数状态: " + String(_messageCallback ? "已设置" : "未设置"));
+    
+    // 检查是否有新消息 - 使用正确的AT指令
+    try {
+        // 当 AT+MQTTMSGSET=1，执行命令可以打印订阅消息。一次最多打印4条。如果一次上报多于4条，则打印最新的4条，最老的那条将被覆盖。
+        debugPrint("Air780EG MQTT: 发送AT+MQTTMSGGET命令...");
+        String response = _modem.sendATWithResponse("AT+MQTTMSGGET=1", 3000);
+        debugPrint("Air780EG MQTT: 消息检查原始响应: " + response);
+        debugPrint("Air780EG MQTT: 响应长度: " + String(response.length()));
+        
+        if (response.length() > 0) {
+            if (response.indexOf("+MQTTMSGGET:") >= 0) {
+                debugPrint("Air780EG MQTT: ✅ 检测到新MQTT消息，开始处理");
+                handleIncomingMessage(response);
+            } else if (response.indexOf("OK") >= 0) {
+                // OK响应表示没有新消息，这是正常的
+                debugPrint("Air780EG MQTT: 无新消息 (OK响应)");
+            } else {
+                debugPrint("Air780EG MQTT: ⚠️ 未知响应格式: " + response);
+            }
+        } else {
+            debugPrint("Air780EG MQTT: ⚠️ 空响应");
+        }
+    } catch (...) {
+        debugPrint("Air780EG MQTT: ❌ 消息检查异常");
+    }
+    debugPrint("=== Air780EG MQTT 消息轮询结束 ===");
 }
 
 void Air780EGMqtt::setCallback(void (*callback)(String topic, String payload)) {

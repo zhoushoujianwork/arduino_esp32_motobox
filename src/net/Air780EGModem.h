@@ -94,6 +94,7 @@ public:
     // GNSS URC处理
     void processURC();                          // 处理未请求的结果代码
     bool handleGNSSURC(const String& urc);      // 处理GNSS自动上报数据
+    void analyzeGNSSFields(const String& data); // 分析GNSS数据字段（调试用）
     
     // 调试功能
     void debugNetworkInfo();

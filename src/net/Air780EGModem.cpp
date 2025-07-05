@@ -486,10 +486,20 @@ bool Air780EGModem::parseGNSSResponse(const String& response) {
     // Air780EG GNSS响应格式: +CGNSINF: <GNSS run status>,<Fix status>,<UTC date & Time>,<Latitude>,<Longitude>,<MSL Altitude>,<Speed Over Ground>,<Course Over Ground>,<Fix Mode>,<Reserved1>,<HDOP>,<PDOP>,<VDOP>,<Reserved2>,<GNSS Satellites in View>,<GNSS Satellites Used>,<GLONASS Satellites Used>,<Reserved3>,<C/N0 max>,<HPA>,<VPA>
     
     int start = response.indexOf("+CGNSINF: ") + 10;
-    if (start < 10) return false;
+    if (start < 10) {
+        GNSS_DEBUG_PRINTLN("[Air780EG] GNSS响应格式错误: " + response);
+        return false;
+    }
     
     String data = response.substring(start);
     data.trim();
+    
+    GNSS_DEBUG_PRINTLN("[Air780EG] 解析GNSS数据: " + data);
+    
+    // 调试模式下分析字段
+    if (_debug) {
+        analyzeGNSSFields(data);
+    }
     
     // 分割数据
     int commaCount = 0;
@@ -507,29 +517,53 @@ bool Air780EGModem::parseGNSSResponse(const String& response) {
         fields[commaCount] = data.substring(lastIndex);
     }
     
+    // 检查字段数量
+    if (commaCount < 15) {
+        GNSS_DEBUG_PRINTLN("[Air780EG] GNSS字段数量不足: " + String(commaCount + 1));
+        return false;
+    }
+    
     // 解析字段
     bool gnssRunning = fields[0].toInt() == 1;
     bool fixStatus = fields[1].toInt() == 1;
     
-    if (!gnssRunning || !fixStatus) {
-        _gnssData.valid = false;
-        return false;
+    GNSS_DEBUG_PRINTLN("[Air780EG] GNSS运行状态: " + String(gnssRunning ? "开启" : "关闭"));
+    GNSS_DEBUG_PRINTLN("[Air780EG] 定位状态: " + String(fixStatus ? "已定位" : "未定位"));
+    
+    // 即使未定位也要解析数据，只是标记为无效
+    _gnssData.valid = gnssRunning && fixStatus;
+    _gnssData.timestamp = fields[2];
+    
+    // 只有在定位成功时才解析位置信息
+    if (fixStatus && fields[3].length() > 0 && fields[4].length() > 0) {
+        _gnssData.latitude = fields[3].toFloat();
+        _gnssData.longitude = fields[4].toFloat();
+        _gnssData.altitude = fields[5].toFloat();
+        _gnssData.speed = fields[6].toFloat();
+        _gnssData.course = fields[7].toFloat();
+        _gnssData.fix_mode = fields[8];
+        _gnssData.hdop = fields[10].toFloat();
+        _gnssData.satellites = fields[15].toInt();
+        
+        GNSS_DEBUG_PRINTF("[Air780EG] GNSS数据: Lat=%.6f, Lon=%.6f, Sats=%d\n",
+                          _gnssData.latitude, _gnssData.longitude, _gnssData.satellites);
+    } else {
+        // 未定位时清空位置数据，但保留其他信息
+        _gnssData.latitude = 0.0;
+        _gnssData.longitude = 0.0;
+        _gnssData.altitude = 0.0;
+        _gnssData.speed = 0.0;
+        _gnssData.course = 0.0;
+        _gnssData.fix_mode = fields[8];
+        _gnssData.hdop = fields[10].length() > 0 ? fields[10].toFloat() : 99.9;
+        _gnssData.satellites = fields[15].length() > 0 ? fields[15].toInt() : 0;
+        
+        GNSS_DEBUG_PRINTLN("[Air780EG] GNSS未定位，等待卫星信号...");
+        GNSS_DEBUG_PRINTLN("[Air780EG] 可见卫星: " + String(_gnssData.satellites));
+        GNSS_DEBUG_PRINTLN("[Air780EG] HDOP: " + String(_gnssData.hdop));
     }
     
-    _gnssData.valid = true;
-    _gnssData.timestamp = fields[2];
-    _gnssData.latitude = fields[3].toFloat();
-    _gnssData.longitude = fields[4].toFloat();
-    _gnssData.altitude = fields[5].toFloat();
-    _gnssData.speed = fields[6].toFloat();
-    _gnssData.course = fields[7].toFloat();
-    _gnssData.fix_mode = fields[8];
-    _gnssData.hdop = fields[10].toFloat();
-    _gnssData.satellites = fields[15].toInt();
-    
-    GNSS_DEBUG_PRINTF("[Air780EG] GNSS数据: Lat=%.6f, Lon=%.6f, Sats=%d\n",
-                      _gnssData.latitude, _gnssData.longitude, _gnssData.satellites);
-    
+    // 解析成功，无论是否定位
     return true;
 }
 
@@ -1006,13 +1040,70 @@ bool Air780EGModem::handleGNSSURC(const String& urc) {
     // 这与AT+CGNSINF的响应格式相同，可以复用解析函数
     String fakeResponse = "+CGNSINF: " + urc.substring(10); // 去掉"+UGNSINF: "前缀，加上"+CGNSINF: "
     
+    GNSS_DEBUG_PRINTLN("[Air780EG] 转换为标准格式: " + fakeResponse);
+    
     if (parseGNSSResponse(fakeResponse)) {
-        GNSS_DEBUG_PRINTLN("[Air780EG] URC GNSS数据解析成功");
+        if (_gnssData.valid) {
+            GNSS_DEBUG_PRINTLN("[Air780EG] ✅ URC GNSS数据解析成功，已定位");
+        } else {
+            GNSS_DEBUG_PRINTLN("[Air780EG] ⏳ URC GNSS数据解析成功，等待定位");
+        }
         _lastGNSSUpdate = millis(); // 更新时间戳
         return true;
     } else {
-        GNSS_DEBUG_PRINTLN("[Air780EG] URC GNSS数据解析失败");
+        GNSS_DEBUG_PRINTLN("[Air780EG] ❌ URC GNSS数据解析失败");
         return false;
+    }
+}
+
+// 分析GNSS数据字段（调试用）
+void Air780EGModem::analyzeGNSSFields(const String& data) {
+    if (!_debug) return;
+    
+    GNSS_DEBUG_PRINTLN("=== GNSS字段分析 ===");
+    GNSS_DEBUG_PRINTLN("原始数据: " + data);
+    
+    // 分割数据
+    int commaCount = 0;
+    int lastIndex = 0;
+    String fields[21];
+    
+    for (int i = 0; i < data.length() && commaCount < 20; i++) {
+        if (data.charAt(i) == ',') {
+            fields[commaCount] = data.substring(lastIndex, i);
+            lastIndex = i + 1;
+            commaCount++;
+        }
+    }
+    if (commaCount < 20) {
+        fields[commaCount] = data.substring(lastIndex);
+    }
+    
+    // 字段说明
+    const char* fieldNames[] = {
+        "GNSS运行状态", "定位状态", "UTC时间", "纬度", "经度", 
+        "海拔高度", "地面速度", "地面航向", "定位模式", "保留1",
+        "HDOP", "PDOP", "VDOP", "保留2", "可见卫星数",
+        "使用卫星数", "GLONASS卫星数", "保留3", "C/N0最大值", "HPA", "VPA"
+    };
+    
+    GNSS_DEBUG_PRINTLN("字段总数: " + String(commaCount + 1));
+    
+    for (int i = 0; i <= commaCount && i < 21; i++) {
+        String value = fields[i].length() > 0 ? fields[i] : "空";
+        GNSS_DEBUG_PRINTLN("字段" + String(i) + " (" + String(fieldNames[i]) + "): " + value);
+    }
+    
+    // 重点字段分析
+    if (commaCount >= 15) {
+        GNSS_DEBUG_PRINTLN("=== 重点字段分析 ===");
+        GNSS_DEBUG_PRINTLN("• GNSS状态: " + String(fields[0] == "1" ? "运行中" : "已停止"));
+        GNSS_DEBUG_PRINTLN("• 定位状态: " + String(fields[1] == "1" ? "已定位" : "未定位"));
+        GNSS_DEBUG_PRINTLN("• 时间戳: " + (fields[2].length() > 0 ? fields[2] : String("无")));
+        GNSS_DEBUG_PRINTLN("• 位置信息: " + String(fields[3].length() > 0 && fields[4].length() > 0 ? "有效" : "无效"));
+        GNSS_DEBUG_PRINTLN("• 可见卫星: " + (fields[14].length() > 0 ? fields[14] : String("0")));
+        GNSS_DEBUG_PRINTLN("• 使用卫星: " + (fields[15].length() > 0 ? fields[15] : String("0")));
+        GNSS_DEBUG_PRINTLN("• HDOP值: " + (fields[10].length() > 0 ? fields[10] : String("99.9")));
     }
 }
 
