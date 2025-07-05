@@ -396,13 +396,7 @@ void Device::begin()
     // 先完成 mqtt 连接，再初始化其他功能
     initializeMQTT();
 
-#ifdef ENABLE_GNSS
-    gpsManager.setGNSSEnabled(false);
-#endif
 
-#ifdef ENABLE_LBS
-    gpsManager.setLBSEnabled(true);
-#endif
 #endif
     gpsManager.init();
     Serial.println("GPS初始化完成!");

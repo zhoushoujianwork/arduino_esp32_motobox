@@ -34,6 +34,14 @@ void GPSManager::init()
     Serial.println("[GPSManager] 外部GPS模式");
     _gpsInterface = new ExternalGPSAdapter(gps);
 #else
+
+#ifdef ENABLE_GNSS
+    setGNSSEnabled(true);
+#endif
+
+#ifdef ENABLE_LBS
+    setLBSEnabled(true);
+#endif
     // GSM模式：使用ML307模块 GPS和GNSS 2 选一的模块
     _gpsInterface = nullptr; // 暂时不创建GPS接口
 #endif
@@ -64,7 +72,7 @@ void GPSManager::loop()
     // GPS信号弱时处理LBS- 简化版本
     if (gps_data.altitude <= 3)
     {
-        #ifdef ENABLE_LBS
+#ifdef ENABLE_LBS
         // LBS 都查询
         handleLBSUpdate();
         // 如果LBS有数据，则使用LBS数据
@@ -72,17 +80,18 @@ void GPSManager::loop()
         {
             // 使用通用的转换函数
             gps_data = convert_lbs_to_gps(lbs_data);
-        }else{
+        }
+        else
+        {
             // debugPrint("LBS定位失败，继续等待GPS定位");
         }
-        #endif
+#endif
     }
-   
 }
 
 bool GPSManager::isReady()
 {
-    return gps_data.altitude>3 || lbs_data.valid;
+    return gps_data.altitude > 3 || lbs_data.valid;
 }
 
 void GPSManager::setDebug(bool debug)
@@ -108,7 +117,10 @@ void GPSManager::setGNSSEnabled(bool enable)
 #ifdef ENABLE_GSM
     if (_gpsInterface)
     {
-        // ml307_at.enableGNSS(enable);
+// ml307_at.enableGNSS(enable);
+#ifdef USE_AIR780EG_GSM
+        air780eg_modem.enableGNSS(enable);
+#endif
     }
 #endif
 }
@@ -118,11 +130,14 @@ void GPSManager::setLBSEnabled(bool enable)
 #ifdef ENABLE_GSM
 #ifdef USE_AIR780EG_GSM
     // Air780EG模块的LBS启用
-    if (enable) {
+    if (enable)
+    {
         Serial.println("[GPS] 启用Air780EG LBS定位");
         // Air780EG的LBS功能通常在网络连接后自动可用
         // 这里可以添加具体的Air780EG LBS配置代码
-    } else {
+    }
+    else
+    {
         Serial.println("[GPS] 禁用Air780EG LBS定位");
     }
 #elif defined(USE_ML307_GSM)
@@ -149,13 +164,13 @@ void GPSManager::handleLBSUpdate()
 #ifdef ENABLE_GSM
     // 检查是否需要更新LBS数据
     unsigned long now = millis();
-    
+
     // 统一使用10秒间隔
     if (now - _lastLBSUpdate < 10000) // 10秒间隔
     {
         return;
     }
-    
+
     // 检查网络状态
 #ifdef USE_AIR780EG_GSM
     if (!air780eg_modem.isNetworkReady())
@@ -167,13 +182,14 @@ void GPSManager::handleLBSUpdate()
     {
         // 降低日志频率，避免刷屏
         static unsigned long lastLBSWarning = 0;
-        if (millis() - lastLBSWarning > 30000) {  // 每30秒提示一次
+        if (millis() - lastLBSWarning > 30000)
+        { // 每30秒提示一次
             lastLBSWarning = millis();
             debugPrint("网络未就绪，跳过LBS更新");
         }
         return;
     }
-    
+
     // 检查LBS是否正在加载
 #ifdef USE_AIR780EG_GSM
     // Air780EG暂时不检查LBS加载状态
@@ -187,7 +203,7 @@ void GPSManager::handleLBSUpdate()
         debugPrint("LBS正在加载中，跳过本次更新");
         return;
     }
-    
+
     // 更新LBS数据
 #ifdef USE_AIR780EG_GSM
     // Air780EG的LBS数据更新
@@ -197,21 +213,27 @@ void GPSManager::handleLBSUpdate()
     if (ml307_at.updateLBSData())
     {
         _lastLBSUpdate = now;
-        
+
         // 获取解析后的LBS数据
         lbs_data_t lbsData = ml307_at.getLBSData();
-        if (ml307_at.isLBSDataValid()) {
+        if (ml307_at.isLBSDataValid())
+        {
             // 更新内部LBS数据
             _lbsData = lbsData;
-            debugPrint("LBS数据更新成功: " + String(lbsData.longitude, 6) + 
-                      ", " + String(lbsData.latitude, 6));
-        } else {
+            debugPrint("LBS数据更新成功: " + String(lbsData.longitude, 6) +
+                       ", " + String(lbsData.latitude, 6));
+        }
+        else
+        {
             debugPrint("LBS数据无效");
         }
-    } else {
+    }
+    else
+    {
         // 减少失败日志频率，避免刷屏
         static unsigned long lastFailureLog = 0;
-        if (now - lastFailureLog > 30000) { // 30秒才打印一次失败日志
+        if (now - lastFailureLog > 30000)
+        { // 30秒才打印一次失败日志
             debugPrint("LBS更新失败");
             lastFailureLog = now;
         }

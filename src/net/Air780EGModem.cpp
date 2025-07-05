@@ -772,6 +772,11 @@ void Air780EGModem::debugLBSConfig() {
 
 // 后台初始化处理
 void Air780EGModem::loop() {
+    // 如果已经完成初始化，直接返回
+    if (_initState == INIT_COMPLETED) {
+        return;
+    }
+    
     unsigned long now = millis();
     
     // 每2秒检查一次
@@ -782,10 +787,17 @@ void Air780EGModem::loop() {
     
     switch (_initState) {
         case INIT_IDLE:
-            // 开始后台初始化
-            debugPrint("Air780EG: 🔄 开始后台网络注册...");
-            _initState = INIT_WAITING_NETWORK;
-            _initStartTime = now;
+            // 只有在网络未就绪时才开始后台初始化
+            if (!isNetworkReady()) {
+                debugPrint("Air780EG: 🔄 开始后台网络注册...");
+                _initState = INIT_WAITING_NETWORK;
+                _initStartTime = now;
+            } else {
+                // 网络已就绪，直接跳到GNSS初始化
+                debugPrint("Air780EG: ✅ 网络已就绪，跳过注册步骤");
+                debugPrint("Air780EG: 🛰️ 启用GNSS...");
+                _initState = INIT_ENABLING_GNSS;
+            }
             break;
             
         case INIT_WAITING_NETWORK:

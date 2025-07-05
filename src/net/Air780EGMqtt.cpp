@@ -301,10 +301,24 @@ bool Air780EGMqtt::unsubscribe(const String& topic) {
 void Air780EGMqtt::loop() {
     if (!_connected) return;
     
+    // 限制消息检查频率，避免过于频繁的AT命令
+    static unsigned long lastMsgCheck = 0;
+    unsigned long now = millis();
+    
+    // 每5秒检查一次消息，避免过于频繁
+    if (now - lastMsgCheck < 5000) {
+        return;
+    }
+    lastMsgCheck = now;
+    
     // 检查是否有新消息 - 使用正确的AT指令
-    String response = _modem.sendATWithResponse("AT+MQTTMSGGET", 1000);
-    if (response.length() > 0 && response.indexOf("+MQTTMSGGET:") >= 0) {
-        handleIncomingMessage(response);
+    try {
+        String response = _modem.sendATWithResponse("AT+MQTTMSGGET", 2000);
+        if (response.length() > 0 && response.indexOf("+MQTTMSGGET:") >= 0) {
+            handleIncomingMessage(response);
+        }
+    } catch (...) {
+        debugPrint("Air780EG MQTT: 消息检查异常");
     }
 }
 
@@ -317,12 +331,36 @@ void Air780EGMqtt::handleIncomingMessage(const String& response) {
     // 格式可能是: +MQTTMSGGET: "topic","payload"
     debugPrint("Air780EG MQTT: 收到消息: " + response);
     
-    if (_messageCallback) {
-        // 这里需要根据实际的响应格式来解析topic和payload
-        // 暂时使用简单的解析方式
-        String topic = "test/topic";
-        String payload = response;
-        _messageCallback(topic, payload);
+    // 安全检查：确保response不为空且包含有效数据
+    if (response.length() == 0) {
+        debugPrint("Air780EG MQTT: 收到空消息，忽略");
+        return;
+    }
+    
+    // 检查消息格式
+    if (response.indexOf("+MQTTMSGGET:") < 0) {
+        debugPrint("Air780EG MQTT: 消息格式不正确，忽略");
+        return;
+    }
+    
+    // 安全检查回调函数
+    if (_messageCallback == nullptr) {
+        debugPrint("Air780EG MQTT: 消息回调未设置，忽略消息");
+        return;
+    }
+    
+    try {
+        // 简单的消息处理，避免复杂的字符串解析
+        String topic = "air780eg/message";
+        String payload = response.substring(response.indexOf(":") + 1);
+        payload.trim();
+        
+        // 确保payload不为空
+        if (payload.length() > 0) {
+            _messageCallback(topic, payload);
+        }
+    } catch (...) {
+        debugPrint("Air780EG MQTT: 消息处理异常，忽略");
     }
 }
 

@@ -811,9 +811,12 @@ void loop()
     }
   }
 
-  // Air780EG后台初始化处理
+  // Air780EG后台初始化处理 - 只在网络未就绪时执行
 #ifdef USE_AIR780EG_GSM
-  air780eg_modem.loop();
+  // 只有在网络未就绪或MQTT未连接时才执行后台初始化
+  if (!air780eg_modem.isNetworkReady() || !mqttInitialized) {
+    air780eg_modem.loop();
+  }
 #endif
 
   // 主循环留空，所有功能都在RTOS任务中处理
