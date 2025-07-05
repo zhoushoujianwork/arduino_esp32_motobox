@@ -130,7 +130,7 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 /* Debug Configuration */
 // MQTT调试输出控制
 #ifndef MQTT_DEBUG_ENABLED
-#define MQTT_DEBUG_ENABLED            false
+#define MQTT_DEBUG_ENABLED            true
 #endif
 
 // 网络调试输出控制
@@ -141,6 +141,21 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 // 系统调试输出控制
 #ifndef SYSTEM_DEBUG_ENABLED
 #define SYSTEM_DEBUG_ENABLED          true
+#endif
+
+// GPS全链路调试输出控制
+#ifndef GPS_DEBUG_ENABLED
+#define GPS_DEBUG_ENABLED             false
+#endif
+
+// GNSS调试输出控制（Air780EG GNSS功能）
+#ifndef GNSS_DEBUG_ENABLED
+#define GNSS_DEBUG_ENABLED            true
+#endif
+
+// LBS调试输出控制（基站定位功能）
+#ifndef LBS_DEBUG_ENABLED
+#define LBS_DEBUG_ENABLED             false
 #endif
 
 /* Debug Macros */
@@ -172,6 +187,36 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 #define SYSTEM_DEBUG_PRINT(x)         do {} while(0)
 #define SYSTEM_DEBUG_PRINTLN(x)       do {} while(0)
 #define SYSTEM_DEBUG_PRINTF(fmt, ...) do {} while(0)
+#endif
+
+#if GPS_DEBUG_ENABLED
+#define GPS_DEBUG_PRINT(x)            Serial.print(x)
+#define GPS_DEBUG_PRINTLN(x)          Serial.println(x)
+#define GPS_DEBUG_PRINTF(fmt, ...)    Serial.printf(fmt, ##__VA_ARGS__)
+#else
+#define GPS_DEBUG_PRINT(x)            do {} while(0)
+#define GPS_DEBUG_PRINTLN(x)          do {} while(0)
+#define GPS_DEBUG_PRINTF(fmt, ...)    do {} while(0)
+#endif
+
+#if GNSS_DEBUG_ENABLED
+#define GNSS_DEBUG_PRINT(x)           Serial.print(x)
+#define GNSS_DEBUG_PRINTLN(x)         Serial.println(x)
+#define GNSS_DEBUG_PRINTF(fmt, ...)   Serial.printf(fmt, ##__VA_ARGS__)
+#else
+#define GNSS_DEBUG_PRINT(x)           do {} while(0)
+#define GNSS_DEBUG_PRINTLN(x)         do {} while(0)
+#define GNSS_DEBUG_PRINTF(fmt, ...)   do {} while(0)
+#endif
+
+#if LBS_DEBUG_ENABLED
+#define LBS_DEBUG_PRINT(x)            Serial.print(x)
+#define LBS_DEBUG_PRINTLN(x)          Serial.println(x)
+#define LBS_DEBUG_PRINTF(fmt, ...)    Serial.printf(fmt, ##__VA_ARGS__)
+#else
+#define LBS_DEBUG_PRINT(x)            do {} while(0)
+#define LBS_DEBUG_PRINTLN(x)          do {} while(0)
+#define LBS_DEBUG_PRINTF(fmt, ...)    do {} while(0)
 #endif
 
 

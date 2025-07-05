@@ -1,6 +1,7 @@
 /*
  * GPS管理器实现 - 统一管理GPS、GNSS和LBS定位
  * 支持GPS和GNSS互斥配置，GNSS模式下支持ML307和Air780EG
+ * Air780EG通过AT指令获取GNSS数据
  */
 
 #include "GPSManager.h"
@@ -10,6 +11,7 @@
 #include "GSMGNSSAdapter.h"
 #ifdef USE_AIR780EG_GSM
 #include "../net/Air780EGModem.h"
+#include "Air780EGGNSSAdapter.h"
 extern Air780EGModem air780eg_modem;
 #elif defined(USE_ML307_GSM)
 #include "../net/Ml307AtModem.h"
@@ -32,8 +34,8 @@ GPSManager &GPSManager::getInstance()
 
 void GPSManager::init()
 {
-    _debug = true;
-    Serial.println("[GPSManager] 开始初始化定位管理器");
+    _debug = GPS_DEBUG_ENABLED;
+    GPS_DEBUG_PRINTLN("[GPSManager] 开始初始化定位管理器");
     
     // 检测GNSS模块类型
     detectGNSSModuleType();
@@ -313,7 +315,7 @@ void GPSManager::debugPrint(const String &message)
 {
     if (_debug)
     {
-        Serial.println("[GPSManager] [debug] " + message);
+        GPS_DEBUG_PRINTLN("[GPSManager] " + message);
     }
 }
 
@@ -380,9 +382,11 @@ void GPSManager::handleGNSSUpdate()
     bool dataUpdated = false;
     
 #ifdef USE_AIR780EG_GSM
-    if (air780eg_modem.isNetworkReady()) {
-        if (air780eg_modem.updateGNSSData()) {
-            _gpsData = air780eg_modem.getGPSData();
+    // 使用Air780EG GNSS适配器
+    if (_air780egGNSSAdapter && _air780egGNSSAdapter->isReady()) {
+        _air780egGNSSAdapter->loop();
+        if (_air780egGNSSAdapter->isGPSDataValid()) {
+            _gpsData = _air780egGNSSAdapter->getGPSData();
             dataUpdated = true;
         }
     }
@@ -396,8 +400,8 @@ void GPSManager::handleGNSSUpdate()
     
     if (dataUpdated) {
         _lastGNSSUpdate = now;
-        debugPrint("GNSS数据更新: " + String(_gpsData.latitude, 6) + 
-                  ", " + String(_gpsData.longitude, 6));
+        GNSS_DEBUG_PRINTF("[GPSManager] GNSS数据更新: %.6f, %.6f, 高度: %.1fm, 卫星: %d\n",
+                          _gpsData.latitude, _gpsData.longitude, _gpsData.altitude, _gpsData.satellites);
     }
 }
 
@@ -429,8 +433,8 @@ void GPSManager::handleLBSUpdate()
     
     if (dataUpdated) {
         _lastLBSUpdate = now;
-        debugPrint("LBS数据更新: " + String(_lbsData.latitude, 6) + 
-                  ", " + String(_lbsData.longitude, 6));
+        LBS_DEBUG_PRINTF("[GPSManager] LBS数据更新: %.6f, %.6f\n",
+                        _lbsData.latitude, _lbsData.longitude);
     }
 }
 
@@ -452,8 +456,8 @@ void GPSManager::handleGPSUpdate()
         _lastGPSUpdate = now;
         // GPS数据通过全局变量gps_data获取
         _gpsData = gps_data;
-        debugPrint("GPS数据更新: " + String(_gpsData.latitude, 6) + 
-                  ", " + String(_gpsData.longitude, 6));
+        GPS_DEBUG_PRINTF("[GPSManager] GPS数据更新: %.6f, %.6f, 高度: %.1fm, 卫星: %d\n",
+                        _gpsData.latitude, _gpsData.longitude, _gpsData.altitude, _gpsData.satellites);
     }
 }
 
@@ -518,8 +522,24 @@ void GPSManager::switchToGNSSMode()
     _gnssEnabled = true;
     _lbsEnabled = false;
     
+#ifdef USE_AIR780EG_GSM
+    // 创建Air780EG GNSS适配器
+    if (!_air780egGNSSAdapter) {
+        _air780egGNSSAdapter = new Air780EGGNSSAdapter(air780eg_modem);
+        if (_air780egGNSSAdapter) {
+            _air780egGNSSAdapter->setDebug(_debug);
+            _air780egGNSSAdapter->begin();
+            debugPrint("Air780EG GNSS适配器已创建");
+        }
+    }
     // 启用GNSS
-    setGNSSEnabled(true);
+    if (_air780egGNSSAdapter) {
+        _air780egGNSSAdapter->enableGNSS(true);
+    }
+#elif defined(USE_ML307_GSM)
+    // ML307暂时不支持GNSS
+    debugPrint("ML307暂不支持GNSS模式");
+#endif
 }
 
 void GPSManager::switchToGNSSWithLBSMode()
@@ -529,9 +549,26 @@ void GPSManager::switchToGNSSWithLBSMode()
     _gnssEnabled = true;
     _lbsEnabled = true;
     
+#ifdef USE_AIR780EG_GSM
+    // 创建Air780EG GNSS适配器
+    if (!_air780egGNSSAdapter) {
+        _air780egGNSSAdapter = new Air780EGGNSSAdapter(air780eg_modem);
+        if (_air780egGNSSAdapter) {
+            _air780egGNSSAdapter->setDebug(_debug);
+            _air780egGNSSAdapter->begin();
+            debugPrint("Air780EG GNSS适配器已创建");
+        }
+    }
     // 启用GNSS和LBS
-    setGNSSEnabled(true);
+    if (_air780egGNSSAdapter) {
+        _air780egGNSSAdapter->enableGNSS(true);
+    }
     setLBSEnabled(true);
+#elif defined(USE_ML307_GSM)
+    // ML307支持LBS，但暂不支持GNSS
+    setLBSEnabled(true);
+    debugPrint("ML307模式：仅启用LBS");
+#endif
 }
 
 void GPSManager::disableAllModes()
@@ -543,6 +580,15 @@ void GPSManager::disableAllModes()
         delete _gpsInterface;
         _gpsInterface = nullptr;
     }
+    
+#ifdef USE_AIR780EG_GSM
+    // 禁用Air780EG GNSS适配器
+    if (_air780egGNSSAdapter) {
+        _air780egGNSSAdapter->enableGNSS(false);
+        delete _air780egGNSSAdapter;
+        _air780egGNSSAdapter = nullptr;
+    }
+#endif
     
     // 禁用GNSS和LBS
     if (_gnssEnabled) {

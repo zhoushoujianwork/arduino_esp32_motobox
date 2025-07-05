@@ -339,7 +339,6 @@ void MqttManager::loop()
         
     _lastNetworkCheckTime = millis();
 
-    Serial.println("MqttManager loop 1");
 #ifdef ENABLE_GSM
     debugPrint("=== MqttManager::loop 开始 ===");
     

@@ -52,6 +52,16 @@ ESP32-S3 MotoBox是一个基于ESP32-S3的摩托车数据采集与显示系统�
 
 ## 版本历史
 
+### v2.3.1 (2025-07-05)
+- 新增GPS全链路调试功能，支持独立的GPS、GNSS、LBS调试控制
+- Air780EG GNSS功能完全接管到GPSManager，通过AT指令获取定位数据
+- 创建Air780EGGNSSAdapter适配器，实现统一的GPS接口
+- 增加GPS调试测试工具和完整的调试文档
+- 优化调试输出格式，提供更清晰的问题定位信息
+
+### v2.3.0 (2025-06-15)
+- 支持 ml307 模块，支持 MQTT 配置
+
 ### v2.2.2 (2025-06-07)
 - 优化振动监测阈值
 - 设置PWM灯光亮度，防止闪光和常亮问题
@@ -69,6 +79,45 @@ ESP32-S3 MotoBox是一个基于ESP32-S3的摩托车数据采集与显示系统�
 - 支持BLE配置设备进入组网模式
 
 ## 技术实现细节
+
+### GPS全链路调试系统
+```cpp
+// config.h中的调试控制宏
+#define GPS_DEBUG_ENABLED             false    // GPS模块调试
+#define GNSS_DEBUG_ENABLED            false    // GNSS功能调试  
+#define LBS_DEBUG_ENABLED             false    // LBS基站定位调试
+
+// 调试宏定义
+#if GPS_DEBUG_ENABLED
+#define GPS_DEBUG_PRINTLN(x)          Serial.println(x)
+#define GPS_DEBUG_PRINTF(fmt, ...)    Serial.printf(fmt, ##__VA_ARGS__)
+#endif
+
+// Air780EG GNSS适配器接口
+class Air780EGGNSSAdapter : public GPSInterface {
+    virtual bool begin() override;
+    virtual void loop() override;
+    virtual bool isReady() override;
+    gps_data_t getGPSData() const;
+};
+```
+
+### GPSManager统一接管GNSS
+```cpp
+// GPSManager支持多种定位模式
+enum class LocationMode {
+    NONE,           // 未启用定位
+    GPS_ONLY,       // 仅GPS模式（外部GPS模块）
+    GNSS_ONLY,      // 仅GNSS模式（GSM模块内置GNSS）
+    GNSS_WITH_LBS   // GNSS+LBS混合模式
+};
+
+// Air780EG GNSS数据通过AT指令获取
+bool Air780EGModem::updateGNSSData() {
+    String response = sendATWithResponse("AT+CGNSINF", 3000);
+    return parseGNSSResponse(response);
+}
+```
 
 ### IMU唤醒功能实现
 ```cpp

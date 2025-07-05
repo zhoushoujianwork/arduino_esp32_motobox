@@ -66,6 +66,7 @@ public:
     bool enableGNSS(bool enable);
     bool isGNSSEnabled();
     bool isGNSSFixed();           // 检查是否已定位
+    bool isGNSSWaitingFix();      // 检查是否正在等待定位
     String getGNSSInfo();         // 获取GNSS详细信息
     bool updateGNSSData();
     GNSSData getGNSSData();
@@ -90,6 +91,10 @@ public:
     String sendATWithResponseThreadSafe(const String& cmd, uint32_t timeout = 1000);
     bool sendATWithRetryThreadSafe(const String &cmd, const String &expected = "OK", int maxRetry = 3, uint32_t timeout = 2000);
 
+    // GNSS URC处理
+    void processURC();                          // 处理未请求的结果代码
+    bool handleGNSSURC(const String& urc);      // 处理GNSS自动上报数据
+    
     // 调试功能
     void debugNetworkInfo();
     void debugGNSSInfo();
