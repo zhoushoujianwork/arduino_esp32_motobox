@@ -270,7 +270,6 @@ void mqttMessageCallback(const String &topic, const String &payload)
 void mqttConnectionCallback(bool connected)
 {
 #ifndef DISABLE_MQTT
-    Serial.println("=== MQTT连接回调触发 ===");
     Serial.printf("MQTT连接状态: %s\n", connected ? "已连接" : "断开");
     
     if (connected)
@@ -333,7 +332,6 @@ void mqttConnectionCallback(bool connected)
         MQTT_DEBUG_PRINTLN("MQTT连接失败");
         Serial.println("❌ MQTT连接断开，订阅功能不可用");
     }
-    Serial.println("=== MQTT连接回调结束 ===");
 #endif
 }
 

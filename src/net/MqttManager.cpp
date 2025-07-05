@@ -331,291 +331,158 @@ void MqttManager::setMqttState(MqttState newState)
 
 void MqttManager::loop()
 {
-
     if (!_isInitialized)
         return;
 
-    // 增加检查间隔，减少重复查询 - 从200ms改为2秒
-    if (millis() - _lastNetworkCheckTime > 2000)
-    {
-        _lastNetworkCheckTime = millis();
+    // 检查间隔 - 每2秒检查一次
+    if (millis() - _lastNetworkCheckTime < 2000)
+        return;
+        
+    _lastNetworkCheckTime = millis();
 
 #ifdef ENABLE_GSM
+    debugPrint("=== MqttManager::loop 开始 ===");
+    
 #ifdef USE_AIR780EG_GSM
-        if (!air780eg_modem.isNetworkReadyCheck())
-#elif defined(USE_ML307_GSM)
-        if (!ml307_at.isNetworkReadyCheck())
-#else
-        if (true)  // 默认认为网络未就绪
-#endif
-        {
-            Serial.println("[MqttManager] 网络未就绪, 设置为DISCONNECTED");
-            setMqttState(MqttState::DISCONNECTED);
-            return;
-        }
-
-        // 如果在获取lbs数据，则不进行mqtt的读取
-#ifdef USE_ML307_GSM
-        if (ml307_at.isLBSLoading())
-#else
-        if (false)  // Air780EG暂时不检查LBS加载状态
-#endif
-            return;
-
-        // 4G逻辑优化 - 减少重复查询
-        bool currentConnected = (_MqttState == MqttState::CONNECTED) && isMqttConnected();
-
-        if (currentConnected != _lastConnectionState)
-        {
-            _lastConnectionState = currentConnected;
-            if (_connectCallback)
-            {
-                _connectCallback(currentConnected);
-            }
-        }
-
-        debugPrint("MqttManager loop MqttState: " + String((int)_MqttState));
+    // 检查网络状态
+    bool networkReady = air780eg_modem.isNetworkReadyCheck();
+    debugPrint("Air780EG网络状态: " + String(networkReady ? "就绪" : "未就绪"));
+    
+    if (!networkReady) {
+        debugPrint("网络未就绪，跳过MQTT处理");
+        setMqttState(MqttState::DISCONNECTED);
+        return;
+    }
+    
+    // 网络就绪，确保MQTT客户端存在并处理消息
+    if (_air780egMqtt) {
+        debugPrint("Air780EG MQTT客户端存在，调用loop()");
+        bool mqttConnected = _air780egMqtt->isConnected();
+        debugPrint("Air780EG MQTT连接状态: " + String(mqttConnected ? "已连接" : "未连接"));
         
-        // 添加详细的状态调试信息
-        static unsigned long lastDebugTime = 0;
-        if (millis() - lastDebugTime > 10000) { // 10秒打印一次详细状态
-            lastDebugTime = millis();
-            debugPrint("=== MQTT状态详情 ===");
-            debugPrint("当前状态: " + String((int)_MqttState));
-            debugPrint("MQTT连接: " + String(isMqttConnected()));
-            
-#ifdef USE_AIR780EG_GSM
-            debugPrint("网络就绪: " + String(air780eg_modem.isNetworkReady()));
-            debugPrint("Air780EG客户端: " + String(_air780egMqtt != nullptr));
-            if (_air780egMqtt) {
-                debugPrint("客户端连接状态: " + String(_air780egMqtt->isConnected()));
-            }
-#elif defined(USE_ML307_GSM)
-            debugPrint("ML307 MQTT连接: " + String(ml307Mqtt.connected()));
-            debugPrint("ML307 MQTT可发布: " + String(ml307Mqtt.canPublish()));
-#endif
-            debugPrint("==================");
-        }
+        // 无论连接状态如何，都调用loop()来处理消息和维护连接
+        _air780egMqtt->loop();
         
-        switch (_MqttState)
-        {
-        case MqttState::CONNECTING:
-        {
-            // 检查连接超时
-            if (millis() - _connectionStartTime > _connectionTimeout)
-            {
-                _reconnectFailCount++;
-                debugPrint("MQTT连接超时 (第" + String(_reconnectFailCount) + "次失败)");
-                setMqttState(MqttState::DISCONNECTED);  // 回到断开状态，而不是ERROR状态
-                _lastReconnectAttempt = millis();  // 重置重连时间
-            }
-            else
-            {
-                // 减少网络状态检查频率
-                static unsigned long lastNetworkCheck = 0;
-                if (millis() - lastNetworkCheck > 5000)
-                { // 5秒检查一次
-                    lastNetworkCheck = millis();
-
-#ifdef USE_AIR780EG_GSM
-                    if (air780eg_modem.isNetworkReady())
-#elif defined(USE_ML307_GSM)
-                    if (ml307_at.isNetworkReady())
-#else
-                    if (false)
-#endif
-                    {
-#ifdef USE_AIR780EG_GSM
-                        if (_air780egMqtt && _air780egMqtt->isConnected())
-#elif defined(USE_ML307_GSM)
-                        if (ml307Mqtt.connected())
-#else
-                        if (false)
-#endif
-                        {
-                            setMqttState(MqttState::CONNECTED);
-#ifdef USE_AIR780EG_GSM
-                            debugPrint("Cellular connected, CSQ: " + String(air780eg_modem.getCSQ()));
-#elif defined(USE_ML307_GSM)
-                            debugPrint("Cellular connected, CSQ: " + String(ml307_at.getCSQ()));
-#endif
-
-                            if (_connectCallback)
-                            {
-                                _connectCallback(true);
-                            }
-                        }
-                        else
-                        {
-                            debugPrint("网络已就绪，尝试MQTT连接...");
-                            if (connect())
-                            {
-                                setMqttState(MqttState::CONNECTED);
-                                debugPrint("MQTT连接成功");
-                            }
-                        }
-                    }
-                }
-            }
-            break;
-        }
-
-        case MqttState::CONNECTED:
-        {
-            // 连接正常，处理MQTT消息
-#ifdef USE_AIR780EG_GSM
-            if (_air780egMqtt) {
-                _air780egMqtt->loop();
-            }
-#elif defined(USE_ML307_GSM)
-            ml307Mqtt.loop();
-#endif
-
-            break;
-        }
-
-        case MqttState::DISCONNECTED:
-        {
-            // 检查网络是否恢复
-#ifdef USE_AIR780EG_GSM
-            bool networkReady = air780eg_modem.isNetworkReady();
-            // 降低日志频率
-            static unsigned long lastDisconnectedLog = 0;
-            if (millis() - lastDisconnectedLog > 10000) {  // 每10秒记录一次
-                lastDisconnectedLog = millis();
-                debugPrint("DISCONNECTED状态 - 网络就绪: " + String(networkReady));
-            }
-            if (networkReady)
-#elif defined(USE_ML307_GSM)
-            if (ml307_at.isNetworkReady())
-#else
-            if (false)
-#endif
-            {
-                // 网络就绪，尝试连接MQTT
-                unsigned long now = millis();
-                
-                // 动态调整重连间隔，失败次数越多间隔越长
-                unsigned long reconnectInterval = RECONNECT_INTERVAL;
-                if (_reconnectFailCount > 3) {
-                    reconnectInterval = RECONNECT_INTERVAL * 2;  // 30秒
-                } else if (_reconnectFailCount > 6) {
-                    reconnectInterval = RECONNECT_INTERVAL * 4;  // 60秒
-                }
-                
-                if (now - _lastReconnectAttempt > reconnectInterval)
-                {
-                    _lastReconnectAttempt = now;
-                    debugPrint("网络已就绪，开始MQTT连接... (失败次数: " + String(_reconnectFailCount) + ")");
-                    setMqttState(MqttState::CONNECTING);
-                    _connectionStartTime = millis();
-                    
-                    // 立即尝试连接
-                    bool connectResult = connect();
-                    if (connectResult)
-                    {
-                        setMqttState(MqttState::CONNECTED);
-                        _reconnectFailCount = 0;  // 重置失败计数
-                        debugPrint("MQTT连接成功");
-                    } else {
-                        _reconnectFailCount++;
-                        debugPrint("MQTT连接失败 (第" + String(_reconnectFailCount) + "次)，将在" + String(reconnectInterval/1000) + "秒后重试");
-                        setMqttState(MqttState::DISCONNECTED);  // 回到断开状态
-                    }
-                }
-            }
-            else
-            {
-                // 网络未就绪，等待网络连接
-                static unsigned long lastNetworkLog = 0;
-                if (millis() - lastNetworkLog > 10000) // 10秒打印一次日志
-                {
-                    lastNetworkLog = millis();
-                    debugPrint("等待网络连接...");
-                }
-            }
-            break;
-        }
-
-        case MqttState::ERROR:
-        {
-            // 错误状态下等待一段时间后重试
-            if (millis() - _lastReconnectAttempt > RECONNECT_INTERVAL * 2)
-            {
-                setMqttState(MqttState::DISCONNECTED);
-                debugPrint("从错误状态恢复，重新开始连接");
-            }
-            break;
-        }
-        }
-
-#else
-        // WiFi逻辑
-        if (wifiManager.getConfigMode())
-            return;
-
-        bool currentConnected = isNetworkConnected() && isMqttConnected();
-
-        if (currentConnected != _lastConnectionState)
-        {
-            _lastConnectionState = currentConnected;
-            if (_connectCallback)
-            {
-                _connectCallback(currentConnected);
-            }
-        }
-
-        // 根据网络和MQTT连接状态设置相应的状态
-        if (!isNetworkConnected())
-        {
-            if (_MqttState != MqttState::DISCONNECTED)
-            {
-                setMqttState(MqttState::DISCONNECTED);
-                debugPrint("WiFi连接已断开，设置为DISCONNECTED状态");
-            }
-            
-            // 尝试重新连接WiFi
-            unsigned long now = millis();
-            if (now - _lastReconnectAttempt > RECONNECT_INTERVAL)
-            {
-                _lastReconnectAttempt = now;
-                debugPrint("尝试重新连接WiFi...");
-                connectWifi();
-            }
-        }
-        else if (!isMqttConnected())
-        {
-            setMqttState(MqttState::CONNECTING);
-            reconnect();
-        }
-        else
-        {
+        if (mqttConnected) {
             setMqttState(MqttState::CONNECTED);
+            
+            // 检查连接状态变化并触发回调
+            if (!_lastConnectionState) {
+                _lastConnectionState = true;
+                if (_connectCallback) {
+                    debugPrint("触发MQTT连接成功回调");
+                    _connectCallback(true);
+                }
+            }
+        } else {
+            setMqttState(MqttState::DISCONNECTED);
+            
+            // 检查连接状态变化并触发回调
+            if (_lastConnectionState) {
+                _lastConnectionState = false;
+                if (_connectCallback) {
+                    debugPrint("触发MQTT连接断开回调");
+                    _connectCallback(false);
+                }
+            }
+            
+            // 尝试重连
+            static unsigned long lastReconnectAttempt = 0;
+            if (millis() - lastReconnectAttempt > 15000) { // 15秒重连一次
+                lastReconnectAttempt = millis();
+                debugPrint("尝试重新连接MQTT...");
+                connect();
+            }
         }
-
-        if (_wifiMqttClient)
-            _wifiMqttClient->loop();
+    } else {
+        debugPrint("❌ Air780EG MQTT客户端不存在");
+        setMqttState(MqttState::ERROR);
+    }
+    
+#elif defined(USE_ML307_GSM)
+    // ML307逻辑保持不变
+    if (!ml307_at.isNetworkReadyCheck()) {
+        setMqttState(MqttState::DISCONNECTED);
+        return;
+    }
+    
+    if (ml307_at.isLBSLoading())
+        return;
+        
+    ml307Mqtt.loop();
+    
+    bool currentConnected = ml307Mqtt.connected();
+    if (currentConnected != _lastConnectionState) {
+        _lastConnectionState = currentConnected;
+        if (_connectCallback) {
+            _connectCallback(currentConnected);
+        }
+    }
+    
+    if (currentConnected) {
+        setMqttState(MqttState::CONNECTED);
+    } else {
+        setMqttState(MqttState::DISCONNECTED);
+        static unsigned long lastReconnectAttempt = 0;
+        if (millis() - lastReconnectAttempt > 15000) {
+            lastReconnectAttempt = millis();
+            connect();
+        }
+    }
 #endif
 
-        // 处理预注册的主题
-        for (auto &topic : _topicConfigs)
+    debugPrint("=== MqttManager::loop 结束 ===");
+
+#else
+    // WiFi逻辑简化
+    bool networkConnected = isNetworkConnected();
+    bool mqttConnected = isMqttConnected();
+    
+    if (!networkConnected) {
+        setMqttState(MqttState::DISCONNECTED);
+        static unsigned long lastWifiReconnect = 0;
+        if (millis() - lastWifiReconnect > 10000) {
+            lastWifiReconnect = millis();
+            connectWifi();
+        }
+    } else if (!mqttConnected) {
+        setMqttState(MqttState::CONNECTING);
+        reconnect();
+    } else {
+        setMqttState(MqttState::CONNECTED);
+    }
+    
+    // 检查连接状态变化
+    bool currentConnected = networkConnected && mqttConnected;
+    if (currentConnected != _lastConnectionState) {
+        _lastConnectionState = currentConnected;
+        if (_connectCallback) {
+            _connectCallback(currentConnected);
+        }
+    }
+    
+    if (_wifiMqttClient)
+        _wifiMqttClient->loop();
+#endif
+
+    // 处理预注册的主题
+    for (auto &topic : _topicConfigs)
+    {
+        if (topic.second.lastPublishTime + topic.second.interval < millis())
         {
-            if (topic.second.lastPublishTime + topic.second.interval < millis())
+            if (topic.first == "device_info")
             {
-                if (topic.first == "device_info")
+                publishToTopic(topic.first, device_state_to_json(get_device_state()).c_str(), false);
+            }
+            // else if (topic.first == "imu")
+            // {
+            //     publishToTopic(topic.first, imu_data_to_json(imu_data).c_str(), false);
+            // }
+            else if (topic.first == "gps")
+            {
+                if (gps_data.satellites > 3 || lbs_data.valid)
                 {
-                    publishToTopic(topic.first, device_state_to_json(get_device_state()).c_str(), false);
-                }
-                // else if (topic.first == "imu")
-                // {
-                //     publishToTopic(topic.first, imu_data_to_json(imu_data).c_str(), false);
-                // }
-                else if (topic.first == "gps")
-                {
-                    if (gps_data.satellites > 3 || lbs_data.valid)
-                    {
-                        publishToTopic(topic.first, gps_data_to_json(gps_data).c_str(), false);
-                    }
+                    publishToTopic(topic.first, gps_data_to_json(gps_data).c_str(), false);
                 }
             }
         }

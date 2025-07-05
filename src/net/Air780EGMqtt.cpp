@@ -431,8 +431,9 @@ void Air780EGMqtt::loop() {
     
     // 检查是否有新消息 - 使用正确的AT指令
     try {
+        // 当 AT+MQTTMSGSET=1，执行命令可以打印订阅消息。一次最多打印4条。如果一次上报多于4条，则打印最新的4条，最老的那条将被覆盖。
         debugPrint("Air780EG MQTT: 发送AT+MQTTMSGGET命令...");
-        String response = _modem.sendATWithResponse("AT+MQTTMSGGET", 3000);
+        String response = _modem.sendATWithResponse("AT+MQTTMSGGET=1", 3000);
         debugPrint("Air780EG MQTT: 消息检查原始响应: " + response);
         debugPrint("Air780EG MQTT: 响应长度: " + String(response.length()));
         
