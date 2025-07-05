@@ -2,7 +2,8 @@
 #include <math.h>
 #include "FS.h"
 #include "SPIFFS.h"
-#include "welcome_voice.h"  // 真实的语音数据
+#include "welcome_voice.h"  // 默认语音数据
+#include "lifanmotuo_welcome_voice.h"  // 力帆摩托语音数据
 
 static const char* TAG = "AudioManager";
 
@@ -11,7 +12,8 @@ AudioManager::AudioManager() :
     playing(false),
     wsPin(IIS_S_WS_PIN),
     bclkPin(IIS_S_BCLK_PIN), 
-    dataPin(IIS_S_DATA_PIN) {
+    dataPin(IIS_S_DATA_PIN),
+    currentWelcomeVoice(WELCOME_VOICE_DEFAULT) {
 }
 
 AudioManager::~AudioManager() {
@@ -297,45 +299,7 @@ bool AudioManager::testAudio() {
 }
 
 bool AudioManager::playWelcomeVoice() {
-    ESP_LOGI(TAG, "Playing welcome voice: %s", WELCOME_VOICE_DATA_INFO.description);
-    
-    // 首先尝试播放内置的真实语音数据
-    if (playVoiceFromArray(WELCOME_VOICE_DATA_INFO.data, WELCOME_VOICE_DATA_INFO.size)) {
-        ESP_LOGI(TAG, "Successfully played embedded voice data");
-        return true;
-    }
-    
-    // 如果内置数据播放失败，尝试从文件播放
-    if (playVoiceFromFile("/spiffs/welcome.wav")) {
-        ESP_LOGI(TAG, "Successfully played voice from SPIFFS file");
-        return true;
-    }
-    
-    // 如果都失败，播放替代的音调序列
-    ESP_LOGW(TAG, "Voice playback failed, using tone sequence fallback");
-    
-    // 创建一个特殊的音调序列来代表"大菠萝车机,扎西德勒"
-    // 使用中国传统五声音阶：宫商角徵羽
-    const float frequencies[] = {
-        523.25,  // C5 - 大
-        587.33,  // D5 - 菠
-        659.25,  // E5 - 萝
-        698.46,  // F5 - 车
-        783.99,  // G5 - 机
-        100,     // 停顿
-        880.00,  // A5 - 扎
-        987.77,  // B5 - 西
-        1046.50, // C6 - 德
-        1174.66, // D6 - 勒
-    };
-    
-    const int durations[] = {
-        300, 300, 400, 300, 500,  // 大菠萝车机
-        200,                       // 停顿
-        300, 300, 300, 600        // 扎西德勒
-    };
-    
-    return playBeepSequence(frequencies, durations, 10, 0.6);
+    return playWelcomeVoice(currentWelcomeVoice);
 }
 
 bool AudioManager::playVoiceFromFile(const char* filename) {
@@ -439,4 +403,104 @@ bool AudioManager::playVoiceFromArray(const uint8_t* audioData, size_t dataSize)
     playing = false;
     ESP_LOGI(TAG, "Voice playback from array completed");
     return true;
+}
+
+// 欢迎语音配置方法
+void AudioManager::setWelcomeVoiceType(WelcomeVoiceType voiceType) {
+    currentWelcomeVoice = voiceType;
+    ESP_LOGI(TAG, "Welcome voice type set to: %s", getWelcomeVoiceDescription());
+}
+
+WelcomeVoiceType AudioManager::getWelcomeVoiceType() const {
+    return currentWelcomeVoice;
+}
+
+const char* AudioManager::getWelcomeVoiceDescription() const {
+    switch (currentWelcomeVoice) {
+        case WELCOME_VOICE_DEFAULT:
+            return WELCOME_VOICE_DATA_INFO.description;
+        case WELCOME_VOICE_LIFAN_MOTUO:
+            return LIFANMOTUO_WELCOME_VOICE_DATA_INFO.description;
+        default:
+            return "Unknown";
+    }
+}
+
+bool AudioManager::playWelcomeVoice(WelcomeVoiceType voiceType) {
+    const VoiceInfo* voiceInfo = nullptr;
+    
+    switch (voiceType) {
+        case WELCOME_VOICE_DEFAULT:
+            voiceInfo = &WELCOME_VOICE_DATA_INFO;
+            break;
+        case WELCOME_VOICE_LIFAN_MOTUO:
+            voiceInfo = &LIFANMOTUO_WELCOME_VOICE_DATA_INFO;
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown welcome voice type: %d", voiceType);
+            return false;
+    }
+    
+    ESP_LOGI(TAG, "Playing welcome voice: %s", voiceInfo->description);
+    
+    // 首先尝试播放内置的语音数据
+    if (playVoiceFromArray(voiceInfo->data, voiceInfo->size)) {
+        ESP_LOGI(TAG, "Successfully played embedded voice data: %s", voiceInfo->description);
+        return true;
+    }
+    
+    // 如果内置数据播放失败，尝试从文件播放
+    if (playVoiceFromFile("/spiffs/welcome.wav")) {
+        ESP_LOGI(TAG, "Successfully played voice from SPIFFS file");
+        return true;
+    }
+    
+    // 如果都失败，播放替代的音调序列
+    ESP_LOGW(TAG, "Voice playback failed, using tone sequence fallback");
+    
+    // 根据语音类型播放不同的音调序列
+    if (voiceType == WELCOME_VOICE_LIFAN_MOTUO) {
+        // 力帆摩托专用音调序列 - 更加激昂的音调
+        const float frequencies[] = {
+            659.25,  // E5 - 力
+            698.46,  // F5 - 帆
+            783.99,  // G5 - 摩
+            880.00,  // A5 - 托
+            100,     // 停顿
+            1046.50, // C6 - 扎
+            1174.66, // D6 - 西
+            1318.51, // E6 - 德
+            1396.91, // F6 - 勒
+        };
+        
+        const int durations[] = {
+            350, 350, 400, 500,  // 力帆摩托
+            200,                  // 停顿
+            300, 300, 300, 700   // 扎西德勒
+        };
+        
+        return playBeepSequence(frequencies, durations, 9, 0.7);
+    } else {
+        // 默认音调序列 - 原有的"大菠萝车机,扎西德勒"
+        const float frequencies[] = {
+            523.25,  // C5 - 大
+            587.33,  // D5 - 菠
+            659.25,  // E5 - 萝
+            698.46,  // F5 - 车
+            783.99,  // G5 - 机
+            100,     // 停顿
+            880.00,  // A5 - 扎
+            987.77,  // B5 - 西
+            1046.50, // C6 - 德
+            1174.66, // D6 - 勒
+        };
+        
+        const int durations[] = {
+            300, 300, 400, 300, 500,  // 大菠萝车机
+            200,                       // 停顿
+            300, 300, 300, 600        // 扎西德勒
+        };
+        
+        return playBeepSequence(frequencies, durations, 10, 0.6);
+    }
 }

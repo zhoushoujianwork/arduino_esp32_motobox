@@ -18,6 +18,7 @@ extern SDManager sdManager;
 #endif
 
 #ifdef ENABLE_AUDIO
+#include "audio/AudioManager.h"
 extern AudioManager audioManager;
 #endif
 
@@ -224,6 +225,25 @@ void mqttMessageCallback(const String &topic, const String &payload)
             } else {
                 Serial.println("音频系统未就绪或事件参数无效");
             }
+        }
+        // 设置欢迎语音类型
+        else if (strcmp(cmd, "set_welcome_voice") == 0)
+        {
+            // {\"cmd\": \"set_welcome_voice\", \"type\": 0}  // 0=默认, 1=力帆摩托
+            int voiceType = doc["type"] | 0;
+            device.setWelcomeVoiceType(voiceType);
+            Serial.printf("设置欢迎语音类型: %d\n", voiceType);
+        }
+        // 播放欢迎语音
+        else if (strcmp(cmd, "play_welcome_voice") == 0)
+        {
+            device.playWelcomeVoice();
+        }
+        // 获取欢迎语音信息
+        else if (strcmp(cmd, "get_welcome_voice_info") == 0)
+        {
+            String info = device.getWelcomeVoiceInfo();
+            Serial.println(info);
         }
 #endif
     }
@@ -777,5 +797,50 @@ bool Device::initializeMQTT() {
 #else
     Serial.println("⚠️ MQTT功能已禁用");
     return false;
+#endif
+}
+
+// 欢迎语音配置方法
+void Device::setWelcomeVoiceType(int voiceType) {
+#ifdef ENABLE_AUDIO
+    if (device_state.audioReady) {
+        WelcomeVoiceType type = static_cast<WelcomeVoiceType>(voiceType);
+        audioManager.setWelcomeVoiceType(type);
+        Serial.printf("欢迎语音类型已设置为: %s\n", audioManager.getWelcomeVoiceDescription());
+    } else {
+        Serial.println("音频系统未就绪，无法设置欢迎语音类型");
+    }
+#else
+    Serial.println("音频功能已禁用");
+#endif
+}
+
+void Device::playWelcomeVoice() {
+#ifdef ENABLE_AUDIO
+    if (device_state.audioReady) {
+        audioManager.playWelcomeVoice();
+        Serial.printf("播放欢迎语音: %s\n", audioManager.getWelcomeVoiceDescription());
+    } else {
+        Serial.println("音频系统未就绪，无法播放欢迎语音");
+    }
+#else
+    Serial.println("音频功能已禁用");
+#endif
+}
+
+String Device::getWelcomeVoiceInfo() {
+#ifdef ENABLE_AUDIO
+    if (device_state.audioReady) {
+        String info = "当前欢迎语音: ";
+        info += audioManager.getWelcomeVoiceDescription();
+        info += " (类型: ";
+        info += String(static_cast<int>(audioManager.getWelcomeVoiceType()));
+        info += ")";
+        return info;
+    } else {
+        return "音频系统未就绪";
+    }
+#else
+    return "音频功能已禁用";
 #endif
 }

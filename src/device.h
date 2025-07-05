@@ -111,6 +111,11 @@ public:
     // GSM初始化
     void initializeGSM();
     
+    // 欢迎语音配置
+    void setWelcomeVoiceType(int voiceType);
+    void playWelcomeVoice();
+    String getWelcomeVoiceInfo();
+    
 private:
     
 };

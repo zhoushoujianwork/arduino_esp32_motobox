@@ -148,15 +148,15 @@ bool Air780EGMqtt::connect(const String& server, int port, const String& clientI
             connectSuccess = true;
             debugPrint("Air780EG MQTT: MQTT连接成功");
             
-            // 5. 设置MQTT消息编码格式为ASCII模式 (关键修复!)
-            debugPrint("Air780EG MQTT: 设置消息编码格式为ASCII模式...");
-            String modeResp = _modem.sendATWithResponse("AT+MQTTMODE=0", 3000);
+            // 5. 设置MQTT消息编码格式为HEX模式 (关键修复!)
+            debugPrint("Air780EG MQTT: 设置消息编码格式为HEX模式...");
+            String modeResp = _modem.sendATWithResponse("AT+MQTTMODE=1", 3000);
             debugPrint("Air780EG MQTT: 模式设置响应: " + modeResp);
             
             if (modeResp.indexOf("OK") >= 0) {
-                debugPrint("Air780EG MQTT: ✅ ASCII模式设置成功");
+                debugPrint("Air780EG MQTT: ✅ HEX模式设置成功");
             } else {
-                debugPrint("Air780EG MQTT: ⚠️ ASCII模式设置失败，可能影响消息发布");
+                debugPrint("Air780EG MQTT: ⚠️ HEX模式设置失败，可能影响消息发布");
             }
             
             // 6. 可选：设置消息上报模式为直接上报
@@ -252,9 +252,8 @@ bool Air780EGMqtt::checkConnection() {
 
 /**
  * 发布MQTT消息
- * 按照官方文档格式：
- * AT+MPUB="topic",qos,retain,"payload"
- * 注意：需要先设置 AT+MQTTMODE=0 (ASCII模式)
+ * 使用HEX编码模式：AT+MQTTMODE=1
+ * 格式：AT+MPUB="topic",qos,retain,length,"hex_payload"
  */
 bool Air780EGMqtt::publish(const String& topic, const String& payload, int qos) {
     if (!_connected) {
@@ -270,34 +269,42 @@ bool Air780EGMqtt::publish(const String& topic, const String& payload, int qos) 
         debugPrint("Air780EG MQTT: ⚠️ 消息过长 (" + String(payload.length()) + " > 1024)，可能发布失败");
     }
 
-    // 确保处于ASCII模式
-    debugPrint("Air780EG MQTT: 确保ASCII模式...");
-    _modem.sendAT("AT+MQTTMODE=0", "OK", 2000);
+    // 设置为HEX模式
+    debugPrint("Air780EG MQTT: 设置HEX编码模式...");
+    if (!_modem.sendAT("AT+MQTTMODE=1", "OK", 3000)) {
+        debugPrint("Air780EG MQTT: ⚠️ HEX模式设置失败");
+    }
 
-    // 构建发布命令 - ASCII模式下直接使用JSON字符串
-    // 注意：JSON中的双引号需要转义，但要保持JSON结构完整
-    String cleanPayload = payload;
-    // 移除可能的换行符和回车符
-    cleanPayload.replace("\r", "");
-    cleanPayload.replace("\n", "");
+    // 将JSON字符串转换为HEX编码
+    String hexPayload = "";
+    for (int i = 0; i < payload.length(); i++) {
+        char c = payload.charAt(i);
+        // 转换为两位十六进制
+        if (c < 16) hexPayload += "0";
+        hexPayload += String((unsigned char)c, HEX);
+    }
     
-    String cmd = "AT+MPUB=\"" + topic + "\"," + String(qos) + ",0,\"" + cleanPayload + "\"";
+    // 构建HEX模式的发布命令
+    // 格式：AT+MPUB="topic",qos,retain,length,"hex_payload"
+    String cmd = "AT+MPUB=\"" + topic + "\"," + String(qos) + ",0," + String(payload.length()) + ",\"" + hexPayload + "\"";
     
-    debugPrint("Air780EG MQTT: 发布命令长度: " + String(cmd.length()));
-    debugPrint("Air780EG MQTT: 发布命令: " + cmd.substring(0, 100) + "...");
+    debugPrint("Air780EG MQTT: HEX载荷长度: " + String(hexPayload.length()));
+    debugPrint("Air780EG MQTT: 原始消息: " + payload.substring(0, 30) + "...");
+    debugPrint("Air780EG MQTT: HEX编码: " + hexPayload.substring(0, 60) + "...");
+    debugPrint("Air780EG MQTT: 发布命令: " + cmd.substring(0, 120) + "...");
 
     // 尝试发布
     if (_modem.sendAT(cmd, "OK", 15000)) {
-        debugPrint("Air780EG MQTT: ✅ 消息发布成功");
+        debugPrint("Air780EG MQTT: ✅ HEX模式消息发布成功");
         return true;
     }
 
-    debugPrint("Air780EG MQTT: ❌ 首次发布失败，开始重试...");
+    debugPrint("Air780EG MQTT: ❌ HEX模式首次发布失败，开始重试...");
 
     // 重试机制
     int maxRetries = 3;
     for (int retry = 0; retry < maxRetries; retry++) {
-        debugPrint("Air780EG MQTT: 重试发布 (" + String(retry + 1) + "/" + String(maxRetries) + ")");
+        debugPrint("Air780EG MQTT: HEX模式重试发布 (" + String(retry + 1) + "/" + String(maxRetries) + ")");
         delay(2000); // 重试前等待2秒
 
         // 检查连接状态
@@ -307,12 +314,12 @@ bool Air780EGMqtt::publish(const String& topic, const String& payload, int qos) 
             break;
         }
 
-        // 重新确保ASCII模式
-        _modem.sendAT("AT+MQTTMODE=0", "OK", 2000);
+        // 重新确保HEX模式
+        _modem.sendAT("AT+MQTTMODE=1", "OK", 2000);
 
         // 重试发布
         if (_modem.sendAT(cmd, "OK", 15000)) {
-            debugPrint("Air780EG MQTT: ✅ 重试成功 - 消息发布成功");
+            debugPrint("Air780EG MQTT: ✅ HEX模式重试成功 - 消息发布成功");
             return true;
         } else {
             debugPrint("Air780EG MQTT: 消息发布失败，尝试: " + String(retry + 1));

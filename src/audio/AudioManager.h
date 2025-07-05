@@ -24,6 +24,12 @@ enum AudioEvent {
     AUDIO_EVENT_CUSTOM
 };
 
+// 欢迎语音类型
+enum WelcomeVoiceType {
+    WELCOME_VOICE_DEFAULT,      // 默认语音："大菠萝车机,扎西德勒"
+    WELCOME_VOICE_LIFAN_MOTUO   // 力帆摩托语音
+};
+
 class AudioManager {
 private:
     bool initialized;
@@ -31,6 +37,9 @@ private:
     int wsPin;      // WS (Word Select) 引脚
     int bclkPin;    // BCLK (Bit Clock) 引脚  
     int dataPin;    // DATA 引脚
+    
+    // 欢迎语音配置
+    WelcomeVoiceType currentWelcomeVoice;
     
     // I2S配置结构体
     i2s_config_t i2s_config;
@@ -59,9 +68,15 @@ public:
     bool playCustomBeep(float frequency = 1000.0, int duration = 200);
     
     // 语音播放功能
-    bool playWelcomeVoice();  // 播放"大菠萝车机,扎西德勒"
+    bool playWelcomeVoice();  // 播放当前配置的欢迎语音
+    bool playWelcomeVoice(WelcomeVoiceType voiceType);  // 播放指定类型的欢迎语音
     bool playVoiceFromFile(const char* filename);
     bool playVoiceFromArray(const uint8_t* audioData, size_t dataSize);
+    
+    // 欢迎语音配置
+    void setWelcomeVoiceType(WelcomeVoiceType voiceType);
+    WelcomeVoiceType getWelcomeVoiceType() const;
+    const char* getWelcomeVoiceDescription() const;
     
     // 音频事件播放
     bool playAudioEvent(AudioEvent event);
