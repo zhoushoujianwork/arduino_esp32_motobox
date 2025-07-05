@@ -160,9 +160,9 @@ bool Air780EGMqtt::connect(const String& server, int port, const String& clientI
                 debugPrint("Air780EG MQTT: ⚠️ HEX模式设置失败，可能影响消息发布");
             }
             
-            // 6. 可选：设置消息上报模式为直接上报
+            // 6. 设置消息上报模式为直接上报
             debugPrint("Air780EG MQTT: 设置消息上报模式...");
-            String msgSetResp = _modem.sendATWithResponse("AT+MQTTMSGSET=0", 3000);
+            String msgSetResp = _modem.sendATWithResponse("AT+MQTTMSGSET=1", 3000);
             debugPrint("Air780EG MQTT: 消息模式设置响应: " + msgSetResp);
             
             break;
@@ -403,57 +403,40 @@ bool Air780EGMqtt::unsubscribe(const String& topic) {
     }
 }
 
+/**
+ * Air780EG MQTT客户端主循环
+ * 
+ * 优化说明：
+ * - 使用直接上报模式，MQTT消息通过URC (+MSUB:) 自动上报到串口
+ * - 移除了不必要的AT+MQTTMSGGET轮询，提高性能
+ * - 实际的消息处理由Air780EGModem的handleURC方法完成
+ * - loop函数主要用于维护连接状态和减少日志输出
+ */
 void Air780EGMqtt::loop() {
+    // 在直接上报模式下，MQTT消息会通过URC (+MSUB:) 自动上报到串口
+    // 这些消息由Air780EGModem的handleURC方法处理，无需在此轮询
+    
     if (!_connected) {
         // 每30秒输出一次未连接状态，避免日志过多
         static unsigned long lastDisconnectedLog = 0;
         unsigned long now = millis();
         if (now - lastDisconnectedLog > 30000) {
-            debugPrint("Air780EG MQTT: loop跳过 - 未连接状态");
+            debugPrint("Air780EG MQTT: 未连接状态，跳过处理");
             lastDisconnectedLog = now;
         }
         return;
     }
     
-    // 限制消息检查频率，但不要太慢以免影响实时性
-    static unsigned long lastMsgCheck = 0;
+    // 在直接上报模式下，loop函数主要用于维护连接状态
+    // 实际的消息处理由URC回调完成，无需主动轮询
+    static unsigned long lastStatusCheck = 0;
     unsigned long now = millis();
     
-    // 每2秒检查一次消息，提高响应速度
-    if (now - lastMsgCheck < 2000) {
-        return;
+    // 每30秒检查一次连接状态（减少日志输出）
+    if (now - lastStatusCheck > 30000) {
+        lastStatusCheck = now;
+        debugPrint("Air780EG MQTT: 连接状态正常，等待消息上报");
     }
-    lastMsgCheck = now;
-    
-    debugPrint("=== Air780EG MQTT 消息轮询开始 ===");
-    debugPrint("Air780EG MQTT: 连接状态正常，开始检查新消息");
-    debugPrint("Air780EG MQTT: 回调函数状态: " + String(_messageCallback ? "已设置" : "未设置"));
-    
-    // 检查是否有新消息 - 使用正确的AT指令
-    try {
-        // 当 AT+MQTTMSGSET=1，执行命令可以打印订阅消息。一次最多打印4条。如果一次上报多于4条，则打印最新的4条，最老的那条将被覆盖。
-        debugPrint("Air780EG MQTT: 发送AT+MQTTMSGGET命令...");
-        String response = _modem.sendATWithResponse("AT+MQTTMSGGET=1", 3000);
-        debugPrint("Air780EG MQTT: 消息检查原始响应: " + response);
-        debugPrint("Air780EG MQTT: 响应长度: " + String(response.length()));
-        
-        if (response.length() > 0) {
-            if (response.indexOf("+MQTTMSGGET:") >= 0) {
-                debugPrint("Air780EG MQTT: ✅ 检测到新MQTT消息，开始处理");
-                handleIncomingMessage(response);
-            } else if (response.indexOf("OK") >= 0) {
-                // OK响应表示没有新消息，这是正常的
-                debugPrint("Air780EG MQTT: 无新消息 (OK响应)");
-            } else {
-                debugPrint("Air780EG MQTT: ⚠️ 未知响应格式: " + response);
-            }
-        } else {
-            debugPrint("Air780EG MQTT: ⚠️ 空响应");
-        }
-    } catch (...) {
-        debugPrint("Air780EG MQTT: ❌ 消息检查异常");
-    }
-    debugPrint("=== Air780EG MQTT 消息轮询结束 ===");
 }
 
 void Air780EGMqtt::setCallback(void (*callback)(String topic, String payload)) {
@@ -553,6 +536,140 @@ void Air780EGMqtt::handleIncomingMessage(const String& response) {
         debugPrint("Air780EG MQTT: ❌ 消息处理异常，忽略");
     }
     debugPrint("=== Air780EG MQTT 消息解析结束 ===");
+}
+
+/**
+ * 解析MSUB消息格式
+ * 格式: +MSUB: <topic>,<len>,<message>
+ */
+void Air780EGMqtt::parseMSUBMessage(const String& data) {
+    debugPrint("=== Air780EG MQTT MSUB消息解析开始 ===");
+    debugPrint("Air780EG MQTT: 原始MSUB数据: " + data);
+    
+    // 安全检查
+    if (data.length() == 0) {
+        debugPrint("Air780EG MQTT: ❌ 空数据，忽略");
+        return;
+    }
+    
+    if (_messageCallback == nullptr) {
+        debugPrint("Air780EG MQTT: ❌ 消息回调未设置，消息将被丢弃");
+        return;
+    }
+    
+    try {
+        // 查找+MSUB:标识
+        int msubPos = data.indexOf("+MSUB:");
+        if (msubPos < 0) {
+            debugPrint("Air780EG MQTT: ❌ 找不到+MSUB:标识");
+            return;
+        }
+        
+        // 提取消息部分
+        String msgPart = data.substring(msubPos + 6); // 跳过"+MSUB:"
+        msgPart.trim();
+        debugPrint("Air780EG MQTT: 提取消息部分: " + msgPart);
+        
+        // 解析格式: <topic>,<len>,<message>
+        // 查找第一个逗号 (topic结束位置)
+        int firstComma = msgPart.indexOf(',');
+        if (firstComma < 0) {
+            debugPrint("Air780EG MQTT: ❌ 找不到第一个逗号分隔符");
+            return;
+        }
+        
+        // 提取topic
+        String topic = msgPart.substring(0, firstComma);
+        topic.trim();
+        // 去除主题两端的引号
+        if (topic.startsWith("\"") && topic.endsWith("\"")) {
+            topic = topic.substring(1, topic.length() - 1);
+        }
+        debugPrint("Air780EG MQTT: 解析到主题: '" + topic + "'");
+        
+        // 查找第二个逗号 (len结束位置)
+        int secondComma = msgPart.indexOf(',', firstComma + 1);
+        if (secondComma < 0) {
+            debugPrint("Air780EG MQTT: ❌ 找不到第二个逗号分隔符");
+            return;
+        }
+        
+        // 提取len (消息长度)
+        String lenStr = msgPart.substring(firstComma + 1, secondComma);
+        lenStr.trim();
+        // 去除可能的"byte"后缀
+        if (lenStr.endsWith(" byte")) {
+            lenStr = lenStr.substring(0, lenStr.length() - 5);
+        }
+        int expectedLen = lenStr.toInt();
+        debugPrint("Air780EG MQTT: 预期消息长度: " + String(expectedLen));
+        
+        // 提取message (十六进制数据)
+        String hexMessage = msgPart.substring(secondComma + 1);
+        hexMessage.trim();
+        
+        // 清理消息内容，移除换行符和"OK"
+        int okPos = hexMessage.indexOf("OK");
+        if (okPos >= 0) {
+            hexMessage = hexMessage.substring(0, okPos);
+        }
+        hexMessage.trim();
+        
+        debugPrint("Air780EG MQTT: 解析到十六进制消息: '" + hexMessage + "'");
+        debugPrint("Air780EG MQTT: 十六进制消息长度: " + String(hexMessage.length()));
+        
+        // 将十六进制字符串转换为实际字符串
+        String message = "";
+        if (hexMessage.length() % 2 != 0) {
+            debugPrint("Air780EG MQTT: ⚠️ 十六进制消息长度不是偶数，可能有问题");
+        }
+        
+        for (int i = 0; i < hexMessage.length(); i += 2) {
+            if (i + 1 < hexMessage.length()) {
+                String hexByte = hexMessage.substring(i, i + 2);
+                // 验证是否为有效的十六进制字符
+                bool isValidHex = true;
+                for (int j = 0; j < hexByte.length(); j++) {
+                    char c = hexByte.charAt(j);
+                    if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))) {
+                        isValidHex = false;
+                        break;
+                    }
+                }
+                
+                if (isValidHex) {
+                    char c = (char)strtol(hexByte.c_str(), NULL, 16);
+                    message += c;
+                } else {
+                    debugPrint("Air780EG MQTT: ⚠️ 无效的十六进制字符: " + hexByte);
+                }
+            }
+        }
+        
+        debugPrint("Air780EG MQTT: 转换后的消息: '" + message + "'");
+        debugPrint("Air780EG MQTT: 转换后消息长度: " + String(message.length()));
+        
+        // 验证消息长度
+        if (message.length() != expectedLen) {
+            debugPrint("Air780EG MQTT: ⚠️ 消息长度不匹配，预期: " + String(expectedLen) + ", 实际: " + String(message.length()));
+        }
+        
+        // 确保topic和message都不为空
+        if (topic.length() > 0 && message.length() > 0) {
+            debugPrint("Air780EG MQTT: ✅ MSUB消息解析成功，调用回调函数");
+            _messageCallback(topic, message);
+            debugPrint("Air780EG MQTT: 回调函数执行完成");
+        } else {
+            debugPrint("Air780EG MQTT: ❌ 主题或消息为空，忽略");
+            debugPrint("Air780EG MQTT: 主题长度: " + String(topic.length()));
+            debugPrint("Air780EG MQTT: 消息长度: " + String(message.length()));
+        }
+        
+    } catch (...) {
+        debugPrint("Air780EG MQTT: ❌ MSUB消息解析异常");
+    }
+    
+    debugPrint("=== Air780EG MQTT MSUB消息解析结束 ===");
 }
 
 void Air780EGMqtt::setDebug(bool debug) {

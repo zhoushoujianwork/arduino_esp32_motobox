@@ -53,7 +53,6 @@ void MqttManager::cleanup()
 
 bool MqttManager::begin(const MqttManagerConfig &config)
 {
-    // setDebug(true);
     Serial.println("[MqttManager] begin");
     cleanup();
     _config = config;
@@ -334,12 +333,13 @@ void MqttManager::loop()
     if (!_isInitialized)
         return;
 
-    // 检查间隔 - 每2秒检查一次
-    if (millis() - _lastNetworkCheckTime < 2000)
+    // 检查间隔 - 每1秒检查一次
+    if (millis() - _lastNetworkCheckTime < 1000)
         return;
         
     _lastNetworkCheckTime = millis();
 
+    Serial.println("MqttManager loop 1");
 #ifdef ENABLE_GSM
     debugPrint("=== MqttManager::loop 开始 ===");
     
@@ -386,7 +386,7 @@ void MqttManager::loop()
                 }
             }
             
-            // 尝试重连
+            // 尝试重连 - 使用静态变量避免重复声明
             static unsigned long lastReconnectAttempt = 0;
             if (millis() - lastReconnectAttempt > 15000) { // 15秒重连一次
                 lastReconnectAttempt = millis();
@@ -465,24 +465,29 @@ void MqttManager::loop()
         _wifiMqttClient->loop();
 #endif
 
-    // 处理预注册的主题
-    for (auto &topic : _topicConfigs)
-    {
-        if (topic.second.lastPublishTime + topic.second.interval < millis())
+    // 处理预注册的主题 - 添加非阻塞检查
+    static unsigned long lastTopicCheck = 0;
+    if (millis() - lastTopicCheck > 1000) { // 每1秒检查一次主题发布
+        lastTopicCheck = millis();
+        
+        for (auto &topic : _topicConfigs)
         {
-            if (topic.first == "device_info")
+            if (topic.second.lastPublishTime + topic.second.interval < millis())
             {
-                publishToTopic(topic.first, device_state_to_json(get_device_state()).c_str(), false);
-            }
-            // else if (topic.first == "imu")
-            // {
-            //     publishToTopic(topic.first, imu_data_to_json(imu_data).c_str(), false);
-            // }
-            else if (topic.first == "gps")
-            {
-                if (gps_data.satellites > 3 || lbs_data.valid)
+                if (topic.first == "device_info")
                 {
-                    publishToTopic(topic.first, gps_data_to_json(gps_data).c_str(), false);
+                    publishToTopic(topic.first, device_state_to_json(get_device_state()).c_str(), false);
+                }
+                // else if (topic.first == "imu")
+                // {
+                //     publishToTopic(topic.first, imu_data_to_json(imu_data).c_str(), false);
+                // }
+                else if (topic.first == "gps")
+                {
+                    if (gps_data.satellites > 3 || lbs_data.valid)
+                    {
+                        publishToTopic(topic.first, gps_data_to_json(gps_data).c_str(), false);
+                    }
                 }
             }
         }

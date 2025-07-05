@@ -234,33 +234,6 @@ void taskDataProcessing(void *parameter)
         gpsData.latitude, gpsData.longitude, gpsData.altitude,
         gpsData.speed, gpsData.satellites);
   }
-
-  // 记录IMU数据
-  if (device_state.imuReady && device_state.sdCardReady &&
-      currentTime - lastIMURecordTime >= IMU_RECORD_INTERVAL)
-  {
-    lastIMURecordTime = currentTime;
-
-    // 获取IMU数据
-    float ax = imu.getAccelX();
-    float ay = imu.getAccelY();
-    float az = imu.getAccelZ();
-    float gx = imu.getGyroX();
-    float gy = imu.getGyroY();
-    float gz = imu.getGyroZ();
-
-    // 获取罗盘数据
-    float heading = 0;
-#ifdef ENABLE_COMPASS
-    heading = compass_data.heading;
-#endif
-
-    // 获取当前时间作为时间戳
-    char timestamp[32];
-    time_t now;
-    // IMU数据记录功能已简化，暂时移除
-    // 可以在后续版本中根据需要重新添加
-  }
 #endif
 
 #ifdef BLE_CLIENT
