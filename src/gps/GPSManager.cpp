@@ -165,7 +165,12 @@ void GPSManager::handleLBSUpdate()
     if (true) // 没有GSM模块时跳过
 #endif
     {
-        debugPrint("网络未就绪，跳过LBS更新");
+        // 降低日志频率，避免刷屏
+        static unsigned long lastLBSWarning = 0;
+        if (millis() - lastLBSWarning > 30000) {  // 每30秒提示一次
+            lastLBSWarning = millis();
+            debugPrint("网络未就绪，跳过LBS更新");
+        }
         return;
     }
     

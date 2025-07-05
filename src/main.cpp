@@ -792,8 +792,23 @@ void loop()
   if (millis() - lastLoopReport > 10000)
   {
     lastLoopReport = millis();
+    uint32_t freeHeap = ESP.getFreeHeap();
+    uint32_t minFreeHeap = ESP.getMinFreeHeap();
+    
     Serial.printf("[主循环] 运行正常，循环计数: %lu, 空闲内存: %d 字节\n",
-                  loopCount, ESP.getFreeHeap());
+                  loopCount, freeHeap);
+    
+    // 内存警告检查
+    if (freeHeap < 50000) {  // 小于50KB时警告
+      Serial.printf("[警告] 内存不足: %d 字节，最小值: %d 字节\n", freeHeap, minFreeHeap);
+    }
+    
+    // 极低内存时强制重启
+    if (freeHeap < 20000) {  // 小于20KB时重启
+      Serial.println("[严重] 内存严重不足，即将重启系统...");
+      delay(1000);
+      ESP.restart();
+    }
   }
 
   // Air780EG后台初始化处理

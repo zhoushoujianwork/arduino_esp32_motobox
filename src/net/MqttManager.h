@@ -160,7 +160,8 @@ private:
     bool reconnect();
     unsigned long _lastReconnectAttempt;
     unsigned long _lastReconnectTime;
-    static const unsigned long RECONNECT_INTERVAL = 5000; // 5秒重连间隔
+    int _reconnectFailCount = 0;  // 重连失败计数器
+    static const unsigned long RECONNECT_INTERVAL = 15000; // 15秒重连间隔
     
     // 调试输出
     void debugPrint(const String& msg);

@@ -50,20 +50,16 @@ bool Air780EGMqtt::connect(const String& server, int port, const String& clientI
                           const String& username, const String& password) {
     _server = server;
     _port = port;
-    
-    // 如果客户端ID为空，自动生成一个唯一ID
-    if (clientId.isEmpty()) {
-        _clientId = "Air780EG_" + String(millis());
-        debugPrint("Air780EG MQTT: 自动生成客户端ID: " + _clientId);
-    } else {
-        _clientId = clientId;
-    }
-    
+    _clientId = clientId;
     _username = username;
     _password = password;
     
     debugPrint("Air780EG MQTT: 连接到 " + server + ":" + String(port));
     debugPrint("Air780EG MQTT: 客户端ID: " + _clientId);
+    debugPrint("Air780EG MQTT: 用户名: " + (username.length() > 0 ? username : "无"));
+    String passInfo = "Air780EG MQTT: 密码: ";
+    passInfo += (password.length() > 0 ? "***已设置***" : "无");
+    debugPrint(passInfo);
     
     if (!_modem.isNetworkReady()) {
         debugPrint("Air780EG MQTT: 网络未就绪");
@@ -79,7 +75,8 @@ bool Air780EGMqtt::connect(const String& server, int port, const String& clientI
     // 按照文档顺序执行MQTT连接
     // 1. 先关闭可能存在的连接
     debugPrint("Air780EG MQTT: 关闭现有连接...");
-    _modem.sendAT("AT+MIPCLOSE", "OK", 3000);
+    String closeResp = _modem.sendATWithResponse("AT+MIPCLOSE", 1000);
+    debugPrint("Air780EG MQTT: 关闭连接响应: " + closeResp);
     delay(500);
     
     // 2. 设置MQTT配置参数 (AT+MCONFIG)
@@ -87,13 +84,18 @@ bool Air780EGMqtt::connect(const String& server, int port, const String& clientI
     if (username.length() > 0 && password.length() > 0) {
         // 有用户名和密码
         configCmd = "AT+MCONFIG=\"" + _clientId + "\",\"" + username + "\",\"" + password + "\"";
+        debugPrint("Air780EG MQTT: 使用认证连接");
     } else {
         // 无用户名密码，只设置客户端ID
         configCmd = "AT+MCONFIG=\"" + _clientId + "\"";
+        debugPrint("Air780EG MQTT: 使用匿名连接");
     }
     
     debugPrint("Air780EG MQTT: 设置MQTT配置: " + configCmd);
-    if (!_modem.sendAT(configCmd, "OK", 5000)) {
+    String configResp = _modem.sendATWithResponse(configCmd, 5000);
+    debugPrint("Air780EG MQTT: 配置响应: " + configResp);
+    
+    if (configResp.indexOf("OK") < 0) {
         debugPrint("Air780EG MQTT: MQTT配置失败");
         return false;
     }
@@ -103,7 +105,10 @@ bool Air780EGMqtt::connect(const String& server, int port, const String& clientI
     String connectCmd = "AT+MIPSTART=\"" + server + "\"," + String(port);
     debugPrint("Air780EG MQTT: 建立TCP连接: " + connectCmd);
     
-    if (!_modem.sendAT(connectCmd, "OK", 15000)) {
+    String tcpResp = _modem.sendATWithResponse(connectCmd, 15000);
+    debugPrint("Air780EG MQTT: TCP连接响应: " + tcpResp);
+    
+    if (tcpResp.indexOf("OK") < 0) {
         debugPrint("Air780EG MQTT: TCP连接失败");
         return false;
     }
@@ -112,13 +117,50 @@ bool Air780EGMqtt::connect(const String& server, int port, const String& clientI
     // 等待TCP连接稳定
     delay(2000);
     
-    // 4. 建立MQTT连接 (AT+MCONNECT) 客户端向服务器请求会话连接
+    // 4. 建立MQTT连接 (AT+MCONNECT=1,60) 客户端向服务器请求会话连接
     debugPrint("Air780EG MQTT: 建立MQTT连接...");
-    if (!_modem.sendAT("AT+MCONNECT", "OK", 10000)) {
-        debugPrint("Air780EG MQTT: MQTT连接失败");
+    
+    // 增加重试机制
+    int maxRetries = 3;
+    bool connectSuccess = false;
+    
+    for (int retry = 0; retry < maxRetries && !connectSuccess; retry++) {
+        if (retry > 0) {
+            debugPrint("Air780EG MQTT: 重试连接 (" + String(retry + 1) + "/" + String(maxRetries) + ")");
+            delay(5000);  // 重试前等待5秒
+        }
+        
+        String mqttResp = _modem.sendATWithResponse("AT+MCONNECT=1,60", 15000);  // 增加超时时间
+        debugPrint("Air780EG MQTT: MQTT连接响应: " + mqttResp);
+        
+        if (mqttResp.indexOf("CME ERROR: 3") >= 0) {
+            debugPrint("Air780EG MQTT: MQTT连接被拒绝 (CME ERROR: 3)");
+            debugPrint("Air780EG MQTT: 可能原因:");
+            debugPrint("  1. 服务器要求认证但未提供用户名密码");
+            debugPrint("  2. 用户名密码错误");
+            debugPrint("  3. 客户端ID冲突");
+            debugPrint("  4. 服务器配置问题");
+            break;  // 认证错误不需要重试
+        } else if (mqttResp.indexOf("ERROR") >= 0) {
+            debugPrint("Air780EG MQTT: MQTT连接出现错误，将重试");
+            continue;  // 其他错误可以重试
+        } else if (mqttResp.indexOf("OK") >= 0) {
+            connectSuccess = true;
+            debugPrint("Air780EG MQTT: MQTT连接成功");
+            break;
+        } else if (mqttResp.length() == 0) {
+            debugPrint("Air780EG MQTT: 连接超时，将重试");
+            continue;  // 超时重试
+        } else {
+            debugPrint("Air780EG MQTT: 未知响应，将重试");
+            continue;
+        }
+    }
+    
+    if (!connectSuccess) {
+        debugPrint("Air780EG MQTT: MQTT连接失败，已达到最大重试次数");
         return false;
     }
-    debugPrint("Air780EG MQTT: MQTT连接成功");
     
     // 等待连接稳定
     delay(2000);

@@ -79,8 +79,8 @@
 #define MQTT_BROKER        "mq-hub.daboluo.cc"
 // #define MQTT_SERVER        "222.186.32.152"
 #define MQTT_PORT         32571
-#define MQTT_USER         ""
-#define MQTT_PASSWORD     ""
+#define MQTT_USER         "box"
+#define MQTT_PASSWORD     "box"
 #define MQTT_KEEP_ALIVE   60
 
 /* 

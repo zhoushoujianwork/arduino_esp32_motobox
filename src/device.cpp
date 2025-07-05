@@ -653,8 +653,10 @@ bool Device::initializeMQTT() {
     config.broker = MQTT_BROKER;
     config.port = MQTT_PORT;
     
-    // 生成唯一的客户端ID，使用设备ID
-    config.clientId = "ESP32_" + device_state.device_id;
+    // 生成唯一的客户端ID，使用设备ID 
+    // [系统] 系统正常启动，硬件版本: esp32-air780eg, 固件版本: v3.4.0+104, 编译时间: Jul  5 2025 15:14:31
+    // 带上硬件版本+固件版本信息
+    config.clientId = "ESP32_" + device_state.device_id + "_" + device_state.device_hardware_version + "_" + device_state.device_firmware_version;
     
     config.username = MQTT_USER;
     config.password = MQTT_PASSWORD;

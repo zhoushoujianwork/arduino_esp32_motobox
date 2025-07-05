@@ -392,11 +392,13 @@ void MqttManager::loop()
         {
         case MqttState::CONNECTING:
         {
-            // 只在连接超时时检查网络状态，避免频繁查询
+            // 检查连接超时
             if (millis() - _connectionStartTime > _connectionTimeout)
             {
-                setMqttState(MqttState::ERROR);
-                debugPrint("Cellular connection timeout");
+                _reconnectFailCount++;
+                debugPrint("MQTT连接超时 (第" + String(_reconnectFailCount) + "次失败)");
+                setMqttState(MqttState::DISCONNECTED);  // 回到断开状态，而不是ERROR状态
+                _lastReconnectAttempt = millis();  // 重置重连时间
             }
             else
             {
@@ -468,7 +470,12 @@ void MqttManager::loop()
             // 检查网络是否恢复
 #ifdef USE_AIR780EG_GSM
             bool networkReady = air780eg_modem.isNetworkReady();
-            debugPrint("DISCONNECTED状态 - 网络就绪: " + String(networkReady));
+            // 降低日志频率
+            static unsigned long lastDisconnectedLog = 0;
+            if (millis() - lastDisconnectedLog > 10000) {  // 每10秒记录一次
+                lastDisconnectedLog = millis();
+                debugPrint("DISCONNECTED状态 - 网络就绪: " + String(networkReady));
+            }
             if (networkReady)
 #elif defined(USE_ML307_GSM)
             if (ml307_at.isNetworkReady())
@@ -478,24 +485,33 @@ void MqttManager::loop()
             {
                 // 网络就绪，尝试连接MQTT
                 unsigned long now = millis();
-                debugPrint("网络就绪，上次重连时间: " + String(now - _lastReconnectAttempt) + "ms前");
-                if (now - _lastReconnectAttempt > RECONNECT_INTERVAL)
+                
+                // 动态调整重连间隔，失败次数越多间隔越长
+                unsigned long reconnectInterval = RECONNECT_INTERVAL;
+                if (_reconnectFailCount > 3) {
+                    reconnectInterval = RECONNECT_INTERVAL * 2;  // 30秒
+                } else if (_reconnectFailCount > 6) {
+                    reconnectInterval = RECONNECT_INTERVAL * 4;  // 60秒
+                }
+                
+                if (now - _lastReconnectAttempt > reconnectInterval)
                 {
                     _lastReconnectAttempt = now;
-                    debugPrint("网络已就绪，开始MQTT连接...");
-                    debugPrint("调用connect()方法...");
+                    debugPrint("网络已就绪，开始MQTT连接... (失败次数: " + String(_reconnectFailCount) + ")");
                     setMqttState(MqttState::CONNECTING);
                     _connectionStartTime = millis();
                     
                     // 立即尝试连接
                     bool connectResult = connect();
-                    debugPrint("connect()结果: " + String(connectResult));
                     if (connectResult)
                     {
                         setMqttState(MqttState::CONNECTED);
+                        _reconnectFailCount = 0;  // 重置失败计数
                         debugPrint("MQTT连接成功");
                     } else {
-                        debugPrint("MQTT连接失败，保持CONNECTING状态等待重试");
+                        _reconnectFailCount++;
+                        debugPrint("MQTT连接失败 (第" + String(_reconnectFailCount) + "次)，将在" + String(reconnectInterval/1000) + "秒后重试");
+                        setMqttState(MqttState::DISCONNECTED);  // 回到断开状态
                     }
                 }
             }

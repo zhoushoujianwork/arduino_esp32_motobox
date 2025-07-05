@@ -3,10 +3,10 @@
 
 // 自动生成的版本号宏
 #ifndef BUILD_NUMBER
-  #define BUILD_NUMBER "97"
+  #define BUILD_NUMBER "106"
 #endif
 #ifndef FIRMWARE_VERSION
-  #define FIRMWARE_VERSION "v3.4.0+97"
+  #define FIRMWARE_VERSION "v3.4.0+106"
 #endif
 #ifndef HARDWARE_VERSION
   #define HARDWARE_VERSION "esp32-air780eg"
