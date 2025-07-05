@@ -141,6 +141,9 @@ private:
     
     // 回调函数
     static void wifiMqttCallback(char* topic, byte* payload, unsigned int length);
+#ifdef USE_AIR780EG_GSM
+    static void air780egMqttMessageBridge(String topic, String payload);
+#endif
     static MqttMessageCallback _messageCallback;
     std::function<void(bool)> _connectCallback;
     

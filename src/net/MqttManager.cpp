@@ -119,6 +119,11 @@ bool MqttManager::initCellular()
         return false;
     }
     
+    // 立即设置回调函数，确保消息处理正常
+    if (_messageCallback) {
+        _air780egMqtt->setCallback(air780egMqttMessageBridge);
+    }
+    
     debugPrint("Air780EG MQTT初始化成功，等待网络就绪后连接");
     return true;
     
@@ -724,9 +729,10 @@ void MqttManager::onMessage(MqttMessageCallback callback)
     _messageCallback = callback;
 #ifdef ENABLE_GSM
 #ifdef USE_AIR780EG_GSM
-    // Air780EG MQTT暂时不设置回调，在loop中处理消息
-    // 因为Air780EGMqtt的setCallback需要函数指针，而我们需要访问成员变量
-    // 可以在后续版本中改进Air780EGMqtt的接口设计
+    // 为Air780EG设置静态回调桥接函数
+    if (_air780egMqtt) {
+        _air780egMqtt->setCallback(air780egMqttMessageBridge);
+    }
 #elif defined(USE_ML307_GSM)
     ml307Mqtt.onMessage(callback);
 #endif
@@ -835,6 +841,16 @@ void MqttManager::wifiMqttCallback(char *topic, byte *payload, unsigned int leng
         _messageCallback(topic, payloadStr);
     }
 }
+
+#ifdef USE_AIR780EG_GSM
+void MqttManager::air780egMqttMessageBridge(String topic, String payload)
+{
+    if (_messageCallback)
+    {
+        _messageCallback(topic, payload);
+    }
+}
+#endif
 
 void MqttManager::onMqttState(std::function<void(MqttState)> callback)
 {
