@@ -105,6 +105,9 @@ public:
     // 硬件初始化
     void begin();
     
+    // MQTT初始化，需要在网络就绪后调用
+    bool initializeMQTT();
+    
 private:
     
 };

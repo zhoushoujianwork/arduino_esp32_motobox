@@ -510,6 +510,7 @@ void taskSystem(void *parameter)
  */
 void taskDataProcessing(void *parameter)
 {
+  extern bool mqttInitialized;  // 声明外部全局变量
   Serial.println("[系统] 数据处理任务启动");
   
   // 数据记录相关变量
@@ -517,9 +518,64 @@ void taskDataProcessing(void *parameter)
   unsigned long lastIMURecordTime = 0;
   const unsigned long GPS_RECORD_INTERVAL = 5000;  // 5秒记录一次GPS数据
   const unsigned long IMU_RECORD_INTERVAL = 1000;  // 1秒记录一次IMU数据
+  
+  // 网络状态检查和MQTT初始化
+  static bool networkReadyReported = false;
 
   while (true)
   {
+    // 首先检查网络状态，确保网络就绪后再初始化MQTT
+#ifdef USE_AIR780EG_GSM
+    static unsigned long lastNetworkCheck = 0;
+    if (millis() - lastNetworkCheck > 2000) {  // 每2秒检查一次网络状态
+      lastNetworkCheck = millis();
+      
+      // 检查网络状态
+      if (air780eg_modem.isNetworkReady()) {
+        device_state.gsmReady = true;
+        device_state.signalStrength = air780eg_modem.getCSQ();
+        
+        // 网络就绪后，初始化MQTT（只初始化一次）
+        if (!mqttInitialized) {
+          if (!networkReadyReported) {
+            Serial.println("🌐 Air780EG网络已就绪！");
+            Serial.printf("📶 信号强度: %d\n", device_state.signalStrength);
+            networkReadyReported = true;
+          }
+          
+          Serial.println("🔄 网络就绪，开始初始化MQTT...");
+          if (device.initializeMQTT()) {
+            mqttInitialized = true;
+            Serial.println("✅ MQTT初始化成功，系统完全就绪！");
+          } else {
+            Serial.println("❌ MQTT初始化失败，将在下次循环重试");
+          }
+        }
+      } else {
+        device_state.gsmReady = false;
+        if (networkReadyReported) {
+          Serial.println("⚠️ 网络连接丢失");
+          networkReadyReported = false;
+        }
+      }
+    }
+#elif defined(ENABLE_WIFI)
+    // WiFi模式下的网络检查
+    if (WiFi.status() == WL_CONNECTED && !mqttInitialized) {
+      if (!networkReadyReported) {
+        Serial.println("🌐 WiFi网络已就绪！");
+        networkReadyReported = true;
+      }
+      
+      Serial.println("🔄 WiFi就绪，开始初始化MQTT...");
+      if (device.initializeMQTT()) {
+        mqttInitialized = true;
+        Serial.println("✅ MQTT初始化成功，系统完全就绪！");
+      } else {
+        Serial.println("❌ MQTT初始化失败，将在下次循环重试");
+      }
+    }
+#endif
     // IMU数据处理
 #ifdef ENABLE_IMU
     imu.setDebug(false);
@@ -626,6 +682,9 @@ void taskWiFi(void *parameter)
   }
 }
 #endif
+
+// 全局变量声明
+bool mqttInitialized = false;
 
 void setup()
 {
@@ -810,7 +869,7 @@ void loop()
 
     update_device_state();
 
-    // Air780EG状态检查和GNSS数据更新
+    // Air780EG GNSS数据更新（网络检查已在上面完成）
 #ifdef USE_AIR780EG_GSM
     static unsigned long lastGNSSCheck = 0;
     if (millis() - lastGNSSCheck > 5000) {  // 每5秒检查一次
@@ -832,14 +891,6 @@ void loop()
           device_state.gpsReady = false;
         }
       }
-      
-      // 网络状态检查
-      if (air780eg_modem.isNetworkReady()) {
-        device_state.gsmReady = true;
-        device_state.signalStrength = air780eg_modem.getCSQ();
-      } else {
-        device_state.gsmReady = false;
-      }
     }
 #endif
 
@@ -850,12 +901,21 @@ void loop()
       print_gps_data(gps_data);
     }
 
-    // 发送状态消息 - 条件编译
+    // 发送状态消息 - 只有在MQTT初始化成功后才发送
 #ifndef DISABLE_MQTT
-    Serial.println("[MQTT] 准备发送设备状态消息...");
-    bool publishResult = mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
-    Serial.printf("[MQTT] 设备状态消息发送结果: device_info=%s\n", 
-                  publishResult ? "成功" : "失败");
+    if (mqttInitialized && mqttManager.isConnected()) {
+      Serial.println("[MQTT] 准备发送设备状态消息...");
+      bool publishResult = mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
+      Serial.printf("[MQTT] 设备状态消息发送结果: device_info=%s\n", 
+                    publishResult ? "成功" : "失败");
+    } else if (!mqttInitialized) {
+      // MQTT未初始化时的提示（降低频率）
+      static unsigned long lastMqttWarning = 0;
+      if (millis() - lastMqttWarning > 10000) {  // 每10秒提示一次
+        lastMqttWarning = millis();
+        Serial.println("[MQTT] 等待网络就绪后初始化MQTT...");
+      }
+    }
 #endif
     
     Serial.println("[状态] 定期状态更新完成");
