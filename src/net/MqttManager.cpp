@@ -483,9 +483,39 @@ void MqttManager::loop()
                 // }
                 else if (topic.first == "gps")
                 {
-                    if (gps_data.satellites > 3 || lbs_data.valid)
-                    {
+                    // 使用GPSManager的统一接口判断数据就绪状态
+                    bool gnssDataReady = false;
+                    bool lbsDataReady = false;
+                    
+                    // 根据定位模式判断数据就绪状态
+                    switch (gpsManager.getLocationMode()) {
+                        case LocationMode::GPS_ONLY:
+                            gnssDataReady = gpsManager.isReady() && gpsManager.isGPSDataValid();
+                            break;
+                            
+                        case LocationMode::GNSS_ONLY:
+                            gnssDataReady = gpsManager.isReady() && gpsManager.isGNSSFixed();
+                            break;
+                            
+                        case LocationMode::GNSS_WITH_LBS:
+                            gnssDataReady = gpsManager.isGNSSFixed();
+                            lbsDataReady = gpsManager.isLBSDataValid();
+                            break;
+                            
+                        default:
+                            // 兼容原有逻辑，使用全局变量判断
+                            gnssDataReady = (gps_data.satellites > 3);
+                            lbsDataReady = lbs_data.valid;
+                            break;
+                    }
+                    
+                    // 如果有任何有效的定位数据就上报
+                    if (gnssDataReady || lbsDataReady) {
+                        debugPrint("GPS数据就绪，准备上报 - GNSS:" + String(gnssDataReady ? "是" : "否") + 
+                                  ", LBS:" + String(lbsDataReady ? "是" : "否"));
                         publishToTopic(topic.first, gps_data_to_json(gps_data).c_str(), false);
+                    } else {
+                        debugPrint("GPS数据未就绪，跳过上报");
                     }
                 }
             }

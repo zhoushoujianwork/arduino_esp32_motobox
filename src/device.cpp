@@ -618,15 +618,36 @@ void update_device_state()
     //     device_state.lbsReady = currentLbsReady;
     // }
 
-    // // 检查GNSS状态变化
-    // bool currentGnssReady = gpsManager.isGNSSEnabled() && ml307.isGNSSReady();
-    // if (currentGnssReady != last_state.gnssReady)
-    // {
-    //     notify_state_change("GNSS状态",
-    //                         last_state.gnssReady ? "就绪" : "未就绪",
-    //                         currentGnssReady ? "就绪" : "未就绪");
-    //     device_state.gnssReady = currentGnssReady;
-    // }
+    // 检查GNSS状态变化
+    bool currentGnssReady = false;
+    
+    switch (gpsManager.getLocationMode()) {
+        case LocationMode::GNSS_ONLY:
+        case LocationMode::GNSS_WITH_LBS:
+            currentGnssReady = gpsManager.isGNSSFixed();
+            break;
+        case LocationMode::GPS_ONLY:
+            currentGnssReady = gpsManager.isReady();
+            break;
+        default:
+            currentGnssReady = false;
+            break;
+    }
+    
+    if (currentGnssReady != device_state.gnssReady) {
+        notify_state_change("GNSS状态",
+                           device_state.gnssReady ? "就绪" : "未就绪",
+                           currentGnssReady ? "就绪" : "未就绪");
+        device_state.gnssReady = currentGnssReady;
+        
+        // 更新GPS数据到device_state
+        if (currentGnssReady) {
+            gps_data_t gpsData = gpsManager.getGPSData();
+            device_state.latitude = gpsData.latitude;
+            device_state.longitude = gpsData.longitude;
+            device_state.satellites = gpsData.satellites;
+        }
+    }
 #endif
 
     // 检查IMU状态变化

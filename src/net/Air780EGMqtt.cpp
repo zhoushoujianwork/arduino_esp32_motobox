@@ -42,15 +42,31 @@ bool Air780EGMqtt::begin() {
 bool Air780EGMqtt::setupMQTT() {
     debugPrint("Air780EG MQTT: 开始设置MQTT服务");
     
-    // 检查网络注册状态
+    // 1. 检查网络注册状态
     String networkStatus = _modem.sendATWithResponse("AT+CREG?", 3000);
     debugPrint("Air780EG MQTT: 网络注册状态: " + networkStatus);
     
-    // 检查GPRS附着状态
+    // 检查网络是否已注册 (状态1或5表示已注册)
+    bool networkRegistered = (networkStatus.indexOf(",1") >= 0 || networkStatus.indexOf(",5") >= 0);
+    if (!networkRegistered) {
+        debugPrint("Air780EG MQTT: ⚠️ 网络未注册，当前状态不适合MQTT连接");
+        // 不立即返回false，让上层决定是否重试
+    }
+    
+    // 2. 检查GPRS附着状态
     String gprsStatus = _modem.sendATWithResponse("AT+CGATT?", 3000);
     debugPrint("Air780EG MQTT: GPRS附着状态: " + gprsStatus);
     
-    // 检查MQTT连接状态 - 使用正确的AT指令
+    // 如果GPRS未附着，记录警告但不阻止连接尝试
+    if (gprsStatus.indexOf("+CGATT: 0") >= 0) {
+        debugPrint("Air780EG MQTT: ⚠️ GPRS未附着，可能影响MQTT连接");
+    }
+    
+    // 3. 检查信号强度
+    String signalStatus = _modem.sendATWithResponse("AT+CSQ", 3000);
+    debugPrint("Air780EG MQTT: 信号强度: " + signalStatus);
+    
+    // 4. 检查MQTT连接状态
     String response = _modem.sendATWithResponse("AT+MQTTSTATU", 3000);
     debugPrint("Air780EG MQTT: MQTT状态查询: " + response);
     
