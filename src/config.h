@@ -93,15 +93,6 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 #define TFT_ROTATION       1 // 0: 0度, 1: 90度, 2: 180度, 3: 270度
 #define UI_MAX_SPEED       199    /* Maximum speed in km/h */
 
-// GNSS和LBS配置 - GPS和GNSS互斥
-#ifdef ENABLE_GSM
-// 默认启用GNSS（与GPS互斥）
-#ifndef ENABLE_GPS
-// #define ENABLE_GNSS   // 启用GNSS
-// #define ENABLE_LBS     // 启用LBS辅助定位
-#endif
-#endif
-
 #ifdef ENABLE_SDCARD
 // SPI模式SD卡引脚配置（在platformio.ini中定义）
 #ifndef SD_MODE_SPI
@@ -126,7 +117,7 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 /* Debug Configuration */
 // MQTT调试输出控制
 #ifndef MQTT_DEBUG_ENABLED
-#define MQTT_DEBUG_ENABLED            true
+#define MQTT_DEBUG_ENABLED            false
 #endif
 
 // 网络调试输出控制
@@ -141,7 +132,50 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 
 // GPS全链路调试输出控制
 #ifndef GPS_DEBUG_ENABLED
-#define GPS_DEBUG_ENABLED             false
+#define GPS_DEBUG_ENABLED             true
+#endif
+
+// AT指令调试输出控制
+#ifndef AT_COMMAND_DEBUG_ENABLED
+#define AT_COMMAND_DEBUG_ENABLED      false  // 默认关闭AT指令调试
+#endif
+
+// 调试级别配置 (0=无, 1=错误, 2=警告, 3=信息, 4=调试, 5=详细)
+#ifndef GLOBAL_DEBUG_LEVEL
+#ifdef DEBUG
+#define GLOBAL_DEBUG_LEVEL            4  // 调试版本默认为DEBUG级别
+#else
+#define GLOBAL_DEBUG_LEVEL            3  // 发布版本默认为INFO级别
+#endif
+#endif
+
+#ifndef AT_COMMAND_DEBUG_LEVEL
+#define AT_COMMAND_DEBUG_LEVEL        1  // AT指令调试级别
+#endif
+
+#ifndef GNSS_DEBUG_LEVEL
+#define GNSS_DEBUG_LEVEL              3  // GNSS调试级别
+#endif
+
+#ifndef MQTT_DEBUG_LEVEL
+#define MQTT_DEBUG_LEVEL              3  // MQTT调试级别
+#endif
+
+// 智能定位切换配置
+#ifndef SMART_LOCATION_ENABLED
+#define SMART_LOCATION_ENABLED        true   // 启用智能定位切换
+#endif
+
+#ifndef GNSS_FAILURE_TIMEOUT_MS
+#define GNSS_FAILURE_TIMEOUT_MS       30000  // GNSS失败30秒后启用LBS备用
+#endif
+
+#ifndef GNSS_RECOVERY_TIMEOUT_MS
+#define GNSS_RECOVERY_TIMEOUT_MS      60000  // GNSS恢复60秒后停用LBS备用
+#endif
+
+#ifndef LBS_FALLBACK_INTERVAL_MS
+#define LBS_FALLBACK_INTERVAL_MS      30000  // LBS备用模式下的更新间隔
 #endif
 
 // GNSS调试输出控制（Air780EG GNSS功能）
@@ -151,69 +185,7 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 
 // LBS调试输出控制（基站定位功能）
 #ifndef LBS_DEBUG_ENABLED
-#define LBS_DEBUG_ENABLED             false
+#define LBS_DEBUG_ENABLED             true
 #endif
-
-/* Debug Macros */
-#if MQTT_DEBUG_ENABLED
-#define MQTT_DEBUG_PRINT(x)           Serial.print(x)
-#define MQTT_DEBUG_PRINTLN(x)         Serial.println(x)
-#define MQTT_DEBUG_PRINTF(fmt, ...)   Serial.printf(fmt, ##__VA_ARGS__)
-#else
-#define MQTT_DEBUG_PRINT(x)           do {} while(0)
-#define MQTT_DEBUG_PRINTLN(x)         do {} while(0)
-#define MQTT_DEBUG_PRINTF(fmt, ...)   do {} while(0)
-#endif
-
-#if NETWORK_DEBUG_ENABLED
-#define NETWORK_DEBUG_PRINT(x)        Serial.print(x)
-#define NETWORK_DEBUG_PRINTLN(x)      Serial.println(x)
-#define NETWORK_DEBUG_PRINTF(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)
-#else
-#define NETWORK_DEBUG_PRINT(x)        do {} while(0)
-#define NETWORK_DEBUG_PRINTLN(x)      do {} while(0)
-#define NETWORK_DEBUG_PRINTF(fmt, ...) do {} while(0)
-#endif
-
-#if SYSTEM_DEBUG_ENABLED
-#define SYSTEM_DEBUG_PRINT(x)         Serial.print(x)
-#define SYSTEM_DEBUG_PRINTLN(x)       Serial.println(x)
-#define SYSTEM_DEBUG_PRINTF(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)
-#else
-#define SYSTEM_DEBUG_PRINT(x)         do {} while(0)
-#define SYSTEM_DEBUG_PRINTLN(x)       do {} while(0)
-#define SYSTEM_DEBUG_PRINTF(fmt, ...) do {} while(0)
-#endif
-
-#if GPS_DEBUG_ENABLED
-#define GPS_DEBUG_PRINT(x)            Serial.print(x)
-#define GPS_DEBUG_PRINTLN(x)          Serial.println(x)
-#define GPS_DEBUG_PRINTF(fmt, ...)    Serial.printf(fmt, ##__VA_ARGS__)
-#else
-#define GPS_DEBUG_PRINT(x)            do {} while(0)
-#define GPS_DEBUG_PRINTLN(x)          do {} while(0)
-#define GPS_DEBUG_PRINTF(fmt, ...)    do {} while(0)
-#endif
-
-#if GNSS_DEBUG_ENABLED
-#define GNSS_DEBUG_PRINT(x)           Serial.print(x)
-#define GNSS_DEBUG_PRINTLN(x)         Serial.println(x)
-#define GNSS_DEBUG_PRINTF(fmt, ...)   Serial.printf(fmt, ##__VA_ARGS__)
-#else
-#define GNSS_DEBUG_PRINT(x)           do {} while(0)
-#define GNSS_DEBUG_PRINTLN(x)         do {} while(0)
-#define GNSS_DEBUG_PRINTF(fmt, ...)   do {} while(0)
-#endif
-
-#if LBS_DEBUG_ENABLED
-#define LBS_DEBUG_PRINT(x)            Serial.print(x)
-#define LBS_DEBUG_PRINTLN(x)          Serial.println(x)
-#define LBS_DEBUG_PRINTF(fmt, ...)    Serial.printf(fmt, ##__VA_ARGS__)
-#else
-#define LBS_DEBUG_PRINT(x)            do {} while(0)
-#define LBS_DEBUG_PRINTLN(x)          do {} while(0)
-#define LBS_DEBUG_PRINTF(fmt, ...)    do {} while(0)
-#endif
-
 
 #endif /* CONFIG_H */

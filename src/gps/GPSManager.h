@@ -74,6 +74,13 @@ public:
     int getSatelliteCount() const;
     float getHDOP() const;
     
+    // 智能定位状态查询
+    bool isUsingLBSFallback() const { return _usingLBSFallback; }
+    bool isGNSSFixLost() const { return _gnssFixLost; }
+    unsigned long getTimeSinceLastGNSSFix() const;
+    unsigned long getGNSSFailureDuration() const;
+    String getLocationStatusString() const;
+    
     // 配置方法
     bool setGNSSUpdateRate(int hz);  // 设置GNSS更新频率
     
@@ -113,10 +120,21 @@ private:
     unsigned long _lastLBSUpdate = 0;
     unsigned long _lastGPSUpdate = 0;
     
+    // 智能定位切换相关
+    unsigned long _lastGNSSFixTime = 0;        // 上次GNSS定位成功时间
+    unsigned long _gnssFailureStartTime = 0;   // GNSS定位失败开始时间
+    bool _gnssFixLost = false;                 // GNSS定位丢失标志
+    bool _usingLBSFallback = false;            // 当前是否使用LBS备用定位
+    
     // 更新间隔配置
     static const unsigned long GNSS_UPDATE_INTERVAL = 1000;  // 1秒
     static const unsigned long LBS_UPDATE_INTERVAL = 10000;  // 10秒
     static const unsigned long GPS_UPDATE_INTERVAL = 1000;   // 1秒
+    
+    // 智能切换配置
+    static const unsigned long GNSS_FAILURE_TIMEOUT = GNSS_FAILURE_TIMEOUT_MS;  // GNSS失败超时时间
+    static const unsigned long GNSS_RECOVERY_TIMEOUT = GNSS_RECOVERY_TIMEOUT_MS; // GNSS恢复超时时间
+    static const unsigned long LBS_FALLBACK_INTERVAL = LBS_FALLBACK_INTERVAL_MS; // LBS备用模式更新间隔
     
     // 私有方法
     void detectGNSSModuleType();
@@ -126,6 +144,14 @@ private:
     void handleGPSUpdate();
     void updateLocationData();
     void debugPrint(const String &message);
+    
+    // 智能定位切换方法
+    void handleSmartGNSSWithLBS();
+    void checkGNSSStatus();
+    void handleGNSSFailure();
+    void handleGNSSRecovery();
+    bool shouldUseLBSFallback();
+    void updateGNSSFailureTracking(bool gnssFixed);
     
     // 模式切换方法
     void switchToGPSMode();

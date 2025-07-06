@@ -1,0 +1,30 @@
+
+设置基站定位（LBS）服务器的域名和端口：AT+GSMLOCFG
+目前只支持公司的特定的适配网站
+
+→ AT+GSMLOCFG="bs.openluat.com",12411 设置服务器域名和端口
+← OK → AT+GSMLOCFG? 查询服务器域名和端口
+← +GSMLOCFG: bs.openluat.com:12411
+OK
+
+
+读取基站定位（LBS）信息和时间：AT+CIPGSMLOC
+
+→ AT+SAPBR=3,1,"CONTYPE","GPRS" 设置承载类型为GPRS 
+← OK 
+→ AT+SAPBR=3,1,"APN","" 设置PDP承载之APN参数模块注册网络后会从网络自动获取<apn>并激活一个PDP上下文，用于RNDIS上网使用（此<apn>可以通过AT+CGDCONT?来查询），所以输入AT+SAPBR=3,<cid>,"APN","" 即可，模块内部会按照自动获取的<apn>来设置APN 
+← OK 
+→ AT+SAPBR=1,1 激活GPRS PDP上下文
+← OK 
+→ AT+SAPBR=2,1 查询是否激活
+← +SAPBR: 1,1,010.169.179.213
+OK
+返回中有IP地址表明激活成功→ AT+CIPGSMLOC=1,1 查询位置和时间（超时时间30S）
+← +CIPGSMLOC:
+0,034.7983328,114.3214505,2023/06/05,14:38:50
+OK 
+→ AT+CIPGSMLOC=2,1 只查询时间
+← +CIPGSMLOC: 0,2023/06/05,14:38:55
+OK 
+→ AT+SAPBR=0,1 去激活PDP上下文
+← OK

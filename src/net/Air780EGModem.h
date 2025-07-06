@@ -140,6 +140,7 @@ private:
     unsigned long _lastLBSUpdate;
     bool _isLBSLoading;
     String _lastLBSLocation;
+    lbs_data_t _lbsData;  // LBS数据缓存
     unsigned long _lastCMEErrorTime;
     int _cmeErrorCount;
     unsigned long _backoffDelay;
@@ -168,6 +169,8 @@ private:
     
     // LBS解析方法
     bool parseLBSResponse(const String& response);
+    bool setupLBSServer();
+    bool setupPDPContext();
     
     // GNSS解析方法
     bool parseGNSSResponse(const String& response);

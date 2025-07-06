@@ -4,6 +4,7 @@
  */
 
 #include "Air780EGMqtt.h"
+#include "../utils/DebugUtils.h"
 #include "../config.h"
 
 // 静态实例指针，用于静态回调函数
@@ -256,7 +257,7 @@ bool Air780EGMqtt::isConnected() {
 bool Air780EGMqtt::checkConnection() {
     // 查询MQTT连接状态
     String response = _modem.sendATWithResponse("AT+MQTTSTATU", 3000);
-    debugPrint("Air780EG MQTT: 连接状态查询: " + response);
+    MQTT_DEBUG("连接状态查询: %s", response.c_str());
     
     // 如果返回OK且没有ERROR，说明MQTT功能正常
     // 具体的连接状态需要根据返回内容判断
@@ -465,7 +466,7 @@ void Air780EGMqtt::setDebug(bool debug) {
 
 void Air780EGMqtt::debugPrint(const String& msg) {
     if (_debug) {
-        MQTT_DEBUG_PRINTLN("[Air780EG MQTT] " + msg);
+        Serial.println("[Air780EG MQTT] " + msg);
     }
 }
 

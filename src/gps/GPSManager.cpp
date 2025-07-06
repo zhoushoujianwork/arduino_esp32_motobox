@@ -5,6 +5,7 @@
  */
 
 #include "GPSManager.h"
+#include "../utils/DebugUtils.h"
 
 // GSM模块支持
 #ifdef ENABLE_GSM
@@ -35,7 +36,7 @@ GPSManager &GPSManager::getInstance()
 void GPSManager::init()
 {
     _debug = GPS_DEBUG_ENABLED;
-    GPS_DEBUG_PRINTLN("[GPSManager] 开始初始化定位管理器");
+    Serial.println("[GPSManager] 开始初始化定位管理器");
     
     // 检测GNSS模块类型
     detectGNSSModuleType();
@@ -49,6 +50,12 @@ void GPSManager::init()
     _lastGNSSUpdate = 0;
     _lastLBSUpdate = 0;
     _lastGPSUpdate = 0;
+    
+    // 初始化智能切换相关变量
+    _lastGNSSFixTime = 0;
+    _gnssFailureStartTime = 0;
+    _gnssFixLost = false;
+    _usingLBSFallback = false;
     
     _initialized = true;
     debugPrint("定位管理器初始化完成");
@@ -75,8 +82,7 @@ void GPSManager::loop()
             break;
             
         case LocationMode::GNSS_WITH_LBS:
-            handleGNSSUpdate();
-            handleLBSUpdate();
+            handleSmartGNSSWithLBS();
             break;
             
         case LocationMode::NONE:
@@ -290,6 +296,64 @@ float GPSManager::getHDOP() const
     return _gpsData.hdop;
 }
 
+// 智能定位状态查询方法
+unsigned long GPSManager::getTimeSinceLastGNSSFix() const
+{
+    if (_lastGNSSFixTime == 0) {
+        return 0; // 从未定位成功
+    }
+    return millis() - _lastGNSSFixTime;
+}
+
+unsigned long GPSManager::getGNSSFailureDuration() const
+{
+    if (!_gnssFixLost || _gnssFailureStartTime == 0) {
+        return 0; // 没有失败或失败时间未记录
+    }
+    return millis() - _gnssFailureStartTime;
+}
+
+String GPSManager::getLocationStatusString() const
+{
+    if (_locationMode == LocationMode::NONE) {
+        return "未启用定位";
+    }
+    
+    if (_locationMode == LocationMode::GPS_ONLY) {
+        return isGPSDataValid() ? "GPS定位正常" : "GPS定位失败";
+    }
+    
+    if (_locationMode == LocationMode::GNSS_ONLY) {
+        return isGNSSFixed() ? "GNSS定位正常" : "GNSS定位失败";
+    }
+    
+    if (_locationMode == LocationMode::GNSS_WITH_LBS) {
+        String status = "";
+        
+        if (isGNSSFixed()) {
+            status += "GNSS定位正常";
+        } else {
+            status += "GNSS定位失败";
+        }
+        
+        if (isLBSDataValid()) {
+            status += ", LBS定位正常";
+        } else {
+            status += ", LBS定位失败";
+        }
+        
+        if (_usingLBSFallback) {
+            status += " [使用LBS备用]";
+        } else {
+            status += " [LBS辅助]";
+        }
+        
+        return status;
+    }
+    
+    return "未知状态";
+}
+
 // 配置方法
 bool GPSManager::setGNSSUpdateRate(int hz)
 {
@@ -315,7 +379,7 @@ void GPSManager::debugPrint(const String &message)
 {
     if (_debug)
     {
-        GPS_DEBUG_PRINTLN("[GPSManager] " + message);
+        Serial.println("[GPSManager] " + message);
     }
 }
 
@@ -353,13 +417,18 @@ void GPSManager::initializeLocationMode()
         #ifdef ENABLE_LBS
             debugPrint("配置为GNSS+LBS混合模式");
             _locationMode = LocationMode::GNSS_WITH_LBS;
-            _gnssEnabled = true;
-            _lbsEnabled = true;
+            // 先设置为false，确保后续的启用调用能够执行
+            _gnssEnabled = false;
+            _lbsEnabled = false;
+            // 实际启用GNSS和LBS功能
+            switchToGNSSWithLBSMode();
         #else
             debugPrint("配置为纯GNSS模式");
             _locationMode = LocationMode::GNSS_ONLY;
-            _gnssEnabled = true;
+            _gnssEnabled = false;
             _lbsEnabled = false;
+            // 实际启用GNSS功能
+            switchToGNSSMode();
         #endif
     #else
         debugPrint("未启用定位功能");
@@ -400,7 +469,7 @@ void GPSManager::handleGNSSUpdate()
     
     if (dataUpdated) {
         _lastGNSSUpdate = now;
-        GNSS_DEBUG_PRINTF("[GPSManager] GNSS数据更新: %.6f, %.6f, 高度: %.1fm, 卫星: %d\n",
+        Serial.printf("[GPSManager] GNSS数据更新: %.6f, %.6f, 高度: %.1fm, 卫星: %d\n",
                           _gpsData.latitude, _gpsData.longitude, _gpsData.altitude, _gpsData.satellites);
     }
 }
@@ -433,8 +502,7 @@ void GPSManager::handleLBSUpdate()
     
     if (dataUpdated) {
         _lastLBSUpdate = now;
-        LBS_DEBUG_PRINTF("[GPSManager] LBS数据更新: %.6f, %.6f\n",
-                        _lbsData.latitude, _lbsData.longitude);
+        debugPrint(String("[GPSManager] LBS数据更新: ") + String(_lbsData.latitude, 6) + ", " + String(_lbsData.longitude, 6));
     }
 }
 
@@ -456,7 +524,7 @@ void GPSManager::handleGPSUpdate()
         _lastGPSUpdate = now;
         // GPS数据通过全局变量gps_data获取
         _gpsData = gps_data;
-        GPS_DEBUG_PRINTF("[GPSManager] GPS数据更新: %.6f, %.6f, 高度: %.1fm, 卫星: %d\n",
+        Serial.printf("[GPSManager] GPS数据更新: %.6f, %.6f, 高度: %.1fm, 卫星: %d\n",
                         _gpsData.latitude, _gpsData.longitude, _gpsData.altitude, _gpsData.satellites);
     }
 }
@@ -477,12 +545,31 @@ void GPSManager::updateLocationData()
             break;
             
         case LocationMode::GNSS_WITH_LBS:
-            // 优先使用GNSS数据，信号弱时使用LBS数据
-            if (is_gps_data_valid(_gpsData) && _gpsData.altitude > 3) {
-                gps_data = _gpsData;
-            } else if (_lbsData.valid) {
-                gps_data = convert_lbs_to_gps(_lbsData);
-                debugPrint("使用LBS数据作为定位源");
+            // 智能选择定位数据源
+            if (_usingLBSFallback) {
+                // 当前使用LBS备用模式
+                if (_lbsData.valid) {
+                    gps_data = convert_lbs_to_gps(_lbsData);
+                    debugPrint("[智能定位] 使用LBS备用定位数据");
+                } else if (is_gps_data_valid(_gpsData)) {
+                    // LBS数据无效，但GNSS数据可用（可能刚恢复）
+                    gps_data = _gpsData;
+                    debugPrint("[智能定位] LBS无效，使用GNSS数据");
+                } else {
+                    // 两个数据源都无效
+                    debugPrint("[智能定位] 警告：所有定位数据源都无效");
+                }
+            } else {
+                // 正常模式：优先使用GNSS，LBS作为辅助
+                if (is_gps_data_valid(_gpsData) && _gpsData.altitude > 3) {
+                    gps_data = _gpsData;
+                    // debugPrint("[智能定位] 使用GNSS主定位数据"); // 减少日志输出
+                } else if (_lbsData.valid) {
+                    gps_data = convert_lbs_to_gps(_lbsData);
+                    debugPrint("[智能定位] GNSS信号弱，使用LBS辅助定位");
+                } else {
+                    debugPrint("[智能定位] 警告：GNSS和LBS数据都无效");
+                }
             }
             break;
             
@@ -521,24 +608,29 @@ void GPSManager::switchToGNSSMode()
     _gpsEnabled = false;
     _gnssEnabled = true;
     _lbsEnabled = false;
-    
 #ifdef USE_AIR780EG_GSM
-    // 创建Air780EG GNSS适配器
+    DEBUG_DEBUG("GPSManager", "enableGNSSMode() - 开始创建Air780EG GNSS适配器");
     if (!_air780egGNSSAdapter) {
+        DEBUG_DEBUG("GPSManager", "enableGNSSMode() - 创建新的Air780EGGNSSAdapter实例");
         _air780egGNSSAdapter = new Air780EGGNSSAdapter(air780eg_modem);
         if (_air780egGNSSAdapter) {
+            DEBUG_DEBUG("GPSManager", "enableGNSSMode() - Air780EGGNSSAdapter创建成功，设置调试模式");
             _air780egGNSSAdapter->setDebug(_debug);
+            DEBUG_DEBUG("GPSManager", "enableGNSSMode() - 调用begin()方法");
             _air780egGNSSAdapter->begin();
-            debugPrint("Air780EG GNSS适配器已创建");
+            DEBUG_INFO("GPSManager", "Air780EG GNSS适配器初始化完成");
+            // debugPrint("Air780EG GNSS适配器已创建");
+        } else {
+            DEBUG_ERROR("GPSManager", "Air780EGGNSSAdapter创建失败");
         }
     }
-    // 启用GNSS
+    // 启用GNSS功能
     if (_air780egGNSSAdapter) {
+        DEBUG_INFO("GPSManager", "启用GNSS功能");
         _air780egGNSSAdapter->enableGNSS(true);
     }
 #elif defined(USE_ML307_GSM)
-    // ML307暂时不支持GNSS
-    debugPrint("ML307暂不支持GNSS模式");
+    // debugPrint("ML307暂不支持GNSS模式");
 #endif
 }
 
@@ -551,12 +643,19 @@ void GPSManager::switchToGNSSWithLBSMode()
     
 #ifdef USE_AIR780EG_GSM
     // 创建Air780EG GNSS适配器
+    DEBUG_DEBUG("GPSManager", "enableGNSSWithLBSMode() - 开始创建Air780EG GNSS适配器");
     if (!_air780egGNSSAdapter) {
+        DEBUG_DEBUG("GPSManager", "enableGNSSWithLBSMode() - 创建新的Air780EGGNSSAdapter实例");
         _air780egGNSSAdapter = new Air780EGGNSSAdapter(air780eg_modem);
         if (_air780egGNSSAdapter) {
+            DEBUG_DEBUG("GPSManager", "enableGNSSWithLBSMode() - Air780EGGNSSAdapter创建成功，设置调试模式");
             _air780egGNSSAdapter->setDebug(_debug);
+            DEBUG_DEBUG("GPSManager", "enableGNSSWithLBSMode() - 调用begin()方法");
             _air780egGNSSAdapter->begin();
+            DEBUG_INFO("GPSManager", "Air780EG GNSS适配器初始化完成");
             debugPrint("Air780EG GNSS适配器已创建");
+        } else {
+            DEBUG_ERROR("GPSManager", "Air780EGGNSSAdapter创建失败");
         }
     }
     // 启用GNSS和LBS
@@ -601,6 +700,119 @@ void GPSManager::disableAllModes()
     _gpsEnabled = false;
     _gnssEnabled = false;
     _lbsEnabled = false;
+}
+
+// 智能GNSS+LBS定位处理
+void GPSManager::handleSmartGNSSWithLBS()
+{
+    // 首先尝试更新GNSS数据
+    handleGNSSUpdate();
+    
+    // 检查GNSS状态并更新失败跟踪
+    bool gnssFixed = isGNSSFixed();
+    updateGNSSFailureTracking(gnssFixed);
+    
+    // 根据GNSS状态决定是否使用LBS
+    if (shouldUseLBSFallback()) {
+        if (!_usingLBSFallback) {
+            debugPrint("[智能定位] GNSS定位失败，切换到LBS备用定位");
+            _usingLBSFallback = true;
+        }
+        
+        // 使用更频繁的LBS更新间隔
+        unsigned long now = millis();
+        if (now - _lastLBSUpdate >= LBS_FALLBACK_INTERVAL) {
+            handleLBSUpdate();
+        }
+    } else {
+        // GNSS正常工作，使用标准LBS更新间隔作为辅助
+        if (_usingLBSFallback) {
+            debugPrint("[智能定位] GNSS定位恢复，LBS切换回辅助模式");
+            _usingLBSFallback = false;
+        }
+        
+        handleLBSUpdate(); // 标准间隔的LBS辅助定位
+    }
+}
+
+// 更新GNSS失败跟踪状态
+void GPSManager::updateGNSSFailureTracking(bool gnssFixed)
+{
+    unsigned long now = millis();
+    
+    if (gnssFixed) {
+        // GNSS定位成功
+        _lastGNSSFixTime = now;
+        
+        if (_gnssFixLost) {
+            // GNSS从失败状态恢复
+            debugPrint("[智能定位] GNSS定位恢复");
+            _gnssFixLost = false;
+            _gnssFailureStartTime = 0;
+        }
+    } else {
+        // GNSS定位失败
+        if (!_gnssFixLost) {
+            // 首次检测到GNSS失败
+            if (_lastGNSSFixTime > 0 && (now - _lastGNSSFixTime) > GNSS_FAILURE_TIMEOUT) {
+                debugPrint("[智能定位] 检测到GNSS定位失败");
+                _gnssFixLost = true;
+                _gnssFailureStartTime = now;
+            }
+        }
+    }
+}
+
+// 判断是否应该使用LBS备用定位
+bool GPSManager::shouldUseLBSFallback()
+{
+    // 如果GNSS正常工作，不需要LBS备用
+    if (isGNSSFixed()) {
+        return false;
+    }
+    
+    // 如果GNSS失败时间超过阈值，启用LBS备用
+    if (_gnssFixLost && _gnssFailureStartTime > 0) {
+        unsigned long now = millis();
+        return (now - _gnssFailureStartTime) >= 0; // 立即启用LBS备用
+    }
+    
+    // 如果从未有过GNSS定位，且初始化时间超过阈值，启用LBS备用
+    if (_lastGNSSFixTime == 0) {
+        unsigned long now = millis();
+        // 假设初始化后30秒内没有GNSS定位就启用LBS
+        return (now - _lastGNSSUpdate) >= GNSS_FAILURE_TIMEOUT;
+    }
+    
+    return false;
+}
+
+// 检查GNSS状态
+void GPSManager::checkGNSSStatus()
+{
+    bool gnssFixed = isGNSSFixed();
+    updateGNSSFailureTracking(gnssFixed);
+}
+
+// 处理GNSS失败
+void GPSManager::handleGNSSFailure()
+{
+    if (!_usingLBSFallback) {
+        debugPrint("[智能定位] GNSS定位失败，启用LBS备用定位");
+        _usingLBSFallback = true;
+        
+        // 立即执行一次LBS更新
+        handleLBSUpdate();
+    }
+}
+
+// 处理GNSS恢复
+void GPSManager::handleGNSSRecovery()
+{
+    if (_usingLBSFallback) {
+        debugPrint("[智能定位] GNSS定位恢复，LBS切换回辅助模式");
+        _usingLBSFallback = false;
+    }
 }
 
 // 全局GPS管理器实例

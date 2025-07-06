@@ -4,6 +4,7 @@
  */
 
 #include "Air780EGGNSSAdapter.h"
+#include "../utils/DebugUtils.h"
 
 #ifdef USE_AIR780EG_GSM
 
@@ -12,26 +13,30 @@ extern Air780EGModem air780eg_modem;
 Air780EGGNSSAdapter::Air780EGGNSSAdapter(Air780EGModem& modem)
     : _modem(modem), _debug(false), _initialized(false), _gnssEnabled(false), _lastUpdate(0)
 {
+    DEBUG_DEBUG("GNSS-Adapter", "Air780EGGNSSAdapter constructor start");
     reset_gps_data(_gpsData);
+    DEBUG_DEBUG("GNSS-Adapter", "Air780EGGNSSAdapter constructor completed");
 }
 
 void Air780EGGNSSAdapter::begin()
 {
-    GNSS_DEBUG_PRINTLN("[Air780EG-GNSS] 开始初始化GNSS适配器");
+    DEBUG_DEBUG("GNSS-Adapter", "Air780EGGNSSAdapter::begin() start");
     
     if (!_modem.isNetworkReady()) {
-        GNSS_DEBUG_PRINTLN("[Air780EG-GNSS] 等待网络就绪...");
+        DEBUG_INFO("GNSS-Adapter", "等待网络就绪...");
         return;
     }
     
-    // 启用GNSS功能
-    if (_modem.enableGNSS(true)) {
-        _gnssEnabled = true;
-        _initialized = true;
-        GNSS_DEBUG_PRINTLN("[Air780EG-GNSS] GNSS适配器初始化成功");
-    } else {
-        GNSS_DEBUG_PRINTLN("[Air780EG-GNSS] GNSS启用失败");
-    }
+    DEBUG_INFO("GNSS-Adapter", "网络已就绪，开始初始化GNSS");
+    
+    // 设置调试模式
+    _modem.setDebug(_debug);
+    
+    // 标记为已初始化
+    _initialized = true;
+    
+    debugPrint("Air780EGGNSSAdapter: 初始化完成");
+    DEBUG_DEBUG("GNSS-Adapter", "Air780EGGNSSAdapter::begin() completed");
 }
 
 void Air780EGGNSSAdapter::loop()
@@ -51,8 +56,7 @@ void Air780EGGNSSAdapter::loop()
         _lastUpdate = now;
         
         if (_debug && is_gps_data_valid(_gpsData)) {
-            GNSS_DEBUG_PRINTF("[Air780EG-GNSS] 位置更新: %.6f, %.6f, 高度: %.1fm, 卫星: %d\n",
-                             _gpsData.latitude, _gpsData.longitude, _gpsData.altitude, _gpsData.satellites);
+            debugPrint(String("[Air780EG-GNSS] 位置更新: ") + String(_gpsData.latitude, 6) + ", " + String(_gpsData.longitude, 6) + ", 高度: " + String(_gpsData.altitude, 1) + "m, 卫星: " + String(_gpsData.satellites));
         }
     }
 }
@@ -148,7 +152,7 @@ bool Air780EGGNSSAdapter::isGPSDataValid() const
 void Air780EGGNSSAdapter::debugPrint(const String& message)
 {
     if (_debug) {
-        GNSS_DEBUG_PRINTLN("[Air780EG-GNSS] " + message);
+        Serial.println("[Air780EG-GNSS] " + message);
     }
 }
 

@@ -544,7 +544,7 @@ void Ml307Mqtt::debugPrint(const String &msg)
 {
     if (_debug)
     {
-        MQTT_DEBUG_PRINTLN("[ml307mqtt] [debug] " + msg);
+        Serial.println("[ml307mqtt] [debug] " + msg);
     }
 }
 

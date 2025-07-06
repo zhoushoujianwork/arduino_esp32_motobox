@@ -189,6 +189,17 @@ void taskDataProcessing(void *parameter)
   const unsigned long GPS_RECORD_INTERVAL = 5000; // 5秒记录一次GPS数据
   const unsigned long IMU_RECORD_INTERVAL = 1000; // 1秒记录一次IMU数据
 
+  // --------- 延迟初始化GPSManager，彻底避开loopTask栈溢出 ---------
+  static bool gpsManagerInitialized = false;
+  while (!gpsManagerInitialized) {
+    delay(1000); // 等待系统其他部分初始化完成
+    Serial.println("[taskDataProcessing] 尝试初始化GPSManager...");
+    gpsManager.init();
+    gpsManagerInitialized = true;
+    Serial.println("[taskDataProcessing] GPSManager初始化完成!");
+  }
+  // ----------------------------------------------------------
+
   for (;;)
   {
     // Air780EG后台初始化处理 - 统一在这里处理，避免竞争条件
@@ -352,116 +363,38 @@ void setup()
 
 void loop()
 {
-  // 添加循环计数器用于调试
-  static unsigned long loopCount = 0;
-  static unsigned long lastLoopReport = 0;
-  loopCount++;
+  // static unsigned long loopCount = 0;
+  // static unsigned long lastLoopReport = 0;
+  // loopCount++;
 
-  // 每10秒报告一次循环状态
-  if (millis() - lastLoopReport > 10000)
-  {
-    lastLoopReport = millis();
-    uint32_t freeHeap = ESP.getFreeHeap();
-    uint32_t minFreeHeap = ESP.getMinFreeHeap();
-    
-    Serial.printf("[主循环] 运行正常，循环计数: %lu, 空闲内存: %d 字节\n",
-                  loopCount, freeHeap);
-    
-    // 内存警告检查
-    if (freeHeap < 50000) {  // 小于50KB时警告
-      Serial.printf("[警告] 内存不足: %d 字节，最小值: %d 字节\n", freeHeap, minFreeHeap);
-    }
-    
-    // 极低内存时强制重启
-    if (freeHeap < 20000) {  // 小于20KB时重启
-      Serial.println("[严重] 内存严重不足，即将重启系统...");
-      delay(1000);
-      ESP.restart();
-    }
-  }
-
-  // Air780EG后台初始化处理 - 移到taskDataProcessing中统一处理
-  // 避免与gpsManager.loop()产生竞争条件
-#ifdef USE_AIR780EG_GSM
-  // 注释掉这里的调用，改为在taskDataProcessing中统一处理
-  // if (!air780eg_modem.isNetworkReady() || !mqttInitialized) {
-  //   air780eg_modem.loop();
+  // if (millis() - lastLoopReport > 10000)
+  // {
+  //   lastLoopReport = millis();
+  //   uint32_t freeHeap = ESP.getFreeHeap();
+  //   uint32_t minFreeHeap = ESP.getMinFreeHeap();
+  //   Serial.printf("[主循环] 运行正常，循环计数: %lu, 空闲内存: %d 字节\n", loopCount, freeHeap);
+  //   if (freeHeap < 50000) {
+  //     Serial.printf("[警告] 内存不足: %d 字节，最小值: %d 字节\n", freeHeap, minFreeHeap);
+  //   }
+  //   if (freeHeap < 20000) {
+  //     Serial.println("[严重] 内存严重不足，即将重启系统...");
+  //     delay(1000);
+  //     ESP.restart();
+  //   }
   // }
-#endif
 
-  // 主循环留空，所有功能都在RTOS任务中处理
+  // delay(20);
   delay(20);
 
-  // 每 30 秒发送一次状态消息
-  static unsigned long lastMsg = 0;
-  if (millis() - lastMsg > 30000) // 改为30秒发送一次，减少频率
-  {
-    lastMsg = millis();
-
-    Serial.println("[状态] 定期状态更新开始...");
-
-    update_device_state();
-
-    // Air780EG GNSS数据更新（网络检查已在上面完成）
-#ifdef USE_AIR780EG_GSM
-    static unsigned long lastGNSSCheck = 0;
-    if (millis() - lastGNSSCheck > 5000)
-    { // 每5秒检查一次
-      lastGNSSCheck = millis();
-
-      // 更新GNSS数据
-      if (air780eg_modem.updateGNSSData())
-      {
-        GNSSData gnss = air780eg_modem.getGNSSData();
-        if (gnss.valid)
-        {
-          Serial.printf("[GNSS] 位置: %.6f, %.6f, 卫星: %d\n",
-                        gnss.latitude, gnss.longitude, gnss.satellites);
-
-          // 更新设备状态
-          device_state.gpsReady = true;
-          device_state.latitude = gnss.latitude;
-          device_state.longitude = gnss.longitude;
-          device_state.satellites = gnss.satellites;
-        }
-        else
-        {
-          device_state.gpsReady = false;
-        }
-      }
-    }
-#endif
-
-    // 获取GPS数据用于调试
-    if (gpsManager.isReady())
-    {
-      print_lbs_data(lbs_data);
-      print_gps_data(gps_data);
-    }
-
-    // 发送状态消息 - 只有在MQTT初始化成功后才发送
-#ifndef DISABLE_MQTT
-    if (mqttInitialized && mqttManager.isConnected())
-    {
-      MQTT_DEBUG_PRINTLN("[MQTT] 准备发送设备状态消息...");
-      bool publishResult = mqttManager.publishToTopic("device_info", device_state_to_json(&device_state).c_str());
-      MQTT_DEBUG_PRINTF("[MQTT] 设备状态消息发送结果: device_info=%s\n",
-                    publishResult ? "成功" : "失败");
-    }
-    else if (!mqttInitialized)
-    {
-      // MQTT未初始化时的提示（降低频率）
-      static unsigned long lastMqttWarning = 0;
-      if (millis() - lastMqttWarning > 10000)
-      { // 每10秒提示一次
-        lastMqttWarning = millis();
-        MQTT_DEBUG_PRINTLN("[MQTT] 等待网络就绪后初始化MQTT...");
-      }
-    }
-#endif
-
-    Serial.println("[状态] 定期状态更新完成");
-  }
+  // static unsigned long lastMsg = 0;
+  // if (millis() - lastMsg > 30000)
+  // {
+  //   lastMsg = millis();
+  //   Serial.println("[状态] 定期状态更新开始...");
+  //   update_device_state();
+  //   // GNSS数据更新等已注释
+  //   Serial.println("[状态] 定期状态更新完成");
+  // }
 }
 
 // ===================== 串口命令处理函数 =====================
@@ -516,7 +449,7 @@ void handleSerialCommand()
       }
       else if (command == "gsm.mqtt")
       {
-        SYSTEM_DEBUG_PRINTLN("=== Air780EG MQTT测试 ===");
+        Serial.println("=== Air780EG MQTT测试 ===");
         if (device_state.gsmReady)
         {
           // 测试MQTT功能支持
@@ -524,12 +457,12 @@ void handleSerialCommand()
         }
         else
         {
-          SYSTEM_DEBUG_PRINTLN("GSM模块未就绪，无法测试MQTT功能");
+          Serial.println("GSM模块未就绪，无法测试MQTT功能");
         }
       }
       else if (command == "gsm.mqtt.debug")
       {
-        SYSTEM_DEBUG_PRINTLN("=== Air780EG MQTT连接调试 ===");
+        Serial.println("=== Air780EG MQTT连接调试 ===");
         if (device_state.gsmReady)
         {
           // 包含调试头文件并调用调试函数
@@ -538,11 +471,67 @@ void handleSerialCommand()
         }
         else
         {
-          SYSTEM_DEBUG_PRINTLN("GSM模块未就绪，无法进行MQTT调试");
+          Serial.println("GSM模块未就绪，无法进行MQTT调试");
+        }
+      }
+      else if (command == "gsm.lbs")
+      {
+        Serial.println("=== Air780EG LBS调试 ===");
+        if (device_state.gsmReady)
+        {
+          // 包含调试头文件并调用调试函数
+          extern void debugAir780EGLbs(Air780EGModem * modem);
+          debugAir780EGLbs(&air780eg_modem);
+        }
+        else
+        {
+          Serial.println("GSM模块未就绪，无法调试LBS功能");
+        }
+      }
+      else if (command == "gsm.lbs.test")
+      {
+        Serial.println("=== Air780EG LBS AT命令测试 ===");
+        if (device_state.gsmReady)
+        {
+          // 包含调试头文件并调用调试函数
+          extern void testAir780EGLbsCommands(Air780EGModem * modem);
+          testAir780EGLbsCommands(&air780eg_modem);
+        }
+        else
+        {
+          Serial.println("GSM模块未就绪，无法测试LBS AT命令");
+        }
+      }
+      else if (command == "gps.lbs")
+      {
+        Serial.println("=== GPSManager LBS集成测试 ===");
+        if (device_state.gsmReady)
+        {
+          // 包含调试头文件并调用调试函数
+          extern void testGPSManagerLBS();
+          testGPSManagerLBS();
+        }
+        else
+        {
+          Serial.println("GSM模块未就绪，无法测试GPSManager LBS功能");
+        }
+      }
+      else if (command == "gps.smart")
+      {
+        Serial.println("=== GPSManager 智能定位切换测试 ===");
+        if (device_state.gsmReady)
+        {
+          // 包含调试头文件并调用调试函数
+          extern void testSmartLocationSwitching();
+          testSmartLocationSwitching();
+        }
+        else
+        {
+          Serial.println("GSM模块未就绪，无法测试智能定位切换功能");
         }
       }
 #else
-      SYSTEM_DEBUG_PRINTLN("Air780EG模块未启用");
+      Serial.println("Air780EG模块未启用");
 #endif
     }
     else
@@ -588,20 +577,20 @@ void handleSerialCommand()
         stateStr = "⚠️ 错误";
         break;
       }
-      MQTT_DEBUG_PRINTLN("MQTT状态: " + stateStr);
-      MQTT_DEBUG_PRINTLN("MQTT服务器: " + String(MQTT_BROKER) + ":" + String(MQTT_PORT));
+      Serial.println("MQTT状态: " + stateStr);
+      Serial.println("MQTT服务器: " + String(MQTT_BROKER) + ":" + String(MQTT_PORT));
 
       // 显示已注册的主题
-      MQTT_DEBUG_PRINTLN("--- MQTT主题配置 ---");
+      Serial.println("--- MQTT主题配置 ---");
       String deviceId = device_state.device_id;
       String baseTopic = "vehicle/v1/" + deviceId;
-      MQTT_DEBUG_PRINTLN("基础主题: " + baseTopic);
-      MQTT_DEBUG_PRINTLN("设备信息: " + baseTopic + "/telemetry/device");
-      MQTT_DEBUG_PRINTLN("位置信息: " + baseTopic + "/telemetry/location");
-      MQTT_DEBUG_PRINTLN("运动信息: " + baseTopic + "/telemetry/motion");
-      MQTT_DEBUG_PRINTLN("控制命令: " + baseTopic + "/ctrl/#");
+      Serial.println("基础主题: " + baseTopic);
+      Serial.println("设备信息: " + baseTopic + "/telemetry/device");
+      Serial.println("位置信息: " + baseTopic + "/telemetry/location");
+      Serial.println("运动信息: " + baseTopic + "/telemetry/motion");
+      Serial.println("控制命令: " + baseTopic + "/ctrl/#");
 #else
-      MQTT_DEBUG_PRINTLN("MQTT功能: ❌ 已禁用");
+      Serial.println("MQTT功能: ❌ 已禁用");
 #endif
 #endif
       Serial.println("");
@@ -667,22 +656,22 @@ void handleSerialCommand()
 #ifndef DISABLE_MQTT
       if (command == "mqtt.status")
       {
-        MQTT_DEBUG_PRINTLN("=== MQTT状态 ===");
-        MQTT_DEBUG_PRINTLN("MQTT服务器: " + String(MQTT_BROKER));
-        MQTT_DEBUG_PRINTLN("MQTT端口: " + String(MQTT_PORT));
-        MQTT_DEBUG_PRINTLN("保持连接: " + String(MQTT_KEEP_ALIVE) + "秒");
+        Serial.println("=== MQTT状态 ===");
+        Serial.println("MQTT服务器: " + String(MQTT_BROKER));
+        Serial.println("MQTT端口: " + String(MQTT_PORT));
+        Serial.println("保持连接: " + String(MQTT_KEEP_ALIVE) + "秒");
 
 #ifdef USE_AIR780EG_GSM
-        MQTT_DEBUG_PRINTLN("连接方式: Air780EG GSM");
-        MQTT_DEBUG_PRINTLN("GSM状态: " + String(device_state.gsmReady ? "就绪" : "未就绪"));
+        Serial.println("连接方式: Air780EG GSM");
+        Serial.println("GSM状态: " + String(device_state.gsmReady ? "就绪" : "未就绪"));
         if (device_state.gsmReady)
         {
-          MQTT_DEBUG_PRINTLN("网络状态: " + String(air780eg_modem.isNetworkReady() ? "已连接" : "未连接"));
-          MQTT_DEBUG_PRINTLN("信号强度: " + String(air780eg_modem.getCSQ()));
+          Serial.println("网络状态: " + String(air780eg_modem.isNetworkReady() ? "已连接" : "未连接"));
+          Serial.println("信号强度: " + String(air780eg_modem.getCSQ()));
         }
 #elif defined(ENABLE_WIFI)
-        MQTT_DEBUG_PRINTLN("连接方式: WiFi");
-        MQTT_DEBUG_PRINTLN("WiFi状态: " + String(device_state.wifiConnected ? "已连接" : "未连接"));
+        Serial.println("连接方式: WiFi");
+        Serial.println("WiFi状态: " + String(device_state.wifiConnected ? "已连接" : "未连接"));
 #endif
 
         // MQTT连接状态
@@ -703,52 +692,52 @@ void handleSerialCommand()
           stateStr = "错误";
           break;
         }
-        MQTT_DEBUG_PRINTLN("MQTT连接: " + stateStr);
+        Serial.println("MQTT连接: " + stateStr);
       }
       else if (command == "mqtt.connect")
       {
-        MQTT_DEBUG_PRINTLN("尝试连接MQTT...");
-        MQTT_DEBUG_PRINTLN("当前网络状态:");
+        Serial.println("尝试连接MQTT...");
+        Serial.println("当前网络状态:");
 #ifdef USE_AIR780EG_GSM
-        MQTT_DEBUG_PRINTLN("- GSM网络: " + String(air780eg_modem.isNetworkReady() ? "就绪" : "未就绪"));
-        MQTT_DEBUG_PRINTLN("- 信号强度: " + String(air780eg_modem.getCSQ()));
+        Serial.println("- GSM网络: " + String(air780eg_modem.isNetworkReady() ? "就绪" : "未就绪"));
+        Serial.println("- 信号强度: " + String(air780eg_modem.getCSQ()));
 #endif
-        MQTT_DEBUG_PRINTLN("- MQTT状态: " + String((int)mqttManager.getMqttState()));
+        Serial.println("- MQTT状态: " + String((int)mqttManager.getMqttState()));
 
         // 强制重新连接
         bool result = mqttManager.forceReconnect();
-        MQTT_DEBUG_PRINTLN("连接结果: " + String(result ? "成功" : "失败"));
+        Serial.println("连接结果: " + String(result ? "成功" : "失败"));
       }
       else if (command == "mqtt.test")
       {
-        MQTT_DEBUG_PRINTLN("发送MQTT测试消息...");
+        Serial.println("发送MQTT测试消息...");
         MqttState mqttState = mqttManager.getMqttState();
         if (mqttState == MqttState::CONNECTED)
         {
           String testTopic = "device/" + device_state.device_id + "/test";
           String testMessage = "{\"test\":\"mqtt_test\",\"timestamp\":" + String(millis()) + "}";
           mqttManager.publish(testTopic.c_str(), testMessage.c_str());
-          MQTT_DEBUG_PRINTLN("测试消息已发送到: " + testTopic);
+          Serial.println("测试消息已发送到: " + testTopic);
         }
         else
         {
-          MQTT_DEBUG_PRINTLN("❌ MQTT未连接，无法发送测试消息");
+          Serial.println("❌ MQTT未连接，无法发送测试消息");
         }
       }
       else if (command == "mqtt.help")
       {
-        MQTT_DEBUG_PRINTLN("=== MQTT命令帮助 ===");
-        MQTT_DEBUG_PRINTLN("mqtt.status     - 显示MQTT状态");
-        MQTT_DEBUG_PRINTLN("mqtt.connect    - 尝试连接MQTT");
-        MQTT_DEBUG_PRINTLN("mqtt.test       - 发送测试消息");
-        MQTT_DEBUG_PRINTLN("mqtt.help       - 显示此帮助信息");
+        Serial.println("=== MQTT命令帮助 ===");
+        Serial.println("mqtt.status     - 显示MQTT状态");
+        Serial.println("mqtt.connect    - 尝试连接MQTT");
+        Serial.println("mqtt.test       - 发送测试消息");
+        Serial.println("mqtt.help       - 显示此帮助信息");
       }
       else
       {
-        MQTT_DEBUG_PRINTLN("未知MQTT命令，输入 'mqtt.help' 查看帮助");
+        Serial.println("未知MQTT命令，输入 'mqtt.help' 查看帮助");
       }
 #else
-      MQTT_DEBUG_PRINTLN("MQTT功能已禁用");
+      Serial.println("MQTT功能已禁用");
 #endif
     }
     else if (command.startsWith("audio."))
@@ -877,8 +866,12 @@ void handleSerialCommand()
       Serial.println("  gsm.test   - 测试AT命令和波特率");
       Serial.println("  gsm.reset  - 重置Air780EG模块");
       Serial.println("  gsm.info   - 显示模块状态信息");
-      SYSTEM_DEBUG_PRINTLN("  gsm.mqtt   - 测试MQTT功能支持");
-      SYSTEM_DEBUG_PRINTLN("  gsm.mqtt.debug - MQTT连接详细调试");
+      Serial.println("  gsm.mqtt   - 测试MQTT功能支持");
+      Serial.println("  gsm.mqtt.debug - MQTT连接详细调试");
+      Serial.println("  gsm.lbs    - LBS基站定位调试");
+      Serial.println("  gsm.lbs.test - LBS AT命令测试");
+      Serial.println("  gps.lbs    - GPSManager LBS集成测试");
+      Serial.println("  gps.smart  - 智能定位切换测试");
       Serial.println("");
 #endif
       Serial.println("提示: 命令不区分大小写");
