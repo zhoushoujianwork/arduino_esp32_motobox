@@ -303,12 +303,6 @@ bool Air780EGMqtt::publish(const String& topic, const String& payload, int qos) 
         debugPrint("Air780EG MQTT: ⚠️ 消息过长 (" + String(payload.length()) + " > 1024)，可能发布失败");
     }
 
-    // 设置为HEX模式
-    debugPrint("Air780EG MQTT: 设置HEX编码模式...");
-    if (!_modem.sendAT("AT+MQTTMODE=1", "OK", 3000)) {
-        debugPrint("Air780EG MQTT: ⚠️ HEX模式设置失败");
-    }
-
     // 将JSON字符串转换为HEX编码
     String hexPayload = "";
     for (int i = 0; i < payload.length(); i++) {
@@ -319,7 +313,6 @@ bool Air780EGMqtt::publish(const String& topic, const String& payload, int qos) 
     }
     
     // 构建HEX模式的发布命令
-    // 格式：AT+MPUB="topic",qos,retain,"hex_payload"
     String cmd = "AT+MPUB=\"" + topic + "\"," + String(qos) + ",0,\"" + hexPayload + "\"";
     
     debugPrint("Air780EG MQTT: HEX载荷长度: " + String(hexPayload.length()));
@@ -333,41 +326,7 @@ bool Air780EGMqtt::publish(const String& topic, const String& payload, int qos) 
         return true;
     }
 
-    debugPrint("Air780EG MQTT: ❌ HEX模式首次发布失败，开始重试...");
-
-    // 重试机制
-    int maxRetries = 3;
-    for (int retry = 0; retry < maxRetries; retry++) {
-        debugPrint("Air780EG MQTT: HEX模式重试发布 (" + String(retry + 1) + "/" + String(maxRetries) + ")");
-        delay(2000); // 重试前等待2秒
-
-        // 检查连接状态
-        if (!checkConnection()) {
-            debugPrint("Air780EG MQTT: 连接已断开，停止重试");
-            _connected = false;
-            break;
-        }
-
-        // 重新确保HEX模式
-        _modem.sendAT("AT+MQTTMODE=1", "OK", 2000);
-
-        // 重试发布
-        if (_modem.sendAT(cmd, "OK", 15000)) {
-            debugPrint("Air780EG MQTT: ✅ HEX模式重试成功 - 消息发布成功");
-            return true;
-        } else {
-            debugPrint("Air780EG MQTT: 消息发布失败，尝试: " + String(retry + 1));
-
-            // 检查连接状态
-            if (!checkConnection()) {
-                debugPrint("Air780EG MQTT: 连接已断开，停止重试");
-                _connected = false;
-                break;
-            }
-        }
-    }
-
-    debugPrint("Air780EG MQTT: 消息发布失败，已达到最大重试次数");
+    debugPrint("Air780EG MQTT: ❌ HEX模式发布失败.");
     return false;
 }
 

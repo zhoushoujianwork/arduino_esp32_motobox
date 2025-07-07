@@ -1,7 +1,7 @@
 /*
  * GPS管理器 - 统一管理不同类型的GPS和GNSS定位
  * 支持GPS和GNSS互斥配置，GNSS模式下支持ML307和Air780EG
- * 通过AT指令获取Air780EG的GNSS数据
+ * 使用GPS数据缓存避免频繁AT调用，提高性能
  */
 
 #ifndef GPS_MANAGER_H
@@ -11,11 +11,10 @@
 #include "ExternalGPSAdapter.h"
 #include "GPSData.h"
 #include "LBSData.h"
+#include "GPSDataCache.h"
 #include "config.h"
 
-#ifdef USE_AIR780EG_GSM
-#include "Air780EGGNSSAdapter.h"
-#endif
+// 注意：Air780EGGNSSAdapter已被GPSDataCache替代，不再需要
 
 // 定位模式枚举
 enum class LocationMode {
@@ -106,10 +105,7 @@ private:
     // GPS接口（用于外部GPS模块）
     GPSInterface* _gpsInterface = nullptr;
     
-#ifdef USE_AIR780EG_GSM
-    // Air780EG GNSS适配器
-    Air780EGGNSSAdapter* _air780egGNSSAdapter = nullptr;
-#endif
+    // 注意：Air780EGGNSSAdapter已被GPSDataCache替代
     
     // 数据缓存
     gps_data_t _gpsData;
