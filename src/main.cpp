@@ -46,17 +46,14 @@ void handleSerialCommand();
 #include "compass/Compass.h"
 #endif
 
-#ifdef ENABLE_GPS
-#include "gps/GPS.h"
-#ifdef USE_ML307_GPS
-#include "net/Ml307Gps.h"
-#endif
-#endif
-
 // GSM模块包含
 #ifdef USE_AIR780EG_GSM
-#include "net/Air780EGModem.h"
-extern Air780EGModem air780eg_modem;
+// 直接使用新的Air780EG库
+#include <Air780EG.h>
+
+// 全局Air780EG库实例
+Air780EG air780;
+
 #elif defined(USE_ML307_GSM)
 #include "net/Ml307AtModem.h"
 extern Ml307AtModem ml307_at;
@@ -86,8 +83,6 @@ extern Ml307AtModem ml307_at;
 #ifdef ENABLE_TFT
 #include "tft/TFT.h"
 #endif
-
-#include "gps/GPSManager.h"
 
 #include <SD.h> // SD卡库
 #include <FS.h>
@@ -184,30 +179,15 @@ void taskDataProcessing(void *parameter)
   Serial.println("[系统] 数据处理任务启动");
 
   // 数据记录相关变量
-  unsigned long lastGPSRecordTime = 0;
+  unsigned long lastGNSSRecordTime = 0;
   unsigned long lastIMURecordTime = 0;
-  const unsigned long GPS_RECORD_INTERVAL = 5000; // 5秒记录一次GPS数据
-  const unsigned long IMU_RECORD_INTERVAL = 1000; // 1秒记录一次IMU数据
-
-  // --------- 延迟初始化GPSManager，彻底避开loopTask栈溢出 ---------
-  static bool gpsManagerInitialized = false;
-  while (!gpsManagerInitialized) {
-    delay(1000); // 等待系统其他部分初始化完成
-    Serial.println("[taskDataProcessing] 尝试初始化GPSManager...");
-    gpsManager.init();
-    gpsManagerInitialized = true;
-    Serial.println("[taskDataProcessing] GPSManager初始化完成!");
-  }
-  // ----------------------------------------------------------
 
   for (;;)
   {
-    // Air780EG后台初始化处理 - 统一在这里处理，避免竞争条件
+    // Air780EG库处理 - 必须在主循环中调用
 #ifdef USE_AIR780EG_GSM
-    // 只有在网络未就绪或MQTT未连接时才执行后台初始化
-    if (!air780eg_modem.isNetworkReady() || !mqttInitialized) {
-      air780eg_modem.loop();
-    }
+    // 调用新库的主循环（处理URC、网络状态更新、GNSS数据更新等）
+    air780.loop();
 #endif
 
     // IMU数据处理
@@ -216,20 +196,15 @@ void taskDataProcessing(void *parameter)
     imu.loop();
 #endif
 
-    // GPS数据处理 - 使用统一的GPS管理器
-    gpsManager.loop();
-    // 更新GPS状态到设备状态
-    device_state.gpsReady = gpsManager.isReady();
-
 #ifdef ENABLE_SDCARD
   // 数据记录到SD卡
   unsigned long currentTime = millis();
 
   // 记录GPS数据
-  if (device_state.gpsReady && device_state.sdCardReady &&
-      currentTime - lastGPSRecordTime >= GPS_RECORD_INTERVAL)
+  if (device_state.gnssReady && device_state.sdCardReady &&
+      currentTime - lastGNSSRecordTime >= GNSS_RECORD_INTERVAL)
   {
-    lastGPSRecordTime = currentTime;
+    lastGNSSRecordTime = currentTime;
 
     // 获取GPS数据
     gps_data_t &gpsData = gps_data;
@@ -291,13 +266,10 @@ void taskWiFi(void *parameter)
 }
 #endif
 
-// 全局变量声明
-bool mqttInitialized = false;
-
 void setup()
 {
   Serial.begin(115200);
-  delay(100);
+  delay(1000);
 
   PreferencesUtils::init();
 
@@ -363,27 +335,26 @@ void setup()
 
 void loop()
 {
-  // static unsigned long loopCount = 0;
-  // static unsigned long lastLoopReport = 0;
-  // loopCount++;
+  static unsigned long loopCount = 0;
+  static unsigned long lastLoopReport = 0;
+  loopCount++;
 
-  // if (millis() - lastLoopReport > 10000)
-  // {
-  //   lastLoopReport = millis();
-  //   uint32_t freeHeap = ESP.getFreeHeap();
-  //   uint32_t minFreeHeap = ESP.getMinFreeHeap();
-  //   Serial.printf("[主循环] 运行正常，循环计数: %lu, 空闲内存: %d 字节\n", loopCount, freeHeap);
-  //   if (freeHeap < 50000) {
-  //     Serial.printf("[警告] 内存不足: %d 字节，最小值: %d 字节\n", freeHeap, minFreeHeap);
-  //   }
-  //   if (freeHeap < 20000) {
-  //     Serial.println("[严重] 内存严重不足，即将重启系统...");
-  //     delay(1000);
-  //     ESP.restart();
-  //   }
-  // }
+  if (millis() - lastLoopReport > 10000)
+  {
+    lastLoopReport = millis();
+    uint32_t freeHeap = ESP.getFreeHeap();
+    uint32_t minFreeHeap = ESP.getMinFreeHeap();
+    Serial.printf("[主循环] 运行正常，循环计数: %lu, 空闲内存: %d 字节\n", loopCount, freeHeap);
+    if (freeHeap < 50000) {
+      Serial.printf("[警告] 内存不足: %d 字节，最小值: %d 字节\n", freeHeap, minFreeHeap);
+    }
+    if (freeHeap < 20000) {
+      Serial.println("[严重] 内存严重不足，即将重启系统...");
+      delay(1000);
+      ESP.restart();
+    }
+  }
 
-  // delay(20);
   delay(20);
 
   // static unsigned long lastMsg = 0;
@@ -417,8 +388,10 @@ void handleSerialCommand()
     {
       sdManager.handleSerialCommand(command);
     }
+    else
+#endif
     // Air780EG调试命令
-    else if (command.startsWith("gsm."))
+    if (command.startsWith("gsm."))
     {
 #ifdef USE_AIR780EG_GSM
       if (command == "gsm.test")
@@ -426,10 +399,19 @@ void handleSerialCommand()
         Serial.println("=== Air780EG 测试 ===");
         Serial.printf("GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
         Serial.printf("RX引脚: %d, TX引脚: %d\n", GSM_RX_PIN, GSM_TX_PIN);
+        Serial.printf("模块状态: %s\n", device_state.gsmReady ? "就绪" : "未就绪");
 
         // 尝试发送AT命令
         Serial.println("发送AT命令测试...");
-        air780eg_modem.testATCommand();
+        if (device_state.gsmReady) {
+          String response = air780.getCore().sendATCommand("AT");
+          Serial.printf("AT响应: %s\n", response.c_str());
+          
+          response = air780.getCore().sendATCommand("ATI");
+          Serial.printf("模块信息: %s\n", response.c_str());
+        } else {
+          Serial.println("模块未就绪，无法测试AT命令");
+        }
       }
       else if (command == "gsm.reset")
       {
@@ -444,8 +426,22 @@ void handleSerialCommand()
       {
         Serial.println("=== Air780EG 信息 ===");
         Serial.printf("模块状态: %s\n", device_state.gsmReady ? "就绪" : "未就绪");
-        Serial.printf("网络状态: %s\n", air780eg_modem.isNetworkReady() ? "已连接" : "未连接");
-        Serial.printf("信号强度: %d\n", air780eg_modem.getCSQ());
+        if (device_state.gsmReady) {
+          Serial.printf("网络状态: %s\n", air780.getNetwork().isNetworkRegistered() ? "已连接" : "未连接");
+          Serial.printf("信号强度: %d dBm\n", air780.getNetwork().getSignalStrength());
+          Serial.printf("运营商: %s\n", air780.getNetwork().getOperatorName().c_str());
+          Serial.printf("网络类型: %s\n", air780.getNetwork().getNetworkType().c_str());
+          Serial.printf("IMEI: %s\n", air780.getNetwork().getIMEI().c_str());
+          
+          // GNSS信息
+          if (air780.getGNSS().isFixed()) {
+            Serial.printf("GNSS状态: 已定位\n");
+            Serial.printf("位置: %.6f, %.6f\n", air780.getGNSS().getLatitude(), air780.getGNSS().getLongitude());
+            Serial.printf("卫星数: %d\n", air780.getGNSS().getSatelliteCount());
+          } else {
+            Serial.printf("GNSS状态: 未定位 (卫星数: %d)\n", air780.getGNSS().getSatelliteCount());
+          }
+        }
       }
       else if (command == "gsm.mqtt")
       {
@@ -453,7 +449,8 @@ void handleSerialCommand()
         if (device_state.gsmReady)
         {
           // 测试MQTT功能支持
-          mqttManager.testMQTTSupport();
+          // mqttManager.testMQTTSupport();
+          Serial.println("MQTT功能已禁用");
         }
         else
         {
@@ -465,9 +462,9 @@ void handleSerialCommand()
         Serial.println("=== Air780EG MQTT连接调试 ===");
         if (device_state.gsmReady)
         {
-          // 包含调试头文件并调用调试函数
-          extern void debugAir780EGMqtt(Air780EGModem * modem);
-          debugAir780EGMqtt(&air780eg_modem);
+          // TODO: 实现基于新库的MQTT调试功能
+          Serial.println("MQTT调试功能正在重构中...");
+          air780.printStatus();
         }
         else
         {
@@ -479,9 +476,15 @@ void handleSerialCommand()
         Serial.println("=== Air780EG LBS调试 ===");
         if (device_state.gsmReady)
         {
-          // 包含调试头文件并调用调试函数
-          extern void debugAir780EGLbs(Air780EGModem * modem);
-          debugAir780EGLbs(&air780eg_modem);
+          // TODO: 实现基于新库的LBS功能
+          Serial.println("LBS功能正在重构中...");
+          if (air780.getGNSS().isFixed()) {
+            Serial.printf("当前位置 (GNSS): %.6f, %.6f\n", 
+                         air780.getGNSS().getLatitude(), 
+                         air780.getGNSS().getLongitude());
+          } else {
+            Serial.println("GNSS未定位，无法提供位置信息");
+          }
         }
         else
         {
@@ -493,50 +496,23 @@ void handleSerialCommand()
         Serial.println("=== Air780EG LBS AT命令测试 ===");
         if (device_state.gsmReady)
         {
-          // 包含调试头文件并调用调试函数
-          extern void testAir780EGLbsCommands(Air780EGModem * modem);
-          testAir780EGLbsCommands(&air780eg_modem);
+          // TODO: 实现基于新库的LBS AT命令测试
+          Serial.println("LBS AT命令测试功能正在重构中...");
+          Serial.println("当前网络信息:");
+          Serial.printf("- 网络注册: %s\n", air780.getNetwork().isNetworkRegistered() ? "是" : "否");
+          Serial.printf("- 信号强度: %d dBm\n", air780.getNetwork().getSignalStrength());
+          Serial.printf("- 运营商: %s\n", air780.getNetwork().getOperatorName().c_str());
         }
         else
         {
           Serial.println("GSM模块未就绪，无法测试LBS AT命令");
         }
       }
-      else if (command == "gps.lbs")
-      {
-        Serial.println("=== GPSManager LBS集成测试 ===");
-        if (device_state.gsmReady)
-        {
-          // 包含调试头文件并调用调试函数
-          extern void testGPSManagerLBS();
-          testGPSManagerLBS();
-        }
-        else
-        {
-          Serial.println("GSM模块未就绪，无法测试GPSManager LBS功能");
-        }
-      }
-      else if (command == "gps.smart")
-      {
-        Serial.println("=== GPSManager 智能定位切换测试 ===");
-        if (device_state.gsmReady)
-        {
-          // 包含调试头文件并调用调试函数
-          extern void testSmartLocationSwitching();
-          testSmartLocationSwitching();
-        }
-        else
-        {
-          Serial.println("GSM模块未就绪，无法测试智能定位切换功能");
-        }
-      }
 #else
       Serial.println("Air780EG模块未启用");
 #endif
     }
-    else
-#endif
-        if (command == "info")
+    else if (command == "info")
     {
       Serial.println("=== 设备信息 ===");
       Serial.println("设备ID: " + device_state.device_id);
@@ -553,8 +529,14 @@ void handleSerialCommand()
 #ifdef USE_AIR780EG_GSM
       if (device_state.gsmReady)
       {
-        Serial.println("网络状态: " + String(air780eg_modem.isNetworkReady() ? "已连接" : "未连接"));
-        Serial.println("信号强度: " + String(air780eg_modem.getCSQ()));
+        Serial.println("网络状态: " + String(air780.getNetwork().isNetworkRegistered() ? "已连接" : "未连接"));
+        Serial.println("信号强度: " + String(air780.getNetwork().getSignalStrength()) + " dBm");
+        Serial.println("运营商: " + air780.getNetwork().getOperatorName());
+        if (air780.getGNSS().isFixed()) {
+          Serial.println("GNSS状态: 已定位 (卫星数: " + String(air780.getGNSS().getSatelliteCount()) + ")");
+        } else {
+          Serial.println("GNSS状态: 未定位 (卫星数: " + String(air780.getGNSS().getSatelliteCount()) + ")");
+        }
       }
 #endif
 
@@ -595,8 +577,9 @@ void handleSerialCommand()
 #endif
       Serial.println("");
       Serial.println("--- 传感器状态 ---");
-      Serial.println("GPS状态: " + String(device_state.gpsReady ? "就绪" : "未就绪"));
+      Serial.println("GNSS状态: " + String(device_state.gnssReady ? "就绪" : "未就绪"));
       Serial.println("IMU状态: " + String(device_state.imuReady ? "就绪" : "未就绪"));
+      Serial.println("罗盘状态: " + String(device_state.compassReady ? "就绪" : "未就绪"));
       Serial.println("");
       Serial.println("--- 音频设备状态 ---");
 #ifdef ENABLE_AUDIO
@@ -666,8 +649,9 @@ void handleSerialCommand()
         Serial.println("GSM状态: " + String(device_state.gsmReady ? "就绪" : "未就绪"));
         if (device_state.gsmReady)
         {
-          Serial.println("网络状态: " + String(air780eg_modem.isNetworkReady() ? "已连接" : "未连接"));
-          Serial.println("信号强度: " + String(air780eg_modem.getCSQ()));
+          Serial.println("网络状态: " + String(air780.getNetwork().isNetworkRegistered() ? "已连接" : "未连接"));
+          Serial.println("信号强度: " + String(air780.getNetwork().getSignalStrength()) + " dBm");
+          Serial.println("运营商: " + air780.getNetwork().getOperatorName());
         }
 #elif defined(ENABLE_WIFI)
         Serial.println("连接方式: WiFi");
@@ -699,8 +683,9 @@ void handleSerialCommand()
         Serial.println("尝试连接MQTT...");
         Serial.println("当前网络状态:");
 #ifdef USE_AIR780EG_GSM
-        Serial.println("- GSM网络: " + String(air780eg_modem.isNetworkReady() ? "就绪" : "未就绪"));
-        Serial.println("- 信号强度: " + String(air780eg_modem.getCSQ()));
+        Serial.println("- GSM网络: " + String(air780.getNetwork().isNetworkRegistered() ? "就绪" : "未就绪"));
+        Serial.println("- 信号强度: " + String(air780.getNetwork().getSignalStrength()) + " dBm");
+        Serial.println("- 运营商: " + air780.getNetwork().getOperatorName());
 #endif
         Serial.println("- MQTT状态: " + String((int)mqttManager.getMqttState()));
 
@@ -870,8 +855,7 @@ void handleSerialCommand()
       Serial.println("  gsm.mqtt.debug - MQTT连接详细调试");
       Serial.println("  gsm.lbs    - LBS基站定位调试");
       Serial.println("  gsm.lbs.test - LBS AT命令测试");
-      Serial.println("  gps.lbs    - GPSManager LBS集成测试");
-      Serial.println("  gps.smart  - 智能定位切换测试");
+      Serial.println("  gps.status - SimpleGPS 状态查询");
       Serial.println("");
 #endif
       Serial.println("提示: 命令不区分大小写");

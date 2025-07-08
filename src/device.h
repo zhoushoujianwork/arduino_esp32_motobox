@@ -14,13 +14,11 @@
 #include "ble/ble_client.h"
 #include "ble/ble_server.h"
 #include "compass/Compass.h"
-#include "gps/GPS.h"
 #include "bat/BAT.h"
-#include "net/Ml307AtModem.h"
-// 条件包含 MQTT 管理器头文件
-#ifndef DISABLE_MQTT
-#include "net/MqttManager.h"
-#endif
+// MQTT管理器已完全禁用
+// #ifndef DISABLE_MQTT
+// #include "net/MqttManager.h"
+// #endif
 #ifdef RTC_INT_PIN
 #include "power/ExternalPower.h"
 #endif
@@ -49,7 +47,6 @@ typedef struct
     bool external_power;       // 新增：外部电源接入状态（车辆电门）
     bool wifiConnected; // WiFi连接状态
     bool bleConnected; // BLE连接状态
-    bool gpsReady; // GPS准备状态
     bool imuReady; // IMU准备状态
     bool compassReady;  // 罗盘准备状态
     bool gsmReady; // GSM准备状态

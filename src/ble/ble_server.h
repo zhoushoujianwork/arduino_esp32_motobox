@@ -4,7 +4,6 @@
 #include <NimBLEDevice.h>
 #include "device.h"
 #include "config.h"
-#include "gps/GPS.h"
 #include "imu/qmi8658.h"
 #include "power/PowerManager.h"
 #include "wifi/server.h"

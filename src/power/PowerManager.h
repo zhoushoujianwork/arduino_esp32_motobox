@@ -7,7 +7,6 @@
 #include <WiFi.h>
 #include "device.h"
 #include "imu/qmi8658.h"
-#include "gps/GPS.h"
 #include "utils/PreferencesUtils.h"
 #include "config.h"
 

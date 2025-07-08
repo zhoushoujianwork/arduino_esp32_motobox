@@ -10,7 +10,7 @@
 #include "config.h"
 
 #ifdef USE_AIR780EG_GSM
-#include "../net/Air780EGModem.h"
+#include <Air780EG.h>
 #endif
 
 class GPSDataCache {
@@ -62,7 +62,7 @@ private:
     
 #ifdef USE_AIR780EG_GSM
     // Air780EG模块引用
-    Air780EGModem* _modem = nullptr;
+    Air780EG* _air780eg = nullptr;
 #endif
     
     // 私有方法

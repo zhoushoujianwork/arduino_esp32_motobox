@@ -7,7 +7,7 @@
 #include "../utils/DebugUtils.h"
 
 #ifdef USE_AIR780EG_GSM
-extern Air780EGModem air780eg_modem;
+extern Air780EG air780eg;
 #endif
 
 // 全局实例
@@ -29,7 +29,7 @@ void GPSDataCache::init() {
     resetCachedData();
     
 #ifdef USE_AIR780EG_GSM
-    _modem = &air780eg_modem;
+    _air780eg = &air780eg;
     debugPrint("使用Air780EG模块");
 #endif
     
@@ -56,31 +56,40 @@ void GPSDataCache::loop() {
 
 void GPSDataCache::updateGPSDataFromModem() {
 #ifdef USE_AIR780EG_GSM
-    if (!_modem || !_modem->isGNSSEnabled()) {
+    if (!_air780eg) {
         resetCachedData();
         return;
     }
     
-    // 直接调用AT+CGNSINF获取数据
-    String response = _modem->sendATWithResponse("AT+CGNSINF", 3000);
-    if (response.length() == 0) {
-        debugPrint("AT+CGNSINF 无响应");
-        _dataValid = false;
+    // 使用新的Air780EG库获取GNSS数据
+    auto& gnss = _air780eg->getGNSS();
+    if (!gnss.isEnabled()) {
+        resetCachedData();
         return;
     }
     
-    // 解析响应数据
-    if (parseGNSSResponse(response)) {
-        _dataValid = true;
-        if (_debug && _gnssFixed) {
+    // 直接从GNSS对象获取数据，无需AT命令
+    _cachedGPSData.latitude = gnss.getLatitude();
+    _cachedGPSData.longitude = gnss.getLongitude();
+    _cachedGPSData.altitude = gnss.getAltitude();
+    _cachedGPSData.speed = gnss.getSpeed();
+    _cachedGPSData.heading = gnss.getCourse();
+    _satelliteCount = gnss.getSatelliteCount();
+    _hdop = gnss.getHDOP();
+    
+    // 更新状态
+    _gnssFixed = gnss.isFixed();
+    _dataValid = _gnssFixed;
+    
+    if (_dataValid) {
+        if (_debug) {
             debugPrint(String("GPS数据更新: ") + 
                       String(_cachedGPSData.latitude, 6) + ", " + 
                       String(_cachedGPSData.longitude, 6) + 
                       ", 卫星: " + String(_satelliteCount));
         }
     } else {
-        _dataValid = false;
-        debugPrint("GPS数据解析失败");
+        debugPrint("GPS数据无效，等待定位");
     }
 #else
     resetCachedData();

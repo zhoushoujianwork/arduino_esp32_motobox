@@ -34,6 +34,7 @@ typedef struct
     double speed;       // 速度，单位：千米/小时
     double heading;     // 航向角，单位：度 (0°~360°)
     uint8_t satellites; // 可见卫星数量
+    uint8_t fix_quality; // 定位质量 (0=无效, 1=GPS, 2=DGPS)
     
     uint8_t gpsHz;      // GPS更新频率
 } gps_data_t;

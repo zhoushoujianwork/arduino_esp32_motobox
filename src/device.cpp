@@ -2,13 +2,11 @@
 #include "utils/DebugUtils.h"
 #include "config.h"
 #include "tft/TFT.h"
-#include "gps/GPSManager.h"
 #include "imu/qmi8658.h"
 
 // GSM模块包含
 #ifdef USE_AIR780EG_GSM
-#include "net/Air780EGModem.h"
-extern Air780EGModem air780eg_modem;
+#include "Air780EG.h"
 #elif defined(USE_ML307_GSM)
 #include "net/Ml307Mqtt.h"
 extern Ml307Mqtt ml307Mqtt;
@@ -47,8 +45,8 @@ void print_device_info()
     Serial.printf("Battery Percentage: %d\n", device_state.battery_percentage);
     Serial.printf("Is Charging: %d\n", device_state.is_charging);
     Serial.printf("External Power: %d\n", device_state.external_power);
-    Serial.printf("GPS Ready: %d\n", device_state.gpsReady);
-    Serial.printf("GPS Type: %s\n", gpsManager.getType().c_str());
+    Serial.printf("GSM Ready: %d\n", device_state.gsmReady);
+    Serial.printf("GNSS Ready: %d\n", device_state.gnssReady);
     Serial.printf("IMU Ready: %d\n", device_state.imuReady);
     Serial.printf("Compass Ready: %d\n", device_state.compassReady);
     Serial.printf("SD Card Ready: %d\n", device_state.sdCardReady);
@@ -89,8 +87,8 @@ String device_state_to_json(device_state_t *state)
     doc["hw"] = device_state.device_hardware_version;
     doc["wifi"] = device_state.wifiConnected;
     doc["ble"] = device_state.bleConnected;
-    doc["gps"] = device_state.gpsReady;
-    doc["gps_type"] = gpsManager.getType();
+    doc["gsm"] = device_state.gsmReady;
+    doc["gnss"] = device_state.gnssReady;
     doc["imu"] = device_state.imuReady;
     doc["compass"] = device_state.compassReady;
     doc["bat_v"] = device_state.battery_voltage;
@@ -169,7 +167,7 @@ void mqttMessageCallback(const String &topic, const String &payload)
         {
             // {"cmd": "gps_debug", "enable": true}
             bool enable = doc["enable"].as<bool>();
-            gpsManager.setDebug(enable);
+            simpleGPS.setDebug(enable);
             Serial.printf("GPS调试模式: %s\n", enable ? "开启" : "关闭");
         }
         // 调试级别控制
@@ -367,21 +365,6 @@ Device device;
 
 Device::Device()
 {
-    // 构造函数只做简单变量初始化
-    device_state.sleep_time = 300;
-    device_state.wifiConnected = false;
-    device_state.bleConnected = false;
-    device_state.battery_voltage = 0;
-    device_state.battery_percentage = 0;
-    device_state.is_charging = false;
-    device_state.external_power = false;
-    device_state.gpsReady = false;
-    device_state.imuReady = false;
-    device_state.compassReady = false;
-    device_state.gsmReady = false;
-    device_state.sdCardReady = false;
-    device_state.sdCardSizeMB = 0;
-    device_state.sdCardFreeMB = 0;
 }
 
 void Device::begin()
@@ -485,8 +468,8 @@ void Device::begin()
 
     initializeGSM();
 
-    // 先完成 mqtt 连接，再初始化其他功能
-    initializeMQTT();
+    // 暂时禁用MQTT初始化
+    // initializeMQTT();
 
 
 #endif
@@ -590,63 +573,20 @@ void update_device_state()
     }
 
     // 检查GPS状态变化 - 使用GPS管理器
-    bool currentGpsReady = gpsManager.isReady();
-    if (currentGpsReady != last_state.gpsReady)
+    if (device_state.gsmReady != last_state.gsmReady)
     {
-        notify_state_change("GPS状态",
-                            last_state.gpsReady ? "就绪" : "未就绪",
-                            currentGpsReady ? "就绪" : "未就绪");
-        state_changes.gps_changed = true;
-        device_state.gpsReady = currentGpsReady;
-        
-#ifdef ENABLE_AUDIO
-        // 当GPS从未就绪变为就绪时播放定位成功音
-        if (currentGpsReady && !last_state.gpsReady && device_state.audioReady && AUDIO_GPS_FIXED_ENABLED) {
-            audioManager.playGPSFixedSound();
-        }
-#endif
-    }
-
-    // 检查LBS状态变化
-#ifdef ENABLE_GSM
-    // bool currentLbsReady = gpsManager.isLBSReady();
-    // if (currentLbsReady != last_state.lbsReady)
-    // {
-    //     notify_state_change("LBS状态",
-    //                         last_state.lbsReady ? "就绪" : "未就绪",
-    //                         currentLbsReady ? "就绪" : "未就绪");
-    //     device_state.lbsReady = currentLbsReady;
-    // }
-
-    // 检查GNSS状态变化
-    bool currentGnssReady = false;
-    
-    switch (gpsManager.getLocationMode()) {
-        case LocationMode::GNSS_ONLY:
-        case LocationMode::GNSS_WITH_LBS:
-            currentGnssReady = gpsManager.isGNSSFixed();
-            break;
-        case LocationMode::GPS_ONLY:
-            currentGnssReady = gpsManager.isReady();
-            break;
-        default:
-            currentGnssReady = false;
-            break;
-    }
-    
-    if (currentGnssReady != device_state.gnssReady) {
         notify_state_change("GNSS状态",
-                           device_state.gnssReady ? "就绪" : "未就绪",
-                           currentGnssReady ? "就绪" : "未就绪");
-        device_state.gnssReady = currentGnssReady;
-        
-        // 更新GPS数据到device_state
-        if (currentGnssReady) {
-            gps_data_t gpsData = gpsManager.getGPSData();
-            device_state.latitude = gpsData.latitude;
-            device_state.longitude = gpsData.longitude;
-            device_state.satellites = gpsData.satellites;
-        }
+                           last_state.gsmReady ? "就绪" : "未就绪",
+                           device_state.gsmReady ? "就绪" : "未就绪");
+        device_state.gsmReady = device_state.gsmReady;
+    }
+
+#ifdef ENABLE_GSM
+    if (device_state.gsmReady != last_state.gsmReady) {
+        notify_state_change("GNSS状态",
+                           last_state.gsmReady ? "就绪" : "未就绪",
+                           device_state.gsmReady ? "就绪" : "未就绪");
+        device_state.gsmReady = device_state.gsmReady;
     }
 #endif
 
@@ -719,19 +659,15 @@ void device_loop()
 void Device::initializeGSM() {
 //================ GSM模块初始化开始 ================
 #ifdef USE_AIR780EG_GSM
-  Serial.println("step 6.5");
   Serial.println("[GSM] 初始化Air780EG模块...");
-
   Serial.printf("[GSM] 引脚配置 - RX:%d, TX:%d, EN:%d\n", GSM_RX_PIN, GSM_TX_PIN, GSM_EN);
-
-  air780eg_modem.setDebug(true);
-  if (air780eg_modem.begin())
+  // 设置日志级别 (可选)
+  Air780EG::setLogLevel(AIR780EG_LOG_VERBOSE);
+  air780eg.getGNSS().enableGNSS();
+  if (air780eg.begin(&Serial1, 115200, GSM_RX_PIN, GSM_TX_PIN, GSM_EN))  
   {
     Serial.println("[GSM] ✅ Air780EG基础初始化成功");
     device_state.gsmReady = true;
-
-    // 检查GSM_EN引脚状态
-    Serial.printf("[GSM] GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
 
     Serial.println("[GSM] 📡 网络注册和GNSS启用将在后台任务中完成");
   }
@@ -750,6 +686,10 @@ void Device::initializeGSM() {
 
 
 bool Device::initializeMQTT() {
+#ifdef DISABLE_MQTT
+    Serial.println("MQTT功能已禁用");
+    return true;
+#else
 #if (defined(ENABLE_WIFI) || defined(ENABLE_GSM)) && !defined(DISABLE_MQTT)
     Serial.println("🔄 开始MQTT初始化...");
     
@@ -889,7 +829,8 @@ bool Device::initializeMQTT() {
 #else
     Serial.println("⚠️ MQTT功能已禁用");
     return false;
-#endif
+#endif // ENABLE_WIFI || ENABLE_GSM
+#endif // DISABLE_MQTT
 }
 
 // 欢迎语音配置方法

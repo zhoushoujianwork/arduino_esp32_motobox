@@ -12,12 +12,12 @@
 #include <map>
 #include "config.h"
 #include "device.h"
-#include "gps/GPSManager.h"
+#include "gps/SimpleGPSManager.h"
 #include "utils/PreferencesUtils.h"
 
 // 根据配置包含相应的GSM模块
 #ifdef USE_AIR780EG_GSM
-#include "Air780EGMqtt.h"
+// #include "Air780EGMqtt.h"  // 暂时注释，需要重新实现
 #elif defined(USE_ML307_GSM)
 #include "Ml307Mqtt.h"
 #endif
@@ -133,7 +133,7 @@ private:
 
     // GSM MQTT客户端
 #ifdef USE_AIR780EG_GSM
-    Air780EGMqtt* _air780egMqtt;
+    // Air780EGMqtt* _air780egMqtt;  // 暂时注释，需要重新实现
 #endif
 
     unsigned long _lastNetworkCheckTime;

@@ -82,7 +82,7 @@ void WiFiConfigManager::enterAPMode()
 
 void WiFiConfigManager::setupAP()
 {
-    apSSID = String(APP_NAME) + "-" + String(device.get_device_id());
+    apSSID = String("MotoBox") + "-" + String(device.get_device_id());
     WiFi.mode(WIFI_AP);
     delay(100);
 

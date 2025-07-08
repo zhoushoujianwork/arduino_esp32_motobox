@@ -1,6 +1,5 @@
 #include "BTN.h"
 #include <Arduino.h>
-#include "gps/GPS.h"
 
 #ifdef BTN_PIN
 BTN button(BTN_PIN);

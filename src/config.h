@@ -2,190 +2,119 @@
 #define CONFIG_H
 
 /*
- * Device Operation Mode Configuration
- * Modes are now defined in platformio.ini build_flags:
- * 1. MODE_ALLINONE: Standalone mode without Bluetooth, direct data collection and display
- * 2. MODE_SERVER: Master mode - collects sensor data, sends via Bluetooth to client,
- *           and can send data to server via MQTT over WiFi
- * 3. MODE_CLIENT: Slave mode - receives data from server via Bluetooth and displays it
+ * ESP32-S3 MotoBox Air780EG Configuration
+ * 专用于Air780EG模块的配置文件
  */
 
-/* 是否启用睡眠模式，在platformio.ini中定义 
- */
-
-// GSM引脚配置检查
-#if defined(GSM_RX_PIN) && defined(GSM_TX_PIN)
+// 强制启用Air780EG GSM模块
 #define ENABLE_GSM
-
-// 根据编译环境确定使用哪个GSM模块
-#ifdef ENABLE_AIR780EG
 #define USE_AIR780EG_GSM
-#elif defined(ENABLE_ML307)
-#define USE_ML307_GSM
-#else
-// 默认使用ML307（向后兼容）
-#define USE_ML307_GSM
-#endif
 
-#else
-#define ENABLE_WIFI
-#endif
-
-// GPS引脚配置检查
-#if defined(GPS_RX_PIN) && defined(GPS_TX_PIN)
+// GPS功能通过Air780EG内置GNSS提供
 #define ENABLE_GPS
-#endif
+#define USE_AIR780EG_GNSS
 
+// MQTT功能完全禁用，专注于GPS功能开发
+// #define ENABLE_MQTT
+// #define USE_AIR780EG_MQTT
+#define DISABLE_MQTT
 
-// 罗盘引脚配置检查
-#if defined(GPS_COMPASS_SDA) && defined(GPS_COMPASS_SCL)
+// 其他基础功能
 #define ENABLE_COMPASS
+#define ENABLE_IMU
+#define ENABLE_AUDIO
+#define ENABLE_LED
+// #define ENABLE_TFT  // 暂时禁用TFT
+#define ENABLE_BLE
+
+// BLE配置
+#define BLE_NAME                      "ESP32-MotoBox"
+#define SERVICE_UUID                  "12345678-1234-1234-1234-123456789abc"
+#define DEVICE_CHAR_UUID              "87654321-4321-4321-4321-cba987654321"
+#define GPS_CHAR_UUID                 "11111111-2222-3333-4444-555555555555"
+#define IMU_CHAR_UUID                 "66666666-7777-8888-9999-aaaaaaaaaaaa"
+
+// 调试配置
+#define GPS_DEBUG_ENABLED             false
+#define GNSS_DEBUG_ENABLED            false
+#define LBS_DEBUG_ENABLED             false
+
+// 音频配置
+#define AUDIO_BOOT_SUCCESS_ENABLED    true
+#define AUDIO_LOW_BATTERY_ENABLED     true
+#define AUDIO_GPS_FIXED_ENABLED       true
+
+// MQTT配置
+#define MQTT_USER                     "motobox"
+#define MQTT_KEEP_ALIVE               60
+// 避免与PubSubClient库冲突，使用不同的宏名  
+#define LBS_DEBUG_ENABLED             false
+#define MQTT_DEBUG_ENABLED            true
+#define NETWORK_DEBUG_ENABLED         true
+
+// 调试宏定义
+#if GPS_DEBUG_ENABLED
+#define GPS_DEBUG_PRINTLN(x)          Serial.println(x)
+#define GPS_DEBUG_PRINTF(fmt, ...)    Serial.printf(fmt, ##__VA_ARGS__)
+#else
+#define GPS_DEBUG_PRINTLN(x)
+#define GPS_DEBUG_PRINTF(fmt, ...)
 #endif
 
+#if GNSS_DEBUG_ENABLED
+#define GNSS_DEBUG_PRINTLN(x)         Serial.println(x)
+#define GNSS_DEBUG_PRINTF(fmt, ...)   Serial.printf(fmt, ##__VA_ARGS__)
+#else
+#define GNSS_DEBUG_PRINTLN(x)
+#define GNSS_DEBUG_PRINTF(fmt, ...)
+#endif
+
+#if MQTT_DEBUG_ENABLED
+#define MQTT_DEBUG_PRINTLN(x)         Serial.println(x)
+#define MQTT_DEBUG_PRINTF(fmt, ...)   Serial.printf(fmt, ##__VA_ARGS__)
+#else
+#define MQTT_DEBUG_PRINTLN(x)
+#define MQTT_DEBUG_PRINTF(fmt, ...)
+#endif
+
+#if NETWORK_DEBUG_ENABLED
+#define NETWORK_DEBUG_PRINTLN(x)      Serial.println(x)
+#define NETWORK_DEBUG_PRINTF(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)
+#else
+#define NETWORK_DEBUG_PRINTLN(x)
+#define NETWORK_DEBUG_PRINTF(fmt, ...)
+#endif
+
+// 版本信息
 #ifndef FIRMWARE_VERSION
 #define FIRMWARE_VERSION "unknown"
 #endif
 
 #ifndef HARDWARE_VERSION
-#define HARDWARE_VERSION "unknown"
+#define HARDWARE_VERSION "esp32-air780eg"
 #endif
 
-/*
- * 以下定义保留是为了兼容性，实际的值在 platformio.ini 中配置
- * Common device configurations are now defined in platformio.ini [env] section
- * Pin configurations are defined in respective environment sections [env:allinone], [env:server], [env:client]
- */
-
-/* Common Device Configuration */
-#define APP_NAME            "MOTO-BOX"
-#define BLE_NAME            "MOTO-BOX"
-#define SERVICE_UUID        "4FAFC201-1FB5-459E-8FCC-C5C9C331914B"
-#define DEVICE_CHAR_UUID    "BEB5483A-36E1-4688-B7F5-EA07361B26A8"
-#define GPS_CHAR_UUID       "BEB5483E-36E1-4688-B7F5-EA07361B26A8"
-#define IMU_CHAR_UUID       "BEB5483F-36E1-4688-B7F5-EA07361B26A8"
-
-/* LED Configuration */
-#define LED_BLINK_INTERVAL 100
-
-/* IMU Configuration */
-#if defined(IMU_SDA_PIN) && defined(IMU_SCL_PIN)
-#define ENABLE_IMU  // 默认启用IMU
+#ifndef BUILD_NUMBER
+#define BUILD_NUMBER 0
 #endif
 
-#define IMU_MAX_D          68     /* Marquis GP retention */
+// Air780EG配置
+#define AIR780EG_BAUD_RATE           115200
+#define AIR780EG_TIMEOUT             5000
+#define AIR780EG_GNSS_UPDATE_RATE    1000  // 1Hz
+#define AIR780EG_NETWORK_CHECK_INTERVAL 5000  // 5秒
 
+// MQTT配置
+#define MQTT_BROKER                  "your-mqtt-broker.com"
+#define MQTT_PORT                    1883
+#define MQTT_CLIENT_ID_PREFIX        "motobox_"
+#define MQTT_USERNAME                ""
+#define MQTT_PASSWORD                ""
+#define MQTT_KEEPALIVE               60
+#define MQTT_RECONNECT_INTERVAL      30000
 
-/* MQTT Configuration */
-#define MQTT_BROKER        "mq-hub.daboluo.cc"
-// #define MQTT_SERVER        "222.186.32.152"
-#define MQTT_PORT         32571
-#define MQTT_USER         "box"
-#define MQTT_PASSWORD     "box"
-#define MQTT_KEEP_ALIVE   60
+// GPS配置
+#define GPS_UPDATE_INTERVAL          1000
+#define GPS_TIMEOUT                  10000
 
-/* 
-TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
-*/
-
-/* Display Configuration */
-#define TFT_HOR_RES        172
-#define TFT_VER_RES        320
-#define TFT_ROTATION       1 // 0: 0度, 1: 90度, 2: 180度, 3: 270度
-#define UI_MAX_SPEED       199    /* Maximum speed in km/h */
-
-#ifdef ENABLE_SDCARD
-// SPI模式SD卡引脚配置（在platformio.ini中定义）
-#ifndef SD_MODE_SPI
-// 默认使用SDIO模式
-#define SD_MMC_MODE
-#endif
-#endif
-
-/* Audio Configuration */
-// 音频引脚配置检查
-#if defined(IIS_S_WS_PIN) && defined(IIS_S_BCLK_PIN) && defined(IIS_S_DATA_PIN)
-#define ENABLE_AUDIO
-#endif
-
-/* Audio Events Configuration */
-#define AUDIO_BOOT_SUCCESS_ENABLED    true
-#define AUDIO_WIFI_CONNECTED_ENABLED  true
-#define AUDIO_GPS_FIXED_ENABLED       true
-#define AUDIO_LOW_BATTERY_ENABLED     true
-#define AUDIO_SLEEP_MODE_ENABLED      true
-
-/* Debug Configuration */
-// MQTT调试输出控制
-#ifndef MQTT_DEBUG_ENABLED
-#define MQTT_DEBUG_ENABLED            false
-#endif
-
-// 网络调试输出控制
-#ifndef NETWORK_DEBUG_ENABLED
-#define NETWORK_DEBUG_ENABLED         false
-#endif
-
-// 系统调试输出控制
-#ifndef SYSTEM_DEBUG_ENABLED
-#define SYSTEM_DEBUG_ENABLED          true
-#endif
-
-// GPS全链路调试输出控制
-#ifndef GPS_DEBUG_ENABLED
-#define GPS_DEBUG_ENABLED             true
-#endif
-
-// AT指令调试输出控制
-#ifndef AT_COMMAND_DEBUG_ENABLED
-#define AT_COMMAND_DEBUG_ENABLED      false  // 默认关闭AT指令调试
-#endif
-
-// 调试级别配置 (0=无, 1=错误, 2=警告, 3=信息, 4=调试, 5=详细)
-#ifndef GLOBAL_DEBUG_LEVEL
-#ifdef DEBUG
-#define GLOBAL_DEBUG_LEVEL            4  // 调试版本默认为DEBUG级别
-#else
-#define GLOBAL_DEBUG_LEVEL            3  // 发布版本默认为INFO级别
-#endif
-#endif
-
-#ifndef AT_COMMAND_DEBUG_LEVEL
-#define AT_COMMAND_DEBUG_LEVEL        4  // AT指令调试级别
-#endif
-
-#ifndef GNSS_DEBUG_LEVEL
-#define GNSS_DEBUG_LEVEL              4  // GNSS调试级别
-#endif
-
-#ifndef MQTT_DEBUG_LEVEL
-#define MQTT_DEBUG_LEVEL              4  // MQTT调试级别
-#endif
-
-// 智能定位切换配置
-#ifndef SMART_LOCATION_ENABLED
-#define SMART_LOCATION_ENABLED        true   // 启用智能定位切换
-#endif
-
-#ifndef GNSS_FAILURE_TIMEOUT_MS
-#define GNSS_FAILURE_TIMEOUT_MS       30000  // GNSS失败30秒后启用LBS备用
-#endif
-
-#ifndef GNSS_RECOVERY_TIMEOUT_MS
-#define GNSS_RECOVERY_TIMEOUT_MS      60000  // GNSS恢复60秒后停用LBS备用
-#endif
-
-#ifndef LBS_FALLBACK_INTERVAL_MS
-#define LBS_FALLBACK_INTERVAL_MS      30000  // LBS备用模式下的更新间隔
-#endif
-
-// GNSS调试输出控制（Air780EG GNSS功能）
-#ifndef GNSS_DEBUG_ENABLED
-#define GNSS_DEBUG_ENABLED            true
-#endif
-
-// LBS调试输出控制（基站定位功能）
-#ifndef LBS_DEBUG_ENABLED
-#define LBS_DEBUG_ENABLED             true
-#endif
-
-#endif /* CONFIG_H */
+#endif // CONFIG_H
