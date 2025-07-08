@@ -150,15 +150,15 @@ TFT 配置请在lib/TFT_eSPI/User_Setup_Select.h中选择
 #endif
 
 #ifndef AT_COMMAND_DEBUG_LEVEL
-#define AT_COMMAND_DEBUG_LEVEL        1  // AT指令调试级别
+#define AT_COMMAND_DEBUG_LEVEL        4  // AT指令调试级别
 #endif
 
 #ifndef GNSS_DEBUG_LEVEL
-#define GNSS_DEBUG_LEVEL              3  // GNSS调试级别
+#define GNSS_DEBUG_LEVEL              4  // GNSS调试级别
 #endif
 
 #ifndef MQTT_DEBUG_LEVEL
-#define MQTT_DEBUG_LEVEL              3  // MQTT调试级别
+#define MQTT_DEBUG_LEVEL              4  // MQTT调试级别
 #endif
 
 // 智能定位切换配置

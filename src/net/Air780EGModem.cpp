@@ -3,29 +3,24 @@
  */
 
 #include "Air780EGModem.h"
-#include "../utils/DebugUtils.h"
+#include <HardwareSerial.h>
 
 #ifdef USE_AIR780EG_GSM
-
-#include <HardwareSerial.h>
 
 // 全局实例声明
 Air780EGModem air780eg_modem(Serial2, GSM_RX_PIN, GSM_TX_PIN, GSM_EN);
 
-// 在文件顶部添加全局变量
+// GNSS和LBS数据解析用的临时缓冲区
 char g_gnssFields[21][32];
-char g_gnssFieldsDebug[21][32];
 char g_lbsParts[5][32];
 
 Air780EGModem::Air780EGModem(HardwareSerial& serial, int rxPin, int txPin, int enPin)
     : _serial(serial), _rxPin(rxPin), _txPin(txPin), _enPin(enPin),
-      _debug(false), _lbsEnabled(false), _gnssEnabled(false),
+      _lbsEnabled(false), _gnssEnabled(false),
       _isNetworkReady(false), _lastNetworkReadyCheckTime(0),
       _initState(INIT_IDLE), _initStartTime(0), _lastInitCheck(0),
       _lastLBSUpdate(0), _isLBSLoading(false),
       _lastCMEErrorTime(0), _cmeErrorCount(0), _backoffDelay(0),
-      _lastGNSSUpdate(0), _gnssUpdateRate(1),
-      _lastLoopTime(0), _loopTimeoutCount(0),
       _mqttMessageHandler(nullptr) {
     // 初始化LBS数据
     _lbsData.valid = false;
@@ -40,46 +35,24 @@ Air780EGModem::Air780EGModem(HardwareSerial& serial, int rxPin, int txPin, int e
 }
 
 bool Air780EGModem::begin(uint32_t baudrate) {
-    debugPrint("Air780EG: 初始化开始");
-    
     // 配置使能引脚
     if (_enPin >= 0) {
-        debugPrint("Air780EG: 配置使能引脚 GPIO" + String(_enPin));
         pinMode(_enPin, OUTPUT);
-        
-        // 先拉低再拉高，确保模块重启
         digitalWrite(_enPin, LOW);
-        debugPrint("Air780EG: GSM_EN -> LOW");
-        delay(500);  // 增加延时确保模块完全断电
-        
+        delay(500);
         digitalWrite(_enPin, HIGH);
-        debugPrint("Air780EG: GSM_EN -> HIGH");
-        delay(2000); // 等待模块启动
+        delay(2000);
         
-        // 验证引脚状态
-        bool pinState = digitalRead(_enPin);
-        debugPrint("Air780EG: GSM_EN引脚状态: " + String(pinState ? "HIGH" : "LOW"));
-        
-        if (!pinState) {
-            debugPrint("Air780EG: 警告 - GSM_EN引脚未能拉高！");
+        if (!digitalRead(_enPin)) {
             return false;
         }
-    } else {
-        debugPrint("Air780EG: 警告 - 未配置使能引脚");
     }
     
     // 初始化串口
-    debugPrint("Air780EG: 初始化串口 - RX:" + String(_rxPin) + ", TX:" + String(_txPin));
-    _serial.begin(baudrate, SERIAL_8N1, _rxPin, _txPin);
-    delay(1000);
-    
-    // 尝试不同波特率
     if (!tryBaudrate(baudrate)) {
-        debugPrint("Air780EG: 尝试其他波特率");
         uint32_t baudrates[] = {115200, 9600, 38400, 57600};
         for (int i = 0; i < 4; i++) {
             if (baudrates[i] != baudrate && tryBaudrate(baudrates[i])) {
-                debugPrint("Air780EG: 找到正确波特率: " + String(baudrates[i]));
                 break;
             }
         }
@@ -103,47 +76,37 @@ bool Air780EGModem::tryBaudrate(uint32_t baudrate) {
 }
 
 bool Air780EGModem::initModem() {
-    debugPrint("Air780EG: 初始化模块");
-    
     // 基础AT命令测试
     if (!sendATWithRetry("AT", "OK", 5, 2000)) {
-        debugPrint("Air780EG: AT命令失败");
         return false;
     }
     
     // 关闭回显
     sendAT("ATE0");
     
-    // 获取模块信息
-    String moduleName = getModuleName();
-    debugPrint("Air780EG: 模块名称: " + moduleName);
-    
     // 检查SIM卡
     if (!sendATWithRetry("AT+CPIN?", "READY", 3, 3000)) {
-        debugPrint("Air780EG: SIM卡未就绪");
         return false;
     }
     
     // 设置网络注册检查
-    sendAT("AT+CREG=1");  // 启用网络注册状态上报
-    sendAT("AT+CGREG=1"); // 启用GPRS注册状态上报
+    sendAT("AT+CREG=1");
+    sendAT("AT+CGREG=1");
     
     // 等待网络注册
-    debugPrint("Air780EG: 等待网络注册...");
     for (int i = 0; i < 30; i++) {
         if (isNetworkReadyCheck()) {
-            debugPrint("Air780EG: 网络注册成功");
             break;
         }
         delay(2000);
     }
     
-    debugPrint("Air780EG: 初始化完成");
-    
     // 启动后台初始化状态机
     _initState = INIT_IDLE;
     _initStartTime = millis();
     _lastInitCheck = 0;
+
+    enableGNSSAutoReport(false);
     return true;
 }
 
@@ -197,32 +160,13 @@ void Air780EGModem::debugPrint(const String& msg) {
 }
 
 bool Air780EGModem::isNetworkReadyCheck() {
-    // 避免频繁检查
     if (millis() - _lastNetworkReadyCheckTime < 5000) {
         return _isNetworkReady;
     }
     
     _lastNetworkReadyCheckTime = millis();
-    
-    // 默认就是好的
     _isNetworkReady = true;
     return true;
-
-    // 检查网络注册状态
-    String response = sendATWithResponse("AT+CREG?", 2000);
-    if (response.indexOf("+CREG: 1,1") >= 0 || response.indexOf("+CREG: 1,5") >= 0) {
-        _isNetworkReady = true;
-    }
-    
-    // 检查GPRS注册状态
-    response = sendATWithResponse("AT+CGREG?", 2000);
-    if (response.indexOf("+CGREG: 1,1") >= 0 || response.indexOf("+CGREG: 1,5") >= 0) {
-        _isNetworkReady = true;
-        return true;
-    }
-    
-    _isNetworkReady = false;
-    return false;
 }
 
 String Air780EGModem::getLocalIP() {
@@ -248,7 +192,6 @@ int Air780EGModem::getCSQ() {
 String Air780EGModem::getIMEI() {
     String response = sendATWithResponse("AT+CGSN", 2000);
     response.trim();
-    // 提取15位IMEI号码
     for (int i = 0; i < response.length(); i++) {
         if (isdigit(response.charAt(i))) {
             String imei = response.substring(i);
@@ -325,12 +268,41 @@ bool Air780EGModem::enableGNSS(bool enable) {
         }
     } else {
         Serial.println("[Air780EG] 禁用GNSS");
+        
+        // 1. 首先关闭GNSS自动上报
+        Serial.println("[Air780EG] 关闭GNSS自动上报...");
+        sendAT("AT+CGNSURC=0", "OK", 3000);
+        
+        // 2. 然后关闭GNSS电源
         if (sendAT("AT+CGNSPWR=0", "OK", 3000)) {
             Serial.println("[Air780EG] GNSS已禁用");
             _gnssEnabled = false;
             return true;
         } else {
             Serial.println("[Air780EG] GNSS禁用失败");
+            return false;
+        }
+    }
+}
+
+// 控制GNSS自动上报
+bool Air780EGModem::enableGNSSAutoReport(bool enable) {
+    if (enable) {
+        Serial.println("[Air780EG] 启用GNSS自动上报");
+        if (sendAT("AT+CGNSURC=1", "OK", 3000)) {
+            Serial.println("[Air780EG] GNSS自动上报已启用");
+            return true;
+        } else {
+            Serial.println("[Air780EG] GNSS自动上报启用失败");
+            return false;
+        }
+    } else {
+        Serial.println("[Air780EG] 禁用GNSS自动上报");
+        if (sendAT("AT+CGNSURC=0", "OK", 3000)) {
+            Serial.println("[Air780EG] GNSS自动上报已禁用");
+            return true;
+        } else {
+            Serial.println("[Air780EG] GNSS自动上报禁用失败");
             return false;
         }
     }
@@ -380,6 +352,7 @@ String Air780EGModem::getGNSSInfo() {
 
 // 检查GNSS是否已定位
 bool Air780EGModem::isGNSSFixed() {
+    Serial.println("[Air780EG] 检查GNSS是否已定位");
     String response = sendATWithResponse("AT+CGNSINF", 2000);
     if (response.length() > 0) {
         int firstComma = response.indexOf(',');
@@ -392,37 +365,9 @@ bool Air780EGModem::isGNSSFixed() {
     return false;
 }
 
-// 检查GNSS是否正在等待定位（电源开启但未定位）
-bool Air780EGModem::isGNSSWaitingFix() {
-    String response = sendATWithResponse("AT+CGNSINF", 2000);
-    if (response.length() > 0) {
-        int firstComma = response.indexOf(',');
-        int secondComma = response.indexOf(',', firstComma + 1);
-        if (firstComma > 0 && secondComma > 0) {
-            String powerStatus = response.substring(response.indexOf(':') + 1, firstComma);
-            String fixStatus = response.substring(firstComma + 1, secondComma);
-            powerStatus.trim();
-            fixStatus.trim();
-            
-            // GNSS电源开启但未定位
-            return (powerStatus == "1" && fixStatus == "0");
-        }
-    }
-    return false;
-}
-
+// 简化版本：移除频率控制，由GPSDataCache统一管理
 bool Air780EGModem::updateGNSSData() {
-    Serial.println("[DEBUG] Enter updateGNSSData, _gnssEnabled=" + String(_gnssEnabled));
     if (!_gnssEnabled) return false;
-    
-    // 避免过于频繁的更新
-    unsigned long interval = 1000 / _gnssUpdateRate;
-    Serial.println("[DEBUG] updateGNSSData: interval=" + String(interval) + ", lastUpdate=" + String(_lastGNSSUpdate));
-    if (millis() - _lastGNSSUpdate < interval) {
-        return _gnssData.valid;
-    }
-    
-    _lastGNSSUpdate = millis();
     
     String response = sendATWithResponse("AT+CGNSINF", 3000);
     if (response.length() > 0) {
@@ -533,7 +478,7 @@ bool Air780EGModem::setGNSSUpdateRate(int hz) {
     }
     
     if (sendAT(cmd, "OK", 2000)) {
-        _gnssUpdateRate = hz;
+        // 不再保存频率值，由GPSDataCache统一管理
         return true;
     }
     return false;
@@ -573,7 +518,7 @@ gps_data_t Air780EGModem::getGPSData() {
             }
         }
         
-        gpsData.gpsHz = _gnssUpdateRate;
+        gpsData.gpsHz = 1; // 默认1Hz，实际频率由GPSDataCache管理
     }
     
     return gpsData;
@@ -781,9 +726,6 @@ bool Air780EGModem::isLBSDataValid() {
 bool Air780EGModem::sendAT(const String& cmd, const String& expected, uint32_t timeout) {
     flushInput();
     _serial.println(cmd);
-    
-    AT_DEBUG_SEND(cmd.c_str());
-    
     return expectResponse(expected, timeout);
 }
 
@@ -800,9 +742,6 @@ bool Air780EGModem::sendATWithRetry(const String& cmd, const String& expected, i
 String Air780EGModem::sendATWithResponse(const String& cmd, uint32_t timeout) {
     flushInput();
     _serial.println(cmd);
-    
-    AT_DEBUG_SEND(cmd.c_str());
-    
     return waitResponse(timeout);
 }
 
@@ -830,15 +769,13 @@ void Air780EGModem::flushInput() {
 String Air780EGModem::waitResponse(uint32_t timeout) {
     String response = "";
     unsigned long start = millis();
-    const size_t MAX_RESPONSE_LENGTH = 2048; // 限制响应长度，防止内存溢出
+    const size_t MAX_RESPONSE_LENGTH = 2048;
     
     while (millis() - start < timeout) {
         if (_serial.available()) {
             char c = _serial.read();
             
-            // 检查响应长度，防止内存溢出
             if (response.length() >= MAX_RESPONSE_LENGTH) {
-                debugPrint("Air780EG: ⚠️ 响应过长，截断处理");
                 break;
             }
             
@@ -850,17 +787,6 @@ String Air780EGModem::waitResponse(uint32_t timeout) {
             }
         }
         delay(1);
-    }
-    
-    if (response.length() > 0) {
-        // 如果响应太长，只显示前面和后面的部分
-        if (response.length() > 200) {
-            String truncated = response.substring(0, 100) + "...[截断]..." + 
-                              response.substring(response.length() - 100);
-            AT_DEBUG_RECV(truncated.c_str());
-        } else {
-            AT_DEBUG_RECV(response.c_str());
-        }
     }
     
     return response;
@@ -912,51 +838,6 @@ void Air780EGModem::debugNetworkInfo() {
     Serial.println("信号强度: " + String(getCSQ()));
     Serial.println("本地IP: " + getLocalIP());
     Serial.println("网络状态: " + String(_isNetworkReady ? "已连接" : "未连接"));
-}
-
-void Air780EGModem::debugGNSSInfo() {
-    if (!_debug) return;
-    
-    Serial.println("=== Air780EG GNSS信息 ===");
-    
-    // 查询GNSS电源状态
-    String powerStatus = sendATWithResponse("AT+CGNSPWR?", 2000);
-    Serial.println("GNSS电源状态: " + powerStatus);
-    
-    // 查询详细GNSS信息
-    String gnssInfo = sendATWithResponse("AT+CGNSINF", 3000);
-    Serial.println("GNSS详细信息: " + gnssInfo);
-    
-    Serial.println("本地解析状态:");
-    Serial.println("  GNSS启用: " + String(_gnssEnabled ? "是" : "否"));
-    Serial.println("  定位有效: " + String(_gnssData.valid ? "是" : "否"));
-    
-    if (_gnssData.valid) {
-        Serial.println("  纬度: " + String(_gnssData.latitude, 6));
-        Serial.println("  经度: " + String(_gnssData.longitude, 6));
-        Serial.println("  海拔: " + String(_gnssData.altitude, 2) + "m");
-        Serial.println("  速度: " + String(_gnssData.speed, 2) + "km/h");
-        Serial.println("  方向: " + String(_gnssData.course, 2) + "°");
-        Serial.println("  卫星数: " + String(_gnssData.satellites));
-        Serial.println("  HDOP: " + String(_gnssData.hdop, 2));
-        Serial.println("  时间戳: " + _gnssData.timestamp);
-        Serial.println("  定位模式: " + _gnssData.fix_mode);
-    } else if (_gnssEnabled) {
-        Serial.println("  状态: 等待定位中...");
-        Serial.println("  建议: 确保设备在室外，等待5-15分钟");
-    }
-    
-    Serial.println("  更新频率: " + String(_gnssUpdateRate) + "Hz");
-    Serial.println("  最后更新: " + String(millis() - _lastGNSSUpdate) + "ms前");
-}
-
-void Air780EGModem::debugLBSConfig() {
-    if (!_debug) return;
-    
-    debugPrint("=== Air780EG LBS信息 ===");
-    debugPrint("LBS状态: " + String(_lbsEnabled ? "已启用" : "未启用"));
-    debugPrint("最后更新: " + String(millis() - _lastLBSUpdate) + "ms前");
-    debugPrint("原始数据: " + _lastLBSLocation);
 }
 
 // 后台初始化处理
