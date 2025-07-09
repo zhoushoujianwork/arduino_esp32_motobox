@@ -50,7 +50,8 @@ void print_device_info()
     Serial.printf("IMU Ready: %d\n", device_state.imuReady);
     Serial.printf("Compass Ready: %d\n", device_state.compassReady);
     Serial.printf("SD Card Ready: %d\n", device_state.sdCardReady);
-    if (device_state.sdCardReady) {
+    if (device_state.sdCardReady)
+    {
         Serial.printf("SD Card Size: %llu MB\n", device_state.sdCardSizeMB);
         Serial.printf("SD Card Free: %llu MB\n", device_state.sdCardFreeMB);
     }
@@ -96,7 +97,8 @@ String device_state_to_json(device_state_t *state)
     doc["is_charging"] = device_state.is_charging;
     doc["ext_power"] = device_state.external_power;
     doc["sd"] = device_state.sdCardReady;
-    if (device_state.sdCardReady) {
+    if (device_state.sdCardReady)
+    {
         doc["sd_size"] = device_state.sdCardSizeMB;
         doc["sd_free"] = device_state.sdCardFreeMB;
     }
@@ -123,7 +125,7 @@ void mqttMessageCallback(const String &topic, const String &payload)
     }
 
     Serial.println("✅ JSON解析成功");
-    
+
     // 解析JSON
     // {"cmd": "enter_config"}
     const char *cmd = doc["cmd"];
@@ -131,7 +133,7 @@ void mqttMessageCallback(const String &topic, const String &payload)
     {
         Serial.printf("收到命令: %s\n", cmd);
         Serial.println("开始执行命令处理...");
-        
+
         if (strcmp(cmd, "enter_ap_mode") == 0)
         {
 #ifdef ENABLE_WIFI
@@ -174,19 +176,23 @@ void mqttMessageCallback(const String &topic, const String &payload)
         else if (strcmp(cmd, "set_debug_level") == 0)
         {
             // {"cmd": "set_debug_level", "global": 3, "at": 4, "gnss": 3, "mqtt": 3}
-            if (doc.containsKey("global")) {
+            if (doc.containsKey("global"))
+            {
                 int level = doc["global"].as<int>();
                 DebugManager::setGlobalLevel((DebugLevel)level);
             }
-            if (doc.containsKey("at")) {
+            if (doc.containsKey("at"))
+            {
                 int level = doc["at"].as<int>();
                 DebugManager::setATLevel((DebugLevel)level);
             }
-            if (doc.containsKey("gnss")) {
+            if (doc.containsKey("gnss"))
+            {
                 int level = doc["gnss"].as<int>();
                 DebugManager::setGNSSLevel((DebugLevel)level);
             }
-            if (doc.containsKey("mqtt")) {
+            if (doc.containsKey("mqtt"))
+            {
                 int level = doc["mqtt"].as<int>();
                 DebugManager::setMQTTLevel((DebugLevel)level);
             }
@@ -227,9 +233,12 @@ void mqttMessageCallback(const String &topic, const String &payload)
         else if (strcmp(cmd, "audio_test") == 0)
         {
             Serial.println("执行音频测试");
-            if (device_state.audioReady) {
+            if (device_state.audioReady)
+            {
                 audioManager.testAudio();
-            } else {
+            }
+            else
+            {
                 Serial.println("音频系统未就绪");
             }
         }
@@ -237,27 +246,43 @@ void mqttMessageCallback(const String &topic, const String &payload)
         else if (strcmp(cmd, "play_audio") == 0)
         {
             // {"cmd": "play_audio", "event": "boot_success"}
-            const char* event = doc["event"];
-            if (event && device_state.audioReady) {
-                if (strcmp(event, "boot_success") == 0) {
+            const char *event = doc["event"];
+            if (event && device_state.audioReady)
+            {
+                if (strcmp(event, "boot_success") == 0)
+                {
                     audioManager.playBootSuccessSound();
-                } else if (strcmp(event, "welcome") == 0) {
+                }
+                else if (strcmp(event, "welcome") == 0)
+                {
                     audioManager.playWelcomeVoice();
-                } else if (strcmp(event, "wifi_connected") == 0) {
+                }
+                else if (strcmp(event, "wifi_connected") == 0)
+                {
                     audioManager.playWiFiConnectedSound();
-                } else if (strcmp(event, "gps_fixed") == 0) {
+                }
+                else if (strcmp(event, "gps_fixed") == 0)
+                {
                     audioManager.playGPSFixedSound();
-                } else if (strcmp(event, "low_battery") == 0) {
+                }
+                else if (strcmp(event, "low_battery") == 0)
+                {
                     audioManager.playLowBatterySound();
-                } else if (strcmp(event, "sleep_mode") == 0) {
+                }
+                else if (strcmp(event, "sleep_mode") == 0)
+                {
                     audioManager.playSleepModeSound();
-                } else if (strcmp(event, "custom") == 0) {
+                }
+                else if (strcmp(event, "custom") == 0)
+                {
                     float frequency = doc["frequency"] | 1000.0;
                     int duration = doc["duration"] | 200;
                     audioManager.playCustomBeep(frequency, duration);
                 }
                 Serial.printf("播放音频事件: %s\n", event);
-            } else {
+            }
+            else
+            {
                 Serial.println("音频系统未就绪或事件参数无效");
             }
         }
@@ -286,7 +311,9 @@ void mqttMessageCallback(const String &topic, const String &payload)
         }
         Serial.println("✅ 命令处理完成");
 #endif
-    } else {
+    }
+    else
+    {
         Serial.println("❌ 消息中未找到cmd字段");
     }
     Serial.println("=== MQTT消息回调结束 ===");
@@ -297,14 +324,14 @@ void mqttConnectionCallback(bool connected)
 {
 #ifndef DISABLE_MQTT
     Serial.printf("MQTT连接状态: %s\n", connected ? "已连接" : "断开");
-    
+
     if (connected)
     {
         Serial.println("MQTT连接成功，开始配置订阅主题");
 
         static bool firstConnect = true; // 添加静态变量标记首次连接
         Serial.printf("首次连接标志: %s\n", firstConnect ? "是" : "否");
-        
+
         // 配置主题
         String baseTopic = String("vehicle/v1/") + device_state.device_id;
         String telemetryTopic = baseTopic + "/telemetry/"; // telemetry: 遥测数据
@@ -316,7 +343,7 @@ void mqttConnectionCallback(bool connected)
         String gpsTopic = telemetryTopic + "location";
         String imuTopic = telemetryTopic + "motion";
         String controlTopic = baseTopic + "/ctrl/#"; // ctrl: 控制命令
-        
+
         Serial.println("设备信息主题: " + deviceInfoTopic);
         Serial.println("GPS主题: " + gpsTopic);
         Serial.println("IMU主题: " + imuTopic);
@@ -338,18 +365,23 @@ void mqttConnectionCallback(bool connected)
 
             mqttManager.addTopic("gps", gpsTopic.c_str(), 1000);
             Serial.println("✅ GPS主题已添加");
-            
+
             // 订阅主题 - 使用QoS=0
             Serial.println("开始订阅控制命令主题: " + controlTopic);
             bool subscribeResult = mqttManager.subscribe(controlTopic.c_str(), 0);
             Serial.printf("订阅结果: %s\n", subscribeResult ? "成功" : "失败");
-            
-            if (subscribeResult) {
+
+            if (subscribeResult)
+            {
                 Serial.println("✅ MQTT订阅链路配置完成");
-            } else {
+            }
+            else
+            {
                 Serial.println("❌ MQTT订阅失败，消息接收可能不正常");
             }
-        } else {
+        }
+        else
+        {
             Serial.println("非首次连接，跳过主题配置");
         }
     }
@@ -425,16 +457,19 @@ void Device::begin()
 #ifdef ENABLE_IMU
     Serial.println("[IMU] 开始初始化IMU系统...");
     Serial.printf("[IMU] 引脚配置 - SDA:%d, SCL:%d, INT:%d\n", IMU_SDA_PIN, IMU_SCL_PIN, IMU_INT_PIN);
-    
-    try {
+
+    try
+    {
         imu.begin();
-        device_state.imuReady = true;  // 设置IMU状态为就绪
+        device_state.imuReady = true; // 设置IMU状态为就绪
         Serial.println("[IMU] ✅ IMU系统初始化成功，状态已设置为就绪");
-    } catch (...) {
+    }
+    catch (...)
+    {
         device_state.imuReady = false;
         Serial.println("[IMU] ❌ IMU系统初始化异常");
     }
-    
+
     // 如果是从深度睡眠唤醒，检查唤醒原因
     if (isWakeFromDeepSleep)
     {
@@ -471,7 +506,6 @@ void Device::begin()
     // 暂时禁用MQTT初始化
     // initializeMQTT();
 
-
 #endif
     Serial.println("GPS初始化已延迟到任务中!");
 
@@ -479,19 +513,23 @@ void Device::begin()
     // 音频系统初始化
     Serial.println("[音频] 开始初始化音频系统...");
     Serial.printf("[音频] 引脚配置 - WS:%d, BCLK:%d, DATA:%d\n", IIS_S_WS_PIN, IIS_S_BCLK_PIN, IIS_S_DATA_PIN);
-    
-    if (audioManager.begin()) {
+
+    if (audioManager.begin())
+    {
         device_state.audioReady = true;
         Serial.println("[音频] ✅ 音频系统初始化成功!");
-        
+
         // 播放开机成功音（只播放一次）
         static bool bootSoundPlayed = false;
-        if (AUDIO_BOOT_SUCCESS_ENABLED && !bootSoundPlayed) {
+        if (AUDIO_BOOT_SUCCESS_ENABLED && !bootSoundPlayed)
+        {
             Serial.println("[音频] 播放开机成功音...");
             audioManager.playBootSuccessSound();
             bootSoundPlayed = true;
         }
-    } else {
+    }
+    else
+    {
         device_state.audioReady = false;
         Serial.println("[音频] ❌ 音频系统初始化失败!");
         Serial.println("[音频] 请检查:");
@@ -523,13 +561,14 @@ void update_device_state()
                             String(last_state.battery_percentage).c_str(),
                             String(device_state.battery_percentage).c_str());
         state_changes.battery_changed = true;
-        
+
 #ifdef ENABLE_AUDIO
         // 当电池电量降到20%以下时播放低电量警告音（避免频繁播放）
-        if (device_state.battery_percentage <= 20 && 
-            last_state.battery_percentage > 20 && 
-            device_state.audioReady && 
-            AUDIO_LOW_BATTERY_ENABLED) {
+        if (device_state.battery_percentage <= 20 &&
+            last_state.battery_percentage > 20 &&
+            device_state.audioReady &&
+            AUDIO_LOW_BATTERY_ENABLED)
+        {
             audioManager.playLowBatterySound();
         }
 #endif
@@ -576,16 +615,17 @@ void update_device_state()
     if (device_state.gsmReady != last_state.gsmReady)
     {
         notify_state_change("GNSS状态",
-                           last_state.gsmReady ? "就绪" : "未就绪",
-                           device_state.gsmReady ? "就绪" : "未就绪");
+                            last_state.gsmReady ? "就绪" : "未就绪",
+                            device_state.gsmReady ? "就绪" : "未就绪");
         device_state.gsmReady = device_state.gsmReady;
     }
 
 #ifdef ENABLE_GSM
-    if (device_state.gsmReady != last_state.gsmReady) {
+    if (device_state.gsmReady != last_state.gsmReady)
+    {
         notify_state_change("GNSS状态",
-                           last_state.gsmReady ? "就绪" : "未就绪",
-                           device_state.gsmReady ? "就绪" : "未就绪");
+                            last_state.gsmReady ? "就绪" : "未就绪",
+                            device_state.gsmReady ? "就绪" : "未就绪");
         device_state.gsmReady = device_state.gsmReady;
     }
 #endif
@@ -656,54 +696,49 @@ void device_loop()
     // Implementation of device_loop function
 }
 
-void Device::initializeGSM() {
+void Device::initializeGSM()
+{
 //================ GSM模块初始化开始 ================
 #ifdef USE_AIR780EG_GSM
-  Serial.println("[GSM] 初始化Air780EG模块...");
-  Serial.printf("[GSM] 引脚配置 - RX:%d, TX:%d, EN:%d\n", GSM_RX_PIN, GSM_TX_PIN, GSM_EN);
-  // 设置日志级别 (可选)
-  Air780EG::setLogLevel(AIR780EG_LOG_VERBOSE);
-  air780eg.getGNSS().enableGNSS();
-  if (air780eg.begin(&Serial1, 115200, GSM_RX_PIN, GSM_TX_PIN, GSM_EN))  
-  {
+    Serial.println("[GSM] 初始化Air780EG模块...");
+    Serial.printf("[GSM] 引脚配置 - RX:%d, TX:%d, EN:%d\n", GSM_RX_PIN, GSM_TX_PIN, GSM_EN);
+    // 设置日志级别 (可选)
+    Air780EG::setLogLevel(AIR780EG_LOG_VERBOSE);
+    while (!air780eg.begin(&Serial1, 115200, GSM_RX_PIN, GSM_TX_PIN, GSM_EN))
+    {
+        Serial.println("[GSM] ❌ Air780EG基础初始化失败");
+        device_state.gsmReady = false;
+        delay(1000);
+    }
     Serial.println("[GSM] ✅ Air780EG基础初始化成功");
     device_state.gsmReady = true;
-
-    Serial.println("[GSM] 📡 网络注册和GNSS启用将在后台任务中完成");
-  }
-  else
-  {
-    Serial.println("[GSM] ❌ Air780EG基础初始化失败");
-    device_state.gsmReady = false;
-
-    // 调试信息
-    Serial.printf("[GSM] GSM_EN引脚状态: %s\n", digitalRead(GSM_EN) ? "HIGH" : "LOW");
-  }
+#ifdef ENABLE_GNSS
+    air780eg.getGNSS().enableGNSS();
 #endif
-  //================ GSM模块初始化结束 ================
+#endif
+    //================ GSM模块初始化结束 ================
 }
 
-
-
-bool Device::initializeMQTT() {
+bool Device::initializeMQTT()
+{
 #ifdef DISABLE_MQTT
     Serial.println("MQTT功能已禁用");
     return true;
 #else
 #if (defined(ENABLE_WIFI) || defined(ENABLE_GSM)) && !defined(DISABLE_MQTT)
     Serial.println("🔄 开始MQTT初始化...");
-    
+
     // 创建 MQTT 配置
     MqttManagerConfig config;
     // 通用 MQTT 配置
     config.broker = MQTT_BROKER;
     config.port = MQTT_PORT;
-    
-    // 生成唯一的客户端ID，使用设备ID 
+
+    // 生成唯一的客户端ID，使用设备ID
     // [系统] 系统正常启动，硬件版本: esp32-air780eg, 固件版本: v3.4.0+104, 编译时间: Jul  5 2025 15:14:31
     // 带上硬件版本+固件版本信息
     config.clientId = "ESP32_" + device_state.device_id + "_" + device_state.device_hardware_version + "_" + device_state.device_firmware_version;
-    
+
     config.username = MQTT_USER;
     config.password = MQTT_PASSWORD;
     config.keepAlive = MQTT_KEEP_ALIVE;
@@ -718,7 +753,7 @@ bool Device::initializeMQTT() {
     Serial.printf("MQTT密码: %s\n", config.password.length() > 0 ? "***已设置***" : "***未设置***");
     Serial.printf("保持连接: %d秒\n", config.keepAlive);
     Serial.printf("清除会话: %s\n", config.cleanSession ? "是" : "否");
-    
+
 #ifdef USE_AIR780EG_GSM
     Serial.println("连接方式: Air780EG 4G网络");
 #elif defined(USE_ML307_GSM)
@@ -732,22 +767,22 @@ bool Device::initializeMQTT() {
 
     // 初始化 MQTT 管理器
     mqttManager.setDebug(MQTT_DEBUG_ENABLED);
-    
+
     // 根据使用的GSM模块设置调试
 #ifdef USE_AIR780EG_GSM
     air780eg_modem.setDebug(MQTT_DEBUG_ENABLED);
 #elif defined(USE_ML307_GSM)
     ml307Mqtt.setDebug(MQTT_DEBUG_ENABLED);
 #endif
-    
+
     if (!mqttManager.begin(config))
     {
         Serial.println("❌ MQTT 初始化失败");
         return false;
     }
-    
+
     Serial.println("✅ MQTT 管理器初始化成功");
-    
+
     // 设置回调
     mqttManager.onMessage(mqttMessageCallback);
     mqttManager.onConnect(mqttConnectionCallback);
@@ -796,36 +831,40 @@ bool Device::initializeMQTT() {
     unsigned long mqttConnectStart = millis();
     const unsigned long MQTT_CONNECT_TIMEOUT = 30000; // 30秒超时
     bool mqttConnected = false;
-    
-    while (!mqttConnected && (millis() - mqttConnectStart < MQTT_CONNECT_TIMEOUT)) {
+
+    while (!mqttConnected && (millis() - mqttConnectStart < MQTT_CONNECT_TIMEOUT))
+    {
         mqttManager.loop(); // 处理MQTT连接
-        
+
         // 检查连接状态
-        if (mqttManager.isConnected()) {
+        if (mqttManager.isConnected())
+        {
             mqttConnected = true;
             Serial.println("✅ MQTT连接成功！");
             break;
         }
-        
+
         // 显示连接进度
         static unsigned long lastProgress = 0;
-        if (millis() - lastProgress > 2000) {
+        if (millis() - lastProgress > 2000)
+        {
             lastProgress = millis();
             unsigned long elapsed = millis() - mqttConnectStart;
-            Serial.printf("⏳ MQTT连接中... (%lu/%lu秒)\n", elapsed/1000, MQTT_CONNECT_TIMEOUT/1000);
+            Serial.printf("⏳ MQTT连接中... (%lu/%lu秒)\n", elapsed / 1000, MQTT_CONNECT_TIMEOUT / 1000);
         }
-        
+
         delay(100); // 短暂延时避免CPU占用过高
     }
-    
-    if (!mqttConnected) {
+
+    if (!mqttConnected)
+    {
         Serial.println("⚠️ MQTT连接超时，将在运行时继续尝试");
         return false;
     }
-    
+
     Serial.println("✅ MQTT初始化完成");
     return true;
-    
+
 #else
     Serial.println("⚠️ MQTT功能已禁用");
     return false;
@@ -834,13 +873,17 @@ bool Device::initializeMQTT() {
 }
 
 // 欢迎语音配置方法
-void Device::setWelcomeVoiceType(int voiceType) {
+void Device::setWelcomeVoiceType(int voiceType)
+{
 #ifdef ENABLE_AUDIO
-    if (device_state.audioReady) {
+    if (device_state.audioReady)
+    {
         WelcomeVoiceType type = static_cast<WelcomeVoiceType>(voiceType);
         audioManager.setWelcomeVoiceType(type);
         Serial.printf("欢迎语音类型已设置为: %s\n", audioManager.getWelcomeVoiceDescription());
-    } else {
+    }
+    else
+    {
         Serial.println("音频系统未就绪，无法设置欢迎语音类型");
     }
 #else
@@ -848,12 +891,16 @@ void Device::setWelcomeVoiceType(int voiceType) {
 #endif
 }
 
-void Device::playWelcomeVoice() {
+void Device::playWelcomeVoice()
+{
 #ifdef ENABLE_AUDIO
-    if (device_state.audioReady) {
+    if (device_state.audioReady)
+    {
         audioManager.playWelcomeVoice();
         Serial.printf("播放欢迎语音: %s\n", audioManager.getWelcomeVoiceDescription());
-    } else {
+    }
+    else
+    {
         Serial.println("音频系统未就绪，无法播放欢迎语音");
     }
 #else
@@ -861,16 +908,20 @@ void Device::playWelcomeVoice() {
 #endif
 }
 
-String Device::getWelcomeVoiceInfo() {
+String Device::getWelcomeVoiceInfo()
+{
 #ifdef ENABLE_AUDIO
-    if (device_state.audioReady) {
+    if (device_state.audioReady)
+    {
         String info = "当前欢迎语音: ";
         info += audioManager.getWelcomeVoiceDescription();
         info += " (类型: ";
         info += String(static_cast<int>(audioManager.getWelcomeVoiceType()));
         info += ")";
         return info;
-    } else {
+    }
+    else
+    {
         return "音频系统未就绪";
     }
 #else

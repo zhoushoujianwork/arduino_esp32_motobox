@@ -17,6 +17,7 @@
 #include "power/PowerManager.h"
 #include "led/LEDManager.h"
 #include "device.h"
+#include "Air780EG.h"
 
 // 函数声明
 void handleSerialCommand();
@@ -50,9 +51,6 @@ void handleSerialCommand();
 #ifdef USE_AIR780EG_GSM
 // 直接使用新的Air780EG库
 #include <Air780EG.h>
-
-// 全局Air780EG库实例
-Air780EG air780;
 
 #elif defined(USE_ML307_GSM)
 #include "net/Ml307AtModem.h"
@@ -187,7 +185,7 @@ void taskDataProcessing(void *parameter)
     // Air780EG库处理 - 必须在主循环中调用
 #ifdef USE_AIR780EG_GSM
     // 调用新库的主循环（处理URC、网络状态更新、GNSS数据更新等）
-    air780.loop();
+    air780eg.loop();
 #endif
 
     // IMU数据处理
@@ -404,10 +402,10 @@ void handleSerialCommand()
         // 尝试发送AT命令
         Serial.println("发送AT命令测试...");
         if (device_state.gsmReady) {
-          String response = air780.getCore().sendATCommand("AT");
+          String response = air780eg.getCore().sendATCommand("AT");
           Serial.printf("AT响应: %s\n", response.c_str());
           
-          response = air780.getCore().sendATCommand("ATI");
+          response = air780eg.getCore().sendATCommand("ATI");
           Serial.printf("模块信息: %s\n", response.c_str());
         } else {
           Serial.println("模块未就绪，无法测试AT命令");
@@ -427,19 +425,19 @@ void handleSerialCommand()
         Serial.println("=== Air780EG 信息 ===");
         Serial.printf("模块状态: %s\n", device_state.gsmReady ? "就绪" : "未就绪");
         if (device_state.gsmReady) {
-          Serial.printf("网络状态: %s\n", air780.getNetwork().isNetworkRegistered() ? "已连接" : "未连接");
-          Serial.printf("信号强度: %d dBm\n", air780.getNetwork().getSignalStrength());
-          Serial.printf("运营商: %s\n", air780.getNetwork().getOperatorName().c_str());
-          Serial.printf("网络类型: %s\n", air780.getNetwork().getNetworkType().c_str());
-          Serial.printf("IMEI: %s\n", air780.getNetwork().getIMEI().c_str());
+          Serial.printf("网络状态: %s\n", air780eg.getNetwork().isNetworkRegistered() ? "已连接" : "未连接");
+          Serial.printf("信号强度: %d dBm\n", air780eg.getNetwork().getSignalStrength());
+          Serial.printf("运营商: %s\n", air780eg.getNetwork().getOperatorName().c_str());
+          Serial.printf("网络类型: %s\n", air780eg.getNetwork().getNetworkType().c_str());
+          Serial.printf("IMEI: %s\n", air780eg.getNetwork().getIMEI().c_str());
           
           // GNSS信息
-          if (air780.getGNSS().isFixed()) {
+          if (air780eg.getGNSS().isFixed()) {
             Serial.printf("GNSS状态: 已定位\n");
-            Serial.printf("位置: %.6f, %.6f\n", air780.getGNSS().getLatitude(), air780.getGNSS().getLongitude());
-            Serial.printf("卫星数: %d\n", air780.getGNSS().getSatelliteCount());
+            Serial.printf("位置: %.6f, %.6f\n", air780eg.getGNSS().getLatitude(), air780eg.getGNSS().getLongitude());
+            Serial.printf("卫星数: %d\n", air780eg.getGNSS().getSatelliteCount());
           } else {
-            Serial.printf("GNSS状态: 未定位 (卫星数: %d)\n", air780.getGNSS().getSatelliteCount());
+            Serial.printf("GNSS状态: 未定位 (卫星数: %d)\n", air780eg.getGNSS().getSatelliteCount());
           }
         }
       }
@@ -464,7 +462,7 @@ void handleSerialCommand()
         {
           // TODO: 实现基于新库的MQTT调试功能
           Serial.println("MQTT调试功能正在重构中...");
-          air780.printStatus();
+          air780eg.printStatus();
         }
         else
         {
@@ -478,10 +476,10 @@ void handleSerialCommand()
         {
           // TODO: 实现基于新库的LBS功能
           Serial.println("LBS功能正在重构中...");
-          if (air780.getGNSS().isFixed()) {
+          if (air780eg.getGNSS().isFixed()) {
             Serial.printf("当前位置 (GNSS): %.6f, %.6f\n", 
-                         air780.getGNSS().getLatitude(), 
-                         air780.getGNSS().getLongitude());
+                         air780eg.getGNSS().getLatitude(), 
+                         air780eg.getGNSS().getLongitude());
           } else {
             Serial.println("GNSS未定位，无法提供位置信息");
           }
@@ -499,9 +497,9 @@ void handleSerialCommand()
           // TODO: 实现基于新库的LBS AT命令测试
           Serial.println("LBS AT命令测试功能正在重构中...");
           Serial.println("当前网络信息:");
-          Serial.printf("- 网络注册: %s\n", air780.getNetwork().isNetworkRegistered() ? "是" : "否");
-          Serial.printf("- 信号强度: %d dBm\n", air780.getNetwork().getSignalStrength());
-          Serial.printf("- 运营商: %s\n", air780.getNetwork().getOperatorName().c_str());
+          Serial.printf("- 网络注册: %s\n", air780eg.getNetwork().isNetworkRegistered() ? "是" : "否");
+          Serial.printf("- 信号强度: %d dBm\n", air780eg.getNetwork().getSignalStrength());
+          Serial.printf("- 运营商: %s\n", air780eg.getNetwork().getOperatorName().c_str());
         }
         else
         {
@@ -529,13 +527,13 @@ void handleSerialCommand()
 #ifdef USE_AIR780EG_GSM
       if (device_state.gsmReady)
       {
-        Serial.println("网络状态: " + String(air780.getNetwork().isNetworkRegistered() ? "已连接" : "未连接"));
-        Serial.println("信号强度: " + String(air780.getNetwork().getSignalStrength()) + " dBm");
-        Serial.println("运营商: " + air780.getNetwork().getOperatorName());
-        if (air780.getGNSS().isFixed()) {
-          Serial.println("GNSS状态: 已定位 (卫星数: " + String(air780.getGNSS().getSatelliteCount()) + ")");
+        Serial.println("网络状态: " + String(air780eg.getNetwork().isNetworkRegistered() ? "已连接" : "未连接"));
+        Serial.println("信号强度: " + String(air780eg.getNetwork().getSignalStrength()) + " dBm");
+        Serial.println("运营商: " + air780eg.getNetwork().getOperatorName());
+        if (air780eg.getGNSS().isFixed()) {
+          Serial.println("GNSS状态: 已定位 (卫星数: " + String(air780eg.getGNSS().getSatelliteCount()) + ")");
         } else {
-          Serial.println("GNSS状态: 未定位 (卫星数: " + String(air780.getGNSS().getSatelliteCount()) + ")");
+          Serial.println("GNSS状态: 未定位 (卫星数: " + String(air780eg.getGNSS().getSatelliteCount()) + ")");
         }
       }
 #endif
@@ -649,9 +647,9 @@ void handleSerialCommand()
         Serial.println("GSM状态: " + String(device_state.gsmReady ? "就绪" : "未就绪"));
         if (device_state.gsmReady)
         {
-          Serial.println("网络状态: " + String(air780.getNetwork().isNetworkRegistered() ? "已连接" : "未连接"));
-          Serial.println("信号强度: " + String(air780.getNetwork().getSignalStrength()) + " dBm");
-          Serial.println("运营商: " + air780.getNetwork().getOperatorName());
+          Serial.println("网络状态: " + String(air780eg.getNetwork().isNetworkRegistered() ? "已连接" : "未连接"));
+          Serial.println("信号强度: " + String(air780eg.getNetwork().getSignalStrength()) + " dBm");
+          Serial.println("运营商: " + air780eg.getNetwork().getOperatorName());
         }
 #elif defined(ENABLE_WIFI)
         Serial.println("连接方式: WiFi");
@@ -683,9 +681,9 @@ void handleSerialCommand()
         Serial.println("尝试连接MQTT...");
         Serial.println("当前网络状态:");
 #ifdef USE_AIR780EG_GSM
-        Serial.println("- GSM网络: " + String(air780.getNetwork().isNetworkRegistered() ? "就绪" : "未就绪"));
-        Serial.println("- 信号强度: " + String(air780.getNetwork().getSignalStrength()) + " dBm");
-        Serial.println("- 运营商: " + air780.getNetwork().getOperatorName());
+        Serial.println("- GSM网络: " + String(air780eg.getNetwork().isNetworkRegistered() ? "就绪" : "未就绪"));
+        Serial.println("- 信号强度: " + String(air780eg.getNetwork().getSignalStrength()) + " dBm");
+        Serial.println("- 运营商: " + air780eg.getNetwork().getOperatorName());
 #endif
         Serial.println("- MQTT状态: " + String((int)mqttManager.getMqttState()));
 

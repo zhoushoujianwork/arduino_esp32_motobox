@@ -14,11 +14,6 @@
 #define ENABLE_GPS
 #define USE_AIR780EG_GNSS
 
-// MQTT功能完全禁用，专注于GPS功能开发
-// #define ENABLE_MQTT
-// #define USE_AIR780EG_MQTT
-#define DISABLE_MQTT
-
 // 其他基础功能
 #define ENABLE_COMPASS
 #define ENABLE_IMU
