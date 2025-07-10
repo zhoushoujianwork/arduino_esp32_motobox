@@ -5691,16 +5691,8 @@ const uint8_t welcome_voice_data[] = {
 
 const size_t welcome_voice_data_size = sizeof(welcome_voice_data);
 
-// 语音文件信息结构
-struct VoiceInfo {
-    const char* name;
-    const char* description;
-    const uint8_t* data;
-    size_t size;
-    uint32_t sample_rate;
-    uint8_t channels;
-    uint8_t bits_per_sample;
-};
+// 前向声明，避免重复定义
+struct VoiceInfo;
 
 // 语音信息常量
 const VoiceInfo WELCOME_VOICE_DATA_INFO = {

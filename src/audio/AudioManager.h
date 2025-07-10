@@ -28,6 +28,18 @@ enum AudioEvent {
 enum WelcomeVoiceType {
     WELCOME_VOICE_DEFAULT,      // 默认语音："大菠萝车机,扎西德勒"
     WELCOME_VOICE_LIFAN_MOTUO,  // 力帆摩托专用语音
+    WELCOME_VOICE_DADADA,       // 新语音："大大大，大菠萝车机"
+};
+
+// 语音文件信息结构
+struct VoiceInfo {
+    const char* name;
+    const char* description;
+    const uint8_t* data;
+    size_t size;
+    uint32_t sample_rate;
+    uint8_t channels;
+    uint8_t bits_per_sample;
 };
 
 class AudioManager {
