@@ -11,14 +11,12 @@
  */
 
 #include "config.h"
-#include "MQTTTopics.h"
 #include "Arduino.h"
 #include "config.h"
 #include "power/PowerManager.h"
 #include "led/LEDManager.h"
 #include "device.h"
 #include "Air780EG.h"
-
 
 // 函数声明
 void handleSerialCommand();

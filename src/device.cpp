@@ -3,7 +3,6 @@
 #include "config.h"
 #include "tft/TFT.h"
 #include "imu/qmi8658.h"
-#include "MQTTTopics.h"
 // GSM模块包含
 #ifdef USE_AIR780EG_GSM
 #include "Air780EG.h"
@@ -295,9 +294,7 @@ void mqttConnectionCallback(bool connected)
     {
        
         // 订阅控制主题
-        air780eg.getMQTT().subscribe(mqttTopics.getControlTopic(), 1);
-
-        air780eg.getMQTT().publishJSON(mqttTopics.getDeviceInfoTopic(), "1232123123", 0);
+        air780eg.getMQTT().subscribe("vehicle/v1/"+device_state.device_id+"/ctrl/#", 1);
     }
     else
     {
@@ -666,7 +663,7 @@ bool Device::initializeMQTT()
     air780eg.getMQTT().setConnectionCallback(mqttConnectionCallback);
 
     // 添加定时任务
-    air780eg.getMQTT().addScheduledTask("device_status", mqttTopics.getDeviceInfoTopic(), getDeviceStatusJSON, 60, 0, false);
+    air780eg.getMQTT().addScheduledTask("device_status", "vehicle/v1/"+device_state.device_id+"/telemetry/device", getDeviceStatusJSON, 30000, 0, false);
     // air780eg.getMQTT().addScheduledTask("location", mqttTopics.getGPSTopic(), getLocationJSON, 60, 0, false);
     // air780eg.getMQTT().addScheduledTask("system_stats", mqttTopics.getSystemStatusTopic(), getSystemStatsJSON, 60, 0, false);
 
