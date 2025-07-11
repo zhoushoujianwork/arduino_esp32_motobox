@@ -666,7 +666,7 @@ bool Device::initializeMQTT()
     air780eg.getMQTT().setConnectionCallback(mqttConnectionCallback);
 
     // 添加定时任务
-    air780eg.getMQTT().addScheduledTask("device_status", mqttTopics.getDeviceStatusTopic(), getDeviceStatusJSON, 60, 0, false);
+    air780eg.getMQTT().addScheduledTask("device_status", mqttTopics.getDeviceInfoTopic(), getDeviceStatusJSON, 60, 0, false);
     // air780eg.getMQTT().addScheduledTask("location", mqttTopics.getGPSTopic(), getLocationJSON, 60, 0, false);
     // air780eg.getMQTT().addScheduledTask("system_stats", mqttTopics.getSystemStatusTopic(), getSystemStatsJSON, 60, 0, false);
 
