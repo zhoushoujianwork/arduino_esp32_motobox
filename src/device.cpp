@@ -165,44 +165,6 @@ void mqttMessageCallback(const String &topic, const String &payload)
                 Serial.println("休眠时间不能小于0");
             }
         }
-        else if (strcmp(cmd, "gps_debug") == 0)
-        {
-            // {"cmd": "gps_debug", "enable": true}
-            bool enable = doc["enable"].as<bool>();
-            simpleGPS.setDebug(enable);
-            Serial.printf("GPS调试模式: %s\n", enable ? "开启" : "关闭");
-        }
-        // 调试级别控制
-        else if (strcmp(cmd, "set_debug_level") == 0)
-        {
-            // {"cmd": "set_debug_level", "global": 3, "at": 4, "gnss": 3, "mqtt": 3}
-            if (doc.containsKey("global"))
-            {
-                int level = doc["global"].as<int>();
-                DebugManager::setGlobalLevel((DebugLevel)level);
-            }
-            if (doc.containsKey("at"))
-            {
-                int level = doc["at"].as<int>();
-                DebugManager::setATLevel((DebugLevel)level);
-            }
-            if (doc.containsKey("gnss"))
-            {
-                int level = doc["gnss"].as<int>();
-                DebugManager::setGNSSLevel((DebugLevel)level);
-            }
-            if (doc.containsKey("mqtt"))
-            {
-                int level = doc["mqtt"].as<int>();
-                DebugManager::setMQTTLevel((DebugLevel)level);
-            }
-            DebugManager::printCurrentLevels();
-        }
-        // 显示当前调试级别
-        else if (strcmp(cmd, "show_debug_levels") == 0)
-        {
-            DebugManager::printCurrentLevels();
-        }
         // reboot
         else if (strcmp(cmd, "reboot") == 0)
         {
@@ -324,66 +286,30 @@ void mqttConnectionCallback(bool connected)
 {
 #ifndef DISABLE_MQTT
     Serial.printf("MQTT连接状态: %s\n", connected ? "已连接" : "断开");
-
     if (connected)
     {
-        Serial.println("MQTT连接成功，开始配置订阅主题");
-
-        static bool firstConnect = true; // 添加静态变量标记首次连接
-        Serial.printf("首次连接标志: %s\n", firstConnect ? "是" : "否");
-
         // 配置主题
         String baseTopic = String("vehicle/v1/") + device_state.device_id;
         String telemetryTopic = baseTopic + "/telemetry/"; // telemetry: 遥测数据
         Serial.println("基础主题: " + baseTopic);
         Serial.println("遥测主题: " + telemetryTopic);
-
         // 构建具体主题
-        String deviceInfoTopic = telemetryTopic + "device";
-        String gpsTopic = telemetryTopic + "location";
-        String imuTopic = telemetryTopic + "motion";
-        String controlTopic = baseTopic + "/ctrl/#"; // ctrl: 控制命令
+        const String deviceInfoTopic = telemetryTopic + "device";
+        const String deviceStatusTopic = baseTopic + "/status";
+        const String gpsTopic = telemetryTopic + "location";
+        const String imuTopic = telemetryTopic + "motion";
+        const String controlTopic = baseTopic + "/ctrl/#"; // ctrl: 控制命令
 
         Serial.println("设备信息主题: " + deviceInfoTopic);
+        Serial.println("设备状态主题: " + deviceStatusTopic);
         Serial.println("GPS主题: " + gpsTopic);
         Serial.println("IMU主题: " + imuTopic);
         Serial.println("控制命令主题: " + controlTopic);
 
-        if (firstConnect)
-        {
-            Serial.println("执行首次连接初始化...");
-            firstConnect = false;
+        // 订阅控制主题
+        air780eg.getMQTT().subscribe(controlTopic, 1);
 
-            Serial.println("添加发布主题...");
-            mqttManager.addTopic("device_info", deviceInfoTopic.c_str(), 30000);
-            Serial.println("✅ 设备信息主题已添加");
-
-#ifdef ENABLE_IMU
-            // mqttManager.addTopic("imu", imuTopic.c_str(), 1000);
-            Serial.println("IMU主题已跳过（被注释）");
-#endif
-
-            mqttManager.addTopic("gps", gpsTopic.c_str(), 1000);
-            Serial.println("✅ GPS主题已添加");
-
-            // 订阅主题 - 使用QoS=0
-            Serial.println("开始订阅控制命令主题: " + controlTopic);
-            bool subscribeResult = mqttManager.subscribe(controlTopic.c_str(), 0);
-            Serial.printf("订阅结果: %s\n", subscribeResult ? "成功" : "失败");
-
-            if (subscribeResult)
-            {
-                Serial.println("✅ MQTT订阅链路配置完成");
-            }
-            else
-            {
-                Serial.println("❌ MQTT订阅失败，消息接收可能不正常");
-            }
-        }
-        else
-        {
-            Serial.println("非首次连接，跳过主题配置");
-        }
+        air780eg.getMQTT().publishJSON(deviceStatusTopic, "1232123123", 0);
     }
     else
     {
@@ -715,161 +641,62 @@ void Device::initializeGSM()
 #ifdef ENABLE_GNSS
     air780eg.getGNSS().enableGNSS();
 #endif
+
+#ifdef DISABLE_MQTT
+    Serial.println("MQTT功能已禁用");
+#else
+    initializeMQTT();
+#endif
+
 #endif
     //================ GSM模块初始化结束 ================
 }
 
 bool Device::initializeMQTT()
 {
-#ifdef DISABLE_MQTT
-    Serial.println("MQTT功能已禁用");
-    return true;
-#else
-#if (defined(ENABLE_WIFI) || defined(ENABLE_GSM)) && !defined(DISABLE_MQTT)
+
+#if (defined(ENABLE_WIFI) || defined(ENABLE_GSM))
     Serial.println("🔄 开始MQTT初始化...");
 
-    // 创建 MQTT 配置
-    MqttManagerConfig config;
-    // 通用 MQTT 配置
-    config.broker = MQTT_BROKER;
-    config.port = MQTT_PORT;
-
-    // 生成唯一的客户端ID，使用设备ID
-    // [系统] 系统正常启动，硬件版本: esp32-air780eg, 固件版本: v3.4.0+104, 编译时间: Jul  5 2025 15:14:31
-    // 带上硬件版本+固件版本信息
-    config.clientId = "ESP32_" + device_state.device_id + "_" + device_state.device_hardware_version + "_" + device_state.device_firmware_version;
-
-    config.username = MQTT_USER;
-    config.password = MQTT_PASSWORD;
-    config.keepAlive = MQTT_KEEP_ALIVE;
-    config.cleanSession = true; // 是否清除会话，true: 清除，false: 保留
-
-    // 打印MQTT配置信息
-    Serial.println("=== MQTT配置信息 ===");
-    Serial.printf("MQTT服务器: %s\n", config.broker.c_str());
-    Serial.printf("MQTT端口: %d\n", config.port);
-    Serial.printf("MQTT客户端ID: %s\n", config.clientId.c_str());
-    Serial.printf("MQTT用户名: %s\n", config.username.c_str());
-    Serial.printf("MQTT密码: %s\n", config.password.length() > 0 ? "***已设置***" : "***未设置***");
-    Serial.printf("保持连接: %d秒\n", config.keepAlive);
-    Serial.printf("清除会话: %s\n", config.cleanSession ? "是" : "否");
-
 #ifdef USE_AIR780EG_GSM
-    Serial.println("连接方式: Air780EG 4G网络");
+
+    // 配置MQTT连接参数
+    Air780EGMQTTConfig config;
+    config.server = MQTT_BROKER;
+    config.port = MQTT_PORT;
+    config.client_id = MQTT_CLIENT_ID_PREFIX + device_state.device_hardware_version + "_" + device_state.device_id;
+    config.username = MQTT_USERNAME;
+    config.password = MQTT_PASSWORD;
+    config.keepalive = 60;
+    config.clean_session = true;
+    // 初始化MQTT模块
+    if (!air780eg.getMQTT().begin(config))
+    {
+        Serial.println("Failed to initialize MQTT module!");
+        return false;
+    }
+
+    // 设置消息回调函数
+    air780eg.getMQTT().setMessageCallback(mqttMessageCallback);
+
+    // 设置连接状态回调
+    air780eg.getMQTT().setConnectionCallback(mqttConnectionCallback);
+
+    // // 连接到MQTT服务器
+    // if (!air780eg.getMQTT().connect())
+    //     Serial.println("Failed to start MQTT connection, will retry later!");
+
 #elif defined(USE_ML307_GSM)
     Serial.println("连接方式: ML307 4G网络");
 #elif defined(ENABLE_WIFI)
     Serial.println("连接方式: WiFi网络");
 #else
     Serial.println("连接方式: 未定义");
-#endif
-    Serial.println("=== MQTT配置信息结束 ===");
-
-    // 初始化 MQTT 管理器
-    mqttManager.setDebug(MQTT_DEBUG_ENABLED);
-
-    // 根据使用的GSM模块设置调试
-#ifdef USE_AIR780EG_GSM
-    air780eg_modem.setDebug(MQTT_DEBUG_ENABLED);
-#elif defined(USE_ML307_GSM)
-    ml307Mqtt.setDebug(MQTT_DEBUG_ENABLED);
-#endif
-
-    if (!mqttManager.begin(config))
-    {
-        Serial.println("❌ MQTT 初始化失败");
-        return false;
-    }
-
-    Serial.println("✅ MQTT 管理器初始化成功");
-
-    // 设置回调
-    mqttManager.onMessage(mqttMessageCallback);
-    mqttManager.onConnect(mqttConnectionCallback);
-    mqttManager.onMqttState([](MqttState state)
-                            {
-        switch (state) {
-            case MqttState::CONNECTED:
-#ifdef ENABLE_WIFI
-                // WiFi模式下可以同时更新WiFi状态
-                device_state.wifiConnected = true;
-                Serial.println("MQTT连接成功");
-#ifdef ENABLE_AUDIO
-                // 播放WiFi连接成功音
-                if (device_state.audioReady && AUDIO_WIFI_CONNECTED_ENABLED) {
-                    audioManager.playWiFiConnectedSound();
-                }
-#endif
-#else
-                // GSM模式下只更新MQTT状态
-                Serial.println("MQTT连接成功");
-#endif
-                ledManager.setLEDState(LED_BLINK_DUAL);
-                break;
-            case MqttState::DISCONNECTED:
-#ifdef ENABLE_WIFI
-                device_state.wifiConnected = false;
-                Serial.println("MQTT连接断开");
-#else
-                Serial.println("MQTT连接断开");
-#endif
-                ledManager.setLEDState(LED_OFF);
-                break;
-            case MqttState::ERROR:
-#ifdef ENABLE_WIFI
-                device_state.wifiConnected = false;
-                Serial.println("MQTT连接错误");
-#else
-                Serial.println("MQTT连接错误");
-#endif
-                ledManager.setLEDState(LED_BLINK_5_SECONDS);
-                break;
-        } });
-
-    // 等待MQTT连接成功
-    Serial.println("🔄 等待MQTT连接成功...");
-    unsigned long mqttConnectStart = millis();
-    const unsigned long MQTT_CONNECT_TIMEOUT = 30000; // 30秒超时
-    bool mqttConnected = false;
-
-    while (!mqttConnected && (millis() - mqttConnectStart < MQTT_CONNECT_TIMEOUT))
-    {
-        mqttManager.loop(); // 处理MQTT连接
-
-        // 检查连接状态
-        if (mqttManager.isConnected())
-        {
-            mqttConnected = true;
-            Serial.println("✅ MQTT连接成功！");
-            break;
-        }
-
-        // 显示连接进度
-        static unsigned long lastProgress = 0;
-        if (millis() - lastProgress > 2000)
-        {
-            lastProgress = millis();
-            unsigned long elapsed = millis() - mqttConnectStart;
-            Serial.printf("⏳ MQTT连接中... (%lu/%lu秒)\n", elapsed / 1000, MQTT_CONNECT_TIMEOUT / 1000);
-        }
-
-        delay(100); // 短暂延时避免CPU占用过高
-    }
-
-    if (!mqttConnected)
-    {
-        Serial.println("⚠️ MQTT连接超时，将在运行时继续尝试");
-        return false;
-    }
-
-    Serial.println("✅ MQTT初始化完成");
-    return true;
-
-#else
-    Serial.println("⚠️ MQTT功能已禁用");
     return false;
-#endif // ENABLE_WIFI || ENABLE_GSM
-#endif // DISABLE_MQTT
+#endif
+
+#endif
+    return false;
 }
 
 // 欢迎语音配置方法

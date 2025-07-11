@@ -22,11 +22,6 @@
 // 函数声明
 void handleSerialCommand();
 
-// 条件包含 MQTT 管理器头文件
-#if (defined(ENABLE_GSM) || defined(ENABLE_WIFI)) && !defined(DISABLE_MQTT)
-#include "net/MqttManager.h"
-#endif
-
 #ifdef BAT_PIN
 #include "bat/BAT.h"
 #endif
@@ -173,7 +168,6 @@ void taskSystem(void *parameter)
  */
 void taskDataProcessing(void *parameter)
 {
-  extern bool mqttInitialized; // 声明外部全局变量
   Serial.println("[系统] 数据处理任务启动");
 
   // 数据记录相关变量
@@ -237,11 +231,6 @@ void taskDataProcessing(void *parameter)
 #ifdef ENABLE_COMPASS
   // 罗盘数据处理
   compass.loop();
-#endif
-
-  // MQTT 消息处理 - 条件编译
-#ifndef DISABLE_MQTT
-  mqttManager.loop();
 #endif
 
     delay(10); // 增加延时，减少CPU占用
@@ -350,6 +339,32 @@ void loop()
       Serial.println("[严重] 内存严重不足，即将重启系统...");
       delay(1000);
       ESP.restart();
+    }
+
+    // 检查MQTT连接状态
+    if (device_state.gsmReady)
+    {
+      Air780EGMQTTState mqttState = air780eg.getMQTT().getState();
+      const char* stateStr = "未知";
+      switch(mqttState) {
+        case MQTT_DISCONNECTED: stateStr = "未连接"; break;
+        case MQTT_CONNECTING: stateStr = "连接中"; break;
+        case MQTT_CONNECTED: stateStr = "已连接"; break;
+        case MQTT_DISCONNECTING: stateStr = "断开中"; break;
+        case MQTT_ERROR: stateStr = "错误"; break;
+      }
+      Serial.printf("[MQTT] 状态: %s\n", stateStr);
+      
+      if (air780eg.getMQTT().isConnected())
+      {
+        // 尝试发布测试消息
+        bool publishResult = air780eg.getMQTT().publishJSON("vehicle/v1/status", "{\"status\":\"online\"}", 0);
+        Serial.printf("[MQTT] 测试发布结果: %s\n", publishResult ? "成功" : "失败");
+      }
+    }
+    else
+    {
+      Serial.println("[GSM] 模块未就绪，无法进行MQTT操作");
     }
   }
 
@@ -540,24 +555,7 @@ void handleSerialCommand()
 
       // MQTT连接状态和配置信息
 #ifndef DISABLE_MQTT
-      MqttState mqttState = mqttManager.getMqttState();
-      String stateStr = "未知";
-      switch (mqttState)
-      {
-      case MqttState::CONNECTED:
-        stateStr = "✅ 已连接";
-        break;
-      case MqttState::DISCONNECTED:
-        stateStr = "❌ 未连接";
-        break;
-      case MqttState::CONNECTING:
-        stateStr = "🔄 连接中";
-        break;
-      case MqttState::ERROR:
-        stateStr = "⚠️ 错误";
-        break;
-      }
-      Serial.println("MQTT状态: " + stateStr);
+      Serial.println("MQTT状态: " + air780eg.getMQTT().getState());
       Serial.println("MQTT服务器: " + String(MQTT_BROKER) + ":" + String(MQTT_PORT));
 
       // 显示已注册的主题
@@ -640,7 +638,7 @@ void handleSerialCommand()
         Serial.println("=== MQTT状态 ===");
         Serial.println("MQTT服务器: " + String(MQTT_BROKER));
         Serial.println("MQTT端口: " + String(MQTT_PORT));
-        Serial.println("保持连接: " + String(MQTT_KEEP_ALIVE) + "秒");
+        Serial.println("保持连接: " + String(MQTT_KEEPALIVE) + "秒");
 
 #ifdef USE_AIR780EG_GSM
         Serial.println("连接方式: Air780EG GSM");
@@ -655,65 +653,8 @@ void handleSerialCommand()
         Serial.println("连接方式: WiFi");
         Serial.println("WiFi状态: " + String(device_state.wifiConnected ? "已连接" : "未连接"));
 #endif
-
         // MQTT连接状态
-        MqttState mqttState = mqttManager.getMqttState();
-        String stateStr = "未知";
-        switch (mqttState)
-        {
-        case MqttState::CONNECTED:
-          stateStr = "已连接";
-          break;
-        case MqttState::DISCONNECTED:
-          stateStr = "未连接";
-          break;
-        case MqttState::CONNECTING:
-          stateStr = "连接中";
-          break;
-        case MqttState::ERROR:
-          stateStr = "错误";
-          break;
-        }
-        Serial.println("MQTT连接: " + stateStr);
-      }
-      else if (command == "mqtt.connect")
-      {
-        Serial.println("尝试连接MQTT...");
-        Serial.println("当前网络状态:");
-#ifdef USE_AIR780EG_GSM
-        Serial.println("- GSM网络: " + String(air780eg.getNetwork().isNetworkRegistered() ? "就绪" : "未就绪"));
-        Serial.println("- 信号强度: " + String(air780eg.getNetwork().getSignalStrength()) + " dBm");
-        Serial.println("- 运营商: " + air780eg.getNetwork().getOperatorName());
-#endif
-        Serial.println("- MQTT状态: " + String((int)mqttManager.getMqttState()));
-
-        // 强制重新连接
-        bool result = mqttManager.forceReconnect();
-        Serial.println("连接结果: " + String(result ? "成功" : "失败"));
-      }
-      else if (command == "mqtt.test")
-      {
-        Serial.println("发送MQTT测试消息...");
-        MqttState mqttState = mqttManager.getMqttState();
-        if (mqttState == MqttState::CONNECTED)
-        {
-          String testTopic = "device/" + device_state.device_id + "/test";
-          String testMessage = "{\"test\":\"mqtt_test\",\"timestamp\":" + String(millis()) + "}";
-          mqttManager.publish(testTopic.c_str(), testMessage.c_str());
-          Serial.println("测试消息已发送到: " + testTopic);
-        }
-        else
-        {
-          Serial.println("❌ MQTT未连接，无法发送测试消息");
-        }
-      }
-      else if (command == "mqtt.help")
-      {
-        Serial.println("=== MQTT命令帮助 ===");
-        Serial.println("mqtt.status     - 显示MQTT状态");
-        Serial.println("mqtt.connect    - 尝试连接MQTT");
-        Serial.println("mqtt.test       - 发送测试消息");
-        Serial.println("mqtt.help       - 显示此帮助信息");
+        Serial.println("MQTT连接: " + air780eg.getMQTT().getState());
       }
       else
       {

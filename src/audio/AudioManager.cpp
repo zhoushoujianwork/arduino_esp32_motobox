@@ -13,7 +13,7 @@ AudioManager::AudioManager() :
     wsPin(IIS_S_WS_PIN),
     bclkPin(IIS_S_BCLK_PIN), 
     dataPin(IIS_S_DATA_PIN),
-    currentWelcomeVoice(WELCOME_VOICE_DEFAULT) {
+    currentWelcomeVoice(WELCOME_VOICE_DADADA) {
 }
 
 AudioManager::~AudioManager() {
