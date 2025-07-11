@@ -297,7 +297,7 @@ void mqttConnectionCallback(bool connected)
         // 订阅控制主题
         air780eg.getMQTT().subscribe(mqttTopics.getControlTopic(), 1);
 
-        air780eg.getMQTT().publishJSON(mqttTopics.getDeviceStatusTopic(), "1232123123", 0);
+        air780eg.getMQTT().publishJSON(mqttTopics.getDeviceInfoTopic(), "1232123123", 0);
     }
     else
     {
