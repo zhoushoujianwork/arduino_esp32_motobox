@@ -11,13 +11,14 @@
  */
 
 #include "config.h"
-
+#include "MQTTTopics.h"
 #include "Arduino.h"
 #include "config.h"
 #include "power/PowerManager.h"
 #include "led/LEDManager.h"
 #include "device.h"
 #include "Air780EG.h"
+
 
 // 函数声明
 void handleSerialCommand();
@@ -339,32 +340,6 @@ void loop()
       Serial.println("[严重] 内存严重不足，即将重启系统...");
       delay(1000);
       ESP.restart();
-    }
-
-    // 检查MQTT连接状态
-    if (device_state.gsmReady)
-    {
-      Air780EGMQTTState mqttState = air780eg.getMQTT().getState();
-      const char* stateStr = "未知";
-      switch(mqttState) {
-        case MQTT_DISCONNECTED: stateStr = "未连接"; break;
-        case MQTT_CONNECTING: stateStr = "连接中"; break;
-        case MQTT_CONNECTED: stateStr = "已连接"; break;
-        case MQTT_DISCONNECTING: stateStr = "断开中"; break;
-        case MQTT_ERROR: stateStr = "错误"; break;
-      }
-      Serial.printf("[MQTT] 状态: %s\n", stateStr);
-      
-      if (air780eg.getMQTT().isConnected())
-      {
-        // 尝试发布测试消息
-        bool publishResult = air780eg.getMQTT().publishJSON("vehicle/v1/status", "{\"status\":\"online\"}", 0);
-        Serial.printf("[MQTT] 测试发布结果: %s\n", publishResult ? "成功" : "失败");
-      }
-    }
-    else
-    {
-      Serial.println("[GSM] 模块未就绪，无法进行MQTT操作");
     }
   }
 

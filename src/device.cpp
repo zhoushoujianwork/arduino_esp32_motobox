@@ -3,7 +3,7 @@
 #include "config.h"
 #include "tft/TFT.h"
 #include "imu/qmi8658.h"
-
+#include "MQTTTopics.h"
 // GSM模块包含
 #ifdef USE_AIR780EG_GSM
 #include "Air780EG.h"
@@ -26,7 +26,6 @@ extern const VersionInfo &getVersionInfo();
 
 device_state_t device_state;
 state_changes_t state_changes;
-
 void print_device_info()
 {
     // 如果休眠倒计时的时候不打印
@@ -79,6 +78,7 @@ void set_device_state(device_state_t *state)
     device_state = *state;
 }
 
+
 // 生成精简版设备状态JSON
 // fw: 固件版本, hw: 硬件版本, wifi/ble/gps/imu/compass: 各模块状态, bat_v: 电池电压, bat_pct: 电池百分比, is_charging: 充电状态, ext_power: 外部电源状态, sd: SD卡状态
 String device_state_to_json(device_state_t *state)
@@ -104,6 +104,11 @@ String device_state_to_json(device_state_t *state)
     }
     doc["audio"] = device_state.audioReady;
     return doc.as<String>();
+}
+
+// 添加包装函数
+String getDeviceStatusJSON() {
+    return device_state_to_json(&device_state);
 }
 
 void mqttMessageCallback(const String &topic, const String &payload)
@@ -288,28 +293,11 @@ void mqttConnectionCallback(bool connected)
     Serial.printf("MQTT连接状态: %s\n", connected ? "已连接" : "断开");
     if (connected)
     {
-        // 配置主题
-        String baseTopic = String("vehicle/v1/") + device_state.device_id;
-        String telemetryTopic = baseTopic + "/telemetry/"; // telemetry: 遥测数据
-        Serial.println("基础主题: " + baseTopic);
-        Serial.println("遥测主题: " + telemetryTopic);
-        // 构建具体主题
-        const String deviceInfoTopic = telemetryTopic + "device";
-        const String deviceStatusTopic = baseTopic + "/status";
-        const String gpsTopic = telemetryTopic + "location";
-        const String imuTopic = telemetryTopic + "motion";
-        const String controlTopic = baseTopic + "/ctrl/#"; // ctrl: 控制命令
-
-        Serial.println("设备信息主题: " + deviceInfoTopic);
-        Serial.println("设备状态主题: " + deviceStatusTopic);
-        Serial.println("GPS主题: " + gpsTopic);
-        Serial.println("IMU主题: " + imuTopic);
-        Serial.println("控制命令主题: " + controlTopic);
-
+       
         // 订阅控制主题
-        air780eg.getMQTT().subscribe(controlTopic, 1);
+        air780eg.getMQTT().subscribe(mqttTopics.getControlTopic(), 1);
 
-        air780eg.getMQTT().publishJSON(deviceStatusTopic, "1232123123", 0);
+        air780eg.getMQTT().publishJSON(mqttTopics.getDeviceStatusTopic(), "1232123123", 0);
     }
     else
     {
@@ -426,12 +414,7 @@ void Device::begin()
     ml307_at.setDebug(true);
     ml307_at.begin(115200);
 #endif
-
     initializeGSM();
-
-    // 暂时禁用MQTT初始化
-    // initializeMQTT();
-
 #endif
     Serial.println("GPS初始化已延迟到任务中!");
 
@@ -681,6 +664,11 @@ bool Device::initializeMQTT()
 
     // 设置连接状态回调
     air780eg.getMQTT().setConnectionCallback(mqttConnectionCallback);
+
+    // 添加定时任务
+    air780eg.getMQTT().addScheduledTask("device_status", mqttTopics.getDeviceStatusTopic(), getDeviceStatusJSON, 60, 0, false);
+    // air780eg.getMQTT().addScheduledTask("location", mqttTopics.getGPSTopic(), getLocationJSON, 60, 0, false);
+    // air780eg.getMQTT().addScheduledTask("system_stats", mqttTopics.getSystemStatusTopic(), getSystemStatsJSON, 60, 0, false);
 
     // // 连接到MQTT服务器
     // if (!air780eg.getMQTT().connect())

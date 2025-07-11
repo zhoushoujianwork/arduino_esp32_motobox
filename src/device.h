@@ -114,7 +114,6 @@ public:
     String getWelcomeVoiceInfo();
     
 private:
-    
 };
 
 extern Device device;
