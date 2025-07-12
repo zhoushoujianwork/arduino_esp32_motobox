@@ -1,5 +1,4 @@
 #include "ble_client.h"
-#include "../gps/GPSData.h"
 
 void scanEndedCB(NimBLEScanResults results);
 
@@ -353,9 +352,9 @@ void BLEC::loop()
             try
             {
                 std::string value = pRemoteGPSCharacteristic->readValue();
-                if (value.length() == sizeof(gps_data_t))
+                if (value.length() == sizeof(air780eg.getGNSS().gnss_data))
                 {
-                    memcpy(&gps_data, value.data(), sizeof(gps_data));
+                    memcpy(&air780eg.getGNSS().gnss_data, value.data(), sizeof(air780eg.getGNSS().gnss_data));
                 }
             }
             catch (const std::exception &e)

@@ -4,16 +4,15 @@
 #include <Arduino.h>
 #include "esp_system.h"
 #include <ArduinoJson.h>
-#include "compass/Compass.h"
 #include "config.h"
 #include "version.h"  // 包含版本信息头文件
+#include "compass/Compass.h"
 #include "led/PWMLED.h"
 #include "led/LED.h"
 #include "imu/qmi8658.h"
 #include "power/PowerManager.h"
 #include "ble/ble_client.h"
 #include "ble/ble_server.h"
-#include "compass/Compass.h"
 #include "bat/BAT.h"
 // MQTT管理器已完全禁用
 // #ifndef DISABLE_MQTT

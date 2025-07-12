@@ -6,6 +6,7 @@
 #include "imu/qmi8658.h"
 #include "compass/Compass.h"
 #include <algorithm> // 为了使用 std::transform
+#include "Air780EG.h"
 
 class BLEC
 {

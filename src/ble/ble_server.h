@@ -7,6 +7,7 @@
 #include "imu/qmi8658.h"
 #include "power/PowerManager.h"
 #include "wifi/server.h"
+#include "Air780EG.h"
 
 // 胎压数据结构
 struct TirePressureData {

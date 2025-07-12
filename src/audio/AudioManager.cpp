@@ -7,6 +7,8 @@
 
 static const char* TAG = "AudioManager";
 
+AudioManager audioManager;
+
 AudioManager::AudioManager() : 
     initialized(false), 
     playing(false),

@@ -27,9 +27,7 @@ class GpsCharacteristicCallbacks : public NimBLECharacteristicCallbacks
 {
     void onRead(NimBLECharacteristic *pGPSCharacteristic)
     {
-        // 获取SimpleGPS数据
-        // gps_data_t currentGpsData = simpleGPS.getGPSData();
-        // pGPSCharacteristic->setValue((uint8_t *)&currentGpsData, sizeof(currentGpsData));
+        pGPSCharacteristic->setValue((uint8_t *)&air780eg.getGNSS().gnss_data, sizeof(air780eg.getGNSS().gnss_data));
     }
 };
 #endif

@@ -120,4 +120,6 @@ private:
     bool canPlaySound(unsigned long& lastPlayTime);
 };
 
+extern AudioManager audioManager;
+
 #endif // AUDIOMANAGER_H
