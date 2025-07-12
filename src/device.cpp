@@ -76,7 +76,6 @@ void set_device_state(device_state_t *state)
     device_state = *state;
 }
 
-
 // 生成精简版设备状态JSON
 // fw: 固件版本, hw: 硬件版本, wifi/ble/gps/imu/compass: 各模块状态, bat_v: 电池电压, bat_pct: 电池百分比, is_charging: 充电状态, ext_power: 外部电源状态, sd: SD卡状态
 String device_state_to_json(device_state_t *state)
@@ -105,16 +104,24 @@ String device_state_to_json(device_state_t *state)
 }
 
 // 添加包装函数
-String getDeviceStatusJSON() {
+String getDeviceStatusJSON()
+{
     return device_state_to_json(&device_state);
 }
 
-String getLocationJSON() {
+String getLocationJSON()
+{
     // 如果 gnss 定位差，则走wifi 和 lbs 获取定位
     if (!air780eg.getGNSS().isDataValid())
     {
-        if (!air780eg.getGNSS().updateWIFILocation())
-            air780eg.getGNSS().updateLBS();
+        // 每2分钟一次定位，因为这个定位比较耗时
+        static unsigned long lastUpdateTime = 0;
+        if (millis() - lastUpdateTime > 60000*2)
+        {
+            lastUpdateTime = millis();
+            if (!air780eg.getGNSS().updateWIFILocation())
+                air780eg.getGNSS().updateLBS();
+        }
     }
     return air780eg.getGNSS().getLocationJSON();
 }
@@ -146,26 +153,22 @@ void mqttMessageCallback(const String &topic, const String &payload)
     {
         Serial.printf("收到命令: %s\n", cmd);
         Serial.println("开始执行命令处理...");
+#ifdef ENABLE_WIFI
 
         if (strcmp(cmd, "enter_ap_mode") == 0)
         {
-#ifdef ENABLE_WIFI
             wifiManager.enterAPMode();
-#endif
         }
         else if (strcmp(cmd, "exit_ap_mode") == 0)
         {
-#ifdef ENABLE_WIFI
             wifiManager.exitAPMode();
-#endif
         }
         else if (strcmp(cmd, "reset_wifi") == 0)
         {
-#ifdef ENABLE_WIFI
             wifiManager.reset();
-#endif
         }
-        else if (strcmp(cmd, "set_sleep_time") == 0)
+#endif
+        if (strcmp(cmd, "set_sleep_time") == 0)
         {
             // {"cmd": "set_sleep_time", "sleep_time": 300}
             int sleepTime = doc["sleep_time"].as<int>();
@@ -179,113 +182,23 @@ void mqttMessageCallback(const String &topic, const String &payload)
             }
         }
         // reboot
-        else if (strcmp(cmd, "reboot") == 0)
+        else if (strcmp(cmd, "reboot") == 0 || strcmp(cmd, "restart") == 0)
         {
             Serial.println("重启设备");
             ESP.restart();
         }
 #ifdef ENABLE_SDCARD
         // 格式化存储卡
-        else if (strcmp(cmd, "format_sdcard") == 0)
+        if (strcmp(cmd, "format_sdcard") == 0)
         {
             Serial.println("格式化存储卡");
             if (!sdManager.handleSerialCommand("yes_format"))
             {
                 Serial.println("格式化存储卡失败");
             }
-            // if (!sdManager.handleSerialCommand("sd_repair"))
-            // {
-            //     Serial.println("修复存储卡失败");
-            // }
-            // if (!sdManager.handleSerialCommand("sd_format"))
-            // {
-            //     Serial.println("格式化存储卡失败");
-            // }
         }
 #endif
-#ifdef ENABLE_AUDIO
-        // 音频测试
-        else if (strcmp(cmd, "audio_test") == 0)
-        {
-            Serial.println("执行音频测试");
-            if (device_state.audioReady)
-            {
-                audioManager.testAudio();
-            }
-            else
-            {
-                Serial.println("音频系统未就绪");
-            }
-        }
-        // 播放自定义音频
-        else if (strcmp(cmd, "play_audio") == 0)
-        {
-            // {"cmd": "play_audio", "event": "boot_success"}
-            const char *event = doc["event"];
-            if (event && device_state.audioReady)
-            {
-                if (strcmp(event, "boot_success") == 0)
-                {
-                    audioManager.playBootSuccessSound();
-                }
-                else if (strcmp(event, "welcome") == 0)
-                {
-                    audioManager.playWelcomeVoice();
-                }
-                else if (strcmp(event, "wifi_connected") == 0)
-                {
-                    audioManager.playWiFiConnectedSound();
-                }
-                else if (strcmp(event, "gps_fixed") == 0)
-                {
-                    audioManager.playGPSFixedSound();
-                }
-                else if (strcmp(event, "low_battery") == 0)
-                {
-                    audioManager.playLowBatterySound();
-                }
-                else if (strcmp(event, "sleep_mode") == 0)
-                {
-                    audioManager.playSleepModeSound();
-                }
-                else if (strcmp(event, "custom") == 0)
-                {
-                    float frequency = doc["frequency"] | 1000.0;
-                    int duration = doc["duration"] | 200;
-                    audioManager.playCustomBeep(frequency, duration);
-                }
-                Serial.printf("播放音频事件: %s\n", event);
-            }
-            else
-            {
-                Serial.println("音频系统未就绪或事件参数无效");
-            }
-        }
-        // 设置欢迎语音类型
-        else if (strcmp(cmd, "set_welcome_voice") == 0)
-        {
-            // {\"cmd\": \"set_welcome_voice\", \"type\": 0}  // 0=默认, 1=力帆摩托
-            int voiceType = doc["type"] | 0;
-            device.setWelcomeVoiceType(voiceType);
-            Serial.printf("设置欢迎语音类型: %d\n", voiceType);
-        }
-        // 播放欢迎语音
-        else if (strcmp(cmd, "play_welcome_voice") == 0)
-        {
-            device.playWelcomeVoice();
-        }
-        // 获取欢迎语音信息
-        else if (strcmp(cmd, "get_welcome_voice_info") == 0)
-        {
-            String info = device.getWelcomeVoiceInfo();
-            Serial.println(info);
-        }
-        else
-        {
-            Serial.println("⚠️ 未知命令: " + String(cmd));
-        }
         Serial.println("✅ 命令处理完成");
-#endif
     }
     else
     {
@@ -301,9 +214,8 @@ void mqttConnectionCallback(bool connected)
     Serial.printf("MQTT连接状态: %s\n", connected ? "已连接" : "断开");
     if (connected)
     {
-       
         // 订阅控制主题
-        air780eg.getMQTT().subscribe("vehicle/v1/"+device_state.device_id+"/ctrl/#", 1);
+        air780eg.getMQTT().subscribe("vehicle/v1/" + device_state.device_id + "/ctrl/#", 1);
     }
     else
     {
@@ -477,14 +389,24 @@ void update_device_state()
                             String(device_state.battery_percentage).c_str());
         state_changes.battery_changed = true;
 
+        if (device_state.battery_percentage <= 20)
+        {
+            ledManager.setLEDState(LED_ON, LED_COLOR_RED, 5);
+        }
+        else
+        {
+            ledManager.setLEDState(LED_BREATH, LED_COLOR_GREEN, 5);
+        }
+
 #ifdef ENABLE_AUDIO
         // 当电池电量降到20%以下时播放低电量警告音（避免频繁播放）
         if (device_state.battery_percentage <= 20 &&
-            last_state.battery_percentage > 20 &&
-            device_state.audioReady &&
-            AUDIO_LOW_BATTERY_ENABLED)
+            last_state.battery_percentage > 20)
         {
+            if (device_state.audioReady){
+            Serial.println("[音频] 播放低电量警告音");
             audioManager.playLowBatterySound();
+            }
         }
 #endif
     }
@@ -507,14 +429,6 @@ void update_device_state()
                             device_state.wifiConnected ? "已连接" : "未连接");
         state_changes.wifi_changed = true;
     }
-#else
-    if (device_state.gsmReady != last_state.gsmReady)
-    {
-        notify_state_change("4G连接",
-                            last_state.gsmReady ? "已连接" : "未连接",
-                            device_state.gsmReady ? "已连接" : "未连接");
-        state_changes.gsm_changed = true;
-    }
 #endif
 
     // 检查BLE状态变化
@@ -524,15 +438,6 @@ void update_device_state()
                             last_state.bleConnected ? "已连接" : "未连接",
                             device_state.bleConnected ? "已连接" : "未连接");
         state_changes.ble_changed = true;
-    }
-
-    // 检查GPS状态变化 - 使用GPS管理器
-    if (device_state.gsmReady != last_state.gsmReady)
-    {
-        notify_state_change("GNSS状态",
-                            last_state.gsmReady ? "就绪" : "未就绪",
-                            device_state.gsmReady ? "就绪" : "未就绪");
-        device_state.gsmReady = device_state.gsmReady;
     }
 
 #ifdef ENABLE_GSM
@@ -670,8 +575,8 @@ bool Device::initializeMQTT()
     air780eg.getMQTT().setConnectionCallback(mqttConnectionCallback);
 
     // 添加定时任务
-    air780eg.getMQTT().addScheduledTask("device_status", "vehicle/v1/"+device_state.device_id+"/telemetry/device", getDeviceStatusJSON, 30000, 0, false);
-    air780eg.getMQTT().addScheduledTask("location", "vehicle/v1/"+device_state.device_id+"/telemetry/location", getLocationJSON, 1000, 0, false);
+    air780eg.getMQTT().addScheduledTask("device_status", "vehicle/v1/" + device_state.device_id + "/telemetry/device", getDeviceStatusJSON, 30000, 0, false);
+    air780eg.getMQTT().addScheduledTask("location", "vehicle/v1/" + device_state.device_id + "/telemetry/location", getLocationJSON, 1000, 0, false);
     // air780eg.getMQTT().addScheduledTask("system_stats", mqttTopics.getSystemStatusTopic(), getSystemStatsJSON, 60, 0, false);
 
     // // 连接到MQTT服务器
@@ -689,61 +594,4 @@ bool Device::initializeMQTT()
 
 #endif
     return false;
-}
-
-// 欢迎语音配置方法
-void Device::setWelcomeVoiceType(int voiceType)
-{
-#ifdef ENABLE_AUDIO
-    if (device_state.audioReady)
-    {
-        WelcomeVoiceType type = static_cast<WelcomeVoiceType>(voiceType);
-        audioManager.setWelcomeVoiceType(type);
-        Serial.printf("欢迎语音类型已设置为: %s\n", audioManager.getWelcomeVoiceDescription());
-    }
-    else
-    {
-        Serial.println("音频系统未就绪，无法设置欢迎语音类型");
-    }
-#else
-    Serial.println("音频功能已禁用");
-#endif
-}
-
-void Device::playWelcomeVoice()
-{
-#ifdef ENABLE_AUDIO
-    if (device_state.audioReady)
-    {
-        audioManager.playWelcomeVoice();
-        Serial.printf("播放欢迎语音: %s\n", audioManager.getWelcomeVoiceDescription());
-    }
-    else
-    {
-        Serial.println("音频系统未就绪，无法播放欢迎语音");
-    }
-#else
-    Serial.println("音频功能已禁用");
-#endif
-}
-
-String Device::getWelcomeVoiceInfo()
-{
-#ifdef ENABLE_AUDIO
-    if (device_state.audioReady)
-    {
-        String info = "当前欢迎语音: ";
-        info += audioManager.getWelcomeVoiceDescription();
-        info += " (类型: ";
-        info += String(static_cast<int>(audioManager.getWelcomeVoiceType()));
-        info += ")";
-        return info;
-    }
-    else
-    {
-        return "音频系统未就绪";
-    }
-#else
-    return "音频功能已禁用";
-#endif
 }

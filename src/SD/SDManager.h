@@ -16,6 +16,9 @@
 #define FIRMWARE_VERSION "2.3.0"
 #endif
 
+#include "Air780EG.h"
+#include "Air780EGGNSS.h"
+
 class SDManager {
 public:
     SDManager();
@@ -32,7 +35,7 @@ public:
 
     // 核心功能
     bool saveDeviceInfo();
-    bool recordGPSData(double latitude, double longitude, double altitude = 0.0, float speed = 0.0, int satellites = 0);
+    bool recordGPSData(gnss_data_t &gnss_data);
     bool finishGPSSession();
 
     // 串口命令处理

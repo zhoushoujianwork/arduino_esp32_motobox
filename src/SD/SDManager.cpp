@@ -257,15 +257,9 @@ bool SDManager::saveDeviceInfo() {
     return true;
 }
 
-bool SDManager::recordGPSData(double latitude, double longitude, double altitude, float speed, int satellites) {
+bool SDManager::recordGPSData(gnss_data_t &gnss_data) {
     if (!_initialized) {
         debugPrint("⚠️ SD卡未初始化，无法记录GPS数据");
-        return false;
-    }
-
-    // 验证GPS数据有效性
-    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-        debugPrint("⚠️ GPS数据无效: lat=" + String(latitude, 6) + ", lon=" + String(longitude, 6));
         return false;
     }
 
@@ -352,13 +346,13 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
     gpsFeature += "      \"type\": \"Feature\",\n";
     gpsFeature += "      \"geometry\": {\n";
     gpsFeature += "        \"type\": \"Point\",\n";
-    gpsFeature += "        \"coordinates\": [" + String(longitude, 6) + ", " + String(latitude, 6) + ", " + String(altitude, 2) + "]\n";
+    gpsFeature += "        \"coordinates\": [" + String(gnss_data.longitude, 6) + ", " + String(gnss_data.latitude, 6) + ", " + String(gnss_data.altitude, 2) + "]\n";
     gpsFeature += "      },\n";
     gpsFeature += "      \"properties\": {\n";
     gpsFeature += "        \"timestamp\": \"" + getCurrentTimestamp() + "\",\n";
     gpsFeature += "        \"runtime_ms\": " + String(millis()) + ",\n";
-    gpsFeature += "        \"speed_kmh\": " + String(speed, 2) + ",\n";
-    gpsFeature += "        \"satellites\": " + String(satellites) + ",\n";
+    gpsFeature += "        \"speed_kmh\": " + String(gnss_data.speed, 2) + ",\n";
+    gpsFeature += "        \"satellites\": " + String(gnss_data.satellites) + ",\n";
     gpsFeature += "        \"hdop\": 0.0\n";  // 可以后续添加HDOP数据
     gpsFeature += "      }\n";
     gpsFeature += "    }";
@@ -373,7 +367,7 @@ bool SDManager::recordGPSData(double latitude, double longitude, double altitude
         return false;
     }
 
-    debugPrint("📍 GPS数据已记录: " + String(latitude, 6) + "," + String(longitude, 6) + " (卫星:" + String(satellites) + ")");
+    debugPrint("📍 GPS数据已记录: " + String(gnss_data.latitude, 6) + "," + String(gnss_data.longitude, 6) + " (卫星:" + String(gnss_data.satellites) + ")");
     return true;
 }
 
@@ -598,7 +592,7 @@ bool SDManager::handleSerialCommand(const String& command) {
         Serial.println("测试数据: 北京天安门广场坐标");
         Serial.println("当前会话文件: " + generateGPSSessionFilename());
         
-        bool result = recordGPSData(39.9042, 116.4074, 50.0, 25.5, 8);
+        bool result = recordGPSData(air780eg.getGNSS().gnss_data);
         
         if (result) {
             Serial.println("✅ GPS数据记录测试成功");

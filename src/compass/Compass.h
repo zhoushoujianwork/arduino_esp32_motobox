@@ -159,7 +159,6 @@ public:
 private:
     int _sda;
     int _scl;
-    bool _debug;
     bool _initialized;
     TwoWire& _wire;              // 使用 Wire1 作为 I2C 总线（与IMU共享）
     float _declination;          // 磁偏角校正值
@@ -170,7 +169,6 @@ private:
     // 数据处理函数
     float calculateHeading(int16_t x, int16_t y);
     void updateCompassData(int16_t x, int16_t y, int16_t z, float heading);
-    void debugPrint(const String& message);
 };
 
 #ifdef ENABLE_COMPASS

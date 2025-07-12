@@ -186,23 +186,13 @@ void taskDataProcessing(void *parameter)
 
     // 记录GPS数据
     if (device_state.gnssReady && device_state.sdCardReady &&
-        currentTime - lastGNSSRecordTime >= GNSS_RECORD_INTERVAL)
+        currentTime - lastGNSSRecordTime >= 1000)
     {
       lastGNSSRecordTime = currentTime;
 
-      // 获取GPS数据
-      gps_data_t &gpsData = gps_data;
-
-      // 获取当前时间作为时间戳
-      char timestamp[32];
-      sprintf(timestamp, "%04d-%02d-%02d %02d:%02d:%02d",
-              gpsData.year, gpsData.month, gpsData.day,
-              gpsData.hour, gpsData.minute, gpsData.second);
-
       // 记录到SD卡
       sdManager.recordGPSData(
-          gpsData.latitude, gpsData.longitude, gpsData.altitude,
-          gpsData.speed, gpsData.satellites);
+          air780eg.getGNSS().gnss_data);
     }
 #endif
 

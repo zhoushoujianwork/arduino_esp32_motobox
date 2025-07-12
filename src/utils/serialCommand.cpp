@@ -12,14 +12,6 @@ void handleSerialCommand()
     if (command.length() > 0)
     {
         Serial.println(">>> 收到命令: " + command);
-
-#ifdef ENABLE_SDCARD
-        // SD卡相关命令
-        if (command.startsWith("sd."))
-        {
-            sdManager.handleSerialCommand(command);
-        }
-#endif
         if (command == "info")
         {
             Serial.println("=== 设备信息 ===");
@@ -280,18 +272,6 @@ void handleSerialCommand()
             Serial.println("  sd.session - 显示当前GPS会话信息");
             Serial.println("  sd.finish  - 结束当前GPS会话");
             Serial.println("  sd.dirs    - 检查和创建目录结构");
-            Serial.println("");
-#endif
-#ifdef USE_AIR780EG_GSM
-            Serial.println("Air780EG命令:");
-            Serial.println("  gsm.test   - 测试AT命令和波特率");
-            Serial.println("  gsm.reset  - 重置Air780EG模块");
-            Serial.println("  gsm.info   - 显示模块状态信息");
-            Serial.println("  gsm.mqtt   - 测试MQTT功能支持");
-            Serial.println("  gsm.mqtt.debug - MQTT连接详细调试");
-            Serial.println("  gsm.lbs    - LBS基站定位调试");
-            Serial.println("  gsm.lbs.test - LBS AT命令测试");
-            Serial.println("  gps.status - SimpleGPS 状态查询");
             Serial.println("");
 #endif
             Serial.println("提示: 命令不区分大小写");

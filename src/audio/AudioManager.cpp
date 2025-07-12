@@ -255,6 +255,7 @@ bool AudioManager::playCustomBeep(float frequency, int duration) {
 }
 
 bool AudioManager::playAudioEvent(AudioEvent event) {
+    ESP_LOGI(TAG, "Playing audio event: %d", event);
     switch (event) {
         case AUDIO_EVENT_BOOT_SUCCESS:
             return playBootSuccessSound();
@@ -459,50 +460,7 @@ bool AudioManager::playWelcomeVoice(WelcomeVoiceType voiceType) {
     
     // 如果都失败，播放替代的音调序列
     ESP_LOGW(TAG, "Voice playback failed, using tone sequence fallback");
-    
-    // 根据语音类型播放不同的音调序列
-    if (voiceType == WELCOME_VOICE_LIFAN_MOTUO) {
-        // 力帆摩托专用音调序列 - 更加激昂的音调
-        const float frequencies[] = {
-            659.25,  // E5 - 力
-            698.46,  // F5 - 帆
-            783.99,  // G5 - 摩
-            880.00,  // A5 - 托
-            100,     // 停顿
-            1046.50, // C6 - 扎
-            1174.66, // D6 - 西
-            1318.51, // E6 - 德
-            1396.91, // F6 - 勒
-        };
-        
-        const int durations[] = {
-            350, 350, 400, 500,  // 力帆摩托
-            200,                  // 停顿
-            300, 300, 300, 700   // 扎西德勒
-        };
-        
-        return playBeepSequence(frequencies, durations, 9, 0.7);
-    } else {
-        // 默认音调序列 - 原有的"大菠萝车机,扎西德勒"
-        const float frequencies[] = {
-            523.25,  // C5 - 大
-            587.33,  // D5 - 菠
-            659.25,  // E5 - 萝
-            698.46,  // F5 - 车
-            783.99,  // G5 - 机
-            100,     // 停顿
-            880.00,  // A5 - 扎
-            987.77,  // B5 - 西
-            1046.50, // C6 - 德
-            1174.66, // D6 - 勒
-        };
-        
-        const int durations[] = {
-            300, 300, 400, 300, 500,  // 大菠萝车机
-            200,                       // 停顿
-            300, 300, 300, 600        // 扎西德勒
-        };
-        
-        return playBeepSequence(frequencies, durations, 10, 0.6);
-    }
+    const float frequencies[] = {1000.0, 1000.0, 1000.0};
+    const int durations[] = {100, 100, 100};
+    return playBeepSequence(frequencies, durations, 10, 0.6);
 }

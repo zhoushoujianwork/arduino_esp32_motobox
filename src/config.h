@@ -31,7 +31,6 @@
 
 // 音频配置
 #define AUDIO_BOOT_SUCCESS_ENABLED    true
-#define AUDIO_LOW_BATTERY_ENABLED     true
 #define AUDIO_GPS_FIXED_ENABLED       true
 
 

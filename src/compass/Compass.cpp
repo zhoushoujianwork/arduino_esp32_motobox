@@ -1,19 +1,12 @@
 #include "compass/Compass.h"
 
+// TAG
+static const char *TAG = "Compass";
+
+
 #ifdef ENABLE_COMPASS
-// 使用与IMU相同的I2C引脚
-#ifdef IMU_SDA_PIN
-Compass compass(IMU_SDA_PIN, IMU_SCL_PIN);
-#else
 // 如果没有定义IMU引脚，使用GPS_COMPASS引脚作为备选
-#ifdef GPS_COMPASS_SDA
 Compass compass(GPS_COMPASS_SDA, GPS_COMPASS_SCL);
-#else
-// 默认引脚
-Compass compass(33, 32);
-#endif
-#endif
-#endif
 
 // 初始化全局罗盘数据
 compass_data_t compass_data = {
@@ -69,11 +62,11 @@ const char* getDirectionCN(float heading) {
 
 void printCompassData() {
     if (!compass_data.isValid) {
-        Serial.println("[罗盘] 数据无效");
+        ESP_LOGI(TAG, "数据无效");
         return;
     }
     
-    Serial.printf("[罗盘] 航向: %.2f° (%.3f rad), 方向: %s (%s, %s), 磁场: X=%.2f Y=%.2f Z=%.2f\n", 
+    ESP_LOGI(TAG, "航向: %.2f° (%.3f rad), 方向: %s (%s, %s), 磁场: X=%.2f Y=%.2f Z=%.2f", 
         compass_data.heading, 
         compass_data.headingRadians,
         compass_data.directionStr, 
@@ -87,8 +80,7 @@ void printCompassData() {
 /**
  * @brief QMC5883L 罗盘传感器驱动实现
  */
-Compass::Compass(int sda, int scl) : _wire(Wire1) {
-    _debug = true;
+Compass::Compass(int sda, int scl) : _wire(Wire) {
     _sda = sda;
     _scl = scl;
     _declination = -6.5f;  // 默认磁偏角，需要根据地理位置调整
@@ -97,18 +89,8 @@ Compass::Compass(int sda, int scl) : _wire(Wire1) {
     _lastDebugPrintTime = 0;
 }
 
-void Compass::setDebug(bool debug) {
-    _debug = debug;
-}
-
-void Compass::debugPrint(const String& message) {
-    if (_debug) {
-        Serial.println("[罗盘] " + message);
-    }
-}
-
 bool Compass::begin() {
-    debugPrint(String("初始化: SDA=") + _sda + ", SCL=" + _scl + ", 磁偏角=" + _declination);
+    debugPrint(String("初始化: SDA=") + _sda + ", SCL=" + _scl + ", 磁偏角=" + String(_declination));
     
     // 先确保 Wire 是干净的
     _wire.end();
@@ -117,10 +99,10 @@ bool Compass::begin() {
     // 初始化I2C
     bool wireBeginSuccess = _wire.begin(_sda, _scl);
     if (!wireBeginSuccess) {
-        debugPrint("Wire.begin() 失败!");
+        ESP_LOGE(TAG, "Wire.begin() 失败!");
         return false;
     }
-    debugPrint("Wire.begin() 成功");
+    ESP_LOGI(TAG, "Wire.begin() 成功");
 
     delay(100);  // 给一些初始化时间
     
@@ -132,7 +114,7 @@ bool Compass::begin() {
     _initialized = true;
     device_state.compassReady = true;
     
-    debugPrint("初始化完成");
+    ESP_LOGI(TAG, "初始化完成");
     return true;
 }
 
@@ -192,13 +174,13 @@ const char* Compass::getCurrentDirectionCN() {
 
 bool Compass::calibrate() {
     if (!_initialized) {
-        debugPrint("罗盘未初始化，无法校准");
+        ESP_LOGE(TAG, "罗盘未初始化，无法校准");
         return false;
     }
     
-    debugPrint("开始校准，请旋转模块...");
+    ESP_LOGI(TAG, "开始校准，请旋转模块...");
     qmc.calibrate();
-    debugPrint("校准完成，请将以下参数写入代码：");
+    ESP_LOGI(TAG, "校准完成，请将以下参数写入代码：");
     
     Serial.printf("qmc.setCalibrationOffsets(%d, %d, %d);\n",
         qmc.getCalibrationOffset(0), qmc.getCalibrationOffset(1), qmc.getCalibrationOffset(2));
@@ -211,7 +193,7 @@ bool Compass::calibrate() {
 void Compass::setCalibration(int xOffset, int yOffset, int zOffset, float xScale, float yScale, float zScale) {
     qmc.setCalibrationOffsets(xOffset, yOffset, zOffset);
     qmc.setCalibrationScales(xScale, yScale, zScale);
-    debugPrint("校准参数已设置");
+    ESP_LOGI(TAG, "校准参数已设置");
 }
 
 void Compass::getRawData(int16_t &x, int16_t &y, int16_t &z) {
@@ -222,7 +204,7 @@ void Compass::getRawData(int16_t &x, int16_t &y, int16_t &z) {
 
 void Compass::setDeclination(float declination) {
     _declination = declination;
-    debugPrint(String("磁偏角设置为: ") + declination + "°");
+    ESP_LOGI(TAG, "磁偏角设置为: %.2f°", _declination);
 }
 
 float Compass::getDeclination() {
@@ -241,7 +223,7 @@ void Compass::reset() {
     _initialized = false;
     device_state.compassReady = false;
     compass_data.isValid = false;
-    debugPrint("罗盘已重置");
+    ESP_LOGI(TAG, "罗盘已重置");
 }
 
 float Compass::calculateHeading(int16_t x, int16_t y) {
@@ -264,3 +246,4 @@ void Compass::updateCompassData(int16_t x, int16_t y, int16_t z, float heading) 
     compass_data.timestamp = millis();
 }
 
+#endif
