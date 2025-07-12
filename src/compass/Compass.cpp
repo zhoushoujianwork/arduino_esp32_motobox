@@ -85,12 +85,12 @@ Compass::Compass(int sda, int scl) : _wire(Wire) {
     _scl = scl;
     _declination = -6.5f;  // 默认磁偏角，需要根据地理位置调整
     _initialized = false;
-    _lastReadTime = 0;
+    _lastReadTime = 0;  
     _lastDebugPrintTime = 0;
 }
 
 bool Compass::begin() {
-    debugPrint(String("初始化: SDA=") + _sda + ", SCL=" + _scl + ", 磁偏角=" + String(_declination));
+    ESP_LOGI(TAG, "初始化: SDA=%d, SCL=%d, 磁偏角=%.2f°", _sda, _scl, _declination);
     
     // 先确保 Wire 是干净的
     _wire.end();
@@ -142,7 +142,7 @@ void Compass::loop() {
     update();
 
     // 定期打印调试信息
-    if (_debug && millis() - _lastDebugPrintTime > 2000) {
+    if (millis() - _lastDebugPrintTime > 2000) {
         _lastDebugPrintTime = millis();
         printCompassData();
     }
