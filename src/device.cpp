@@ -41,10 +41,9 @@ void print_device_info()
     Serial.printf("BLE Connected: %d\n", device_state.bleConnected);
     Serial.printf("Battery Voltage: %d\n", device_state.battery_voltage);
     Serial.printf("Battery Percentage: %d\n", device_state.battery_percentage);
-    Serial.printf("Is Charging: %d\n", device_state.is_charging);
-    Serial.printf("External Power: %d\n", device_state.external_power);
+    Serial.printf("ICharging: %d\n", device_state.is_charging);
+    Serial.printf("EPower: %d\n", device_state.external_power);
     Serial.printf("GSM Ready: %d\n", device_state.gsmReady);
-    Serial.printf("GNSS Ready: %d\n", device_state.gnssReady);
     Serial.printf("IMU Ready: %d\n", device_state.imuReady);
     Serial.printf("Compass Ready: %d\n", device_state.compassReady);
     Serial.printf("SD Card Ready: %d\n", device_state.sdCardReady);
@@ -108,6 +107,16 @@ String device_state_to_json(device_state_t *state)
 // 添加包装函数
 String getDeviceStatusJSON() {
     return device_state_to_json(&device_state);
+}
+
+String getLocationJSON() {
+    // 如果 gnss 定位差，则走wifi 和 lbs 获取定位
+    if (!air780eg.getGNSS().isDataValid())
+    {
+        if (!air780eg.getGNSS().updateWIFILocation())
+            air780eg.getGNSS().updateLBS();
+    }
+    return air780eg.getGNSS().getLocationJSON();
 }
 
 void mqttMessageCallback(const String &topic, const String &payload)
@@ -609,7 +618,7 @@ void Device::initializeGSM()
     Serial.println("[GSM] 初始化Air780EG模块...");
     Serial.printf("[GSM] 引脚配置 - RX:%d, TX:%d, EN:%d\n", GSM_RX_PIN, GSM_TX_PIN, GSM_EN);
     // 设置日志级别 (可选)
-    Air780EG::setLogLevel(AIR780EG_LOG_VERBOSE);
+    Air780EG::setLogLevel(AIR780EG_LOG_INFO);
     while (!air780eg.begin(&Serial1, 115200, GSM_RX_PIN, GSM_TX_PIN, GSM_EN))
     {
         Serial.println("[GSM] ❌ Air780EG基础初始化失败");
@@ -618,9 +627,7 @@ void Device::initializeGSM()
     }
     Serial.println("[GSM] ✅ Air780EG基础初始化成功");
     device_state.gsmReady = true;
-#ifdef ENABLE_GNSS
     air780eg.getGNSS().enableGNSS();
-#endif
 
 #ifdef DISABLE_MQTT
     Serial.println("MQTT功能已禁用");
@@ -664,7 +671,7 @@ bool Device::initializeMQTT()
 
     // 添加定时任务
     air780eg.getMQTT().addScheduledTask("device_status", "vehicle/v1/"+device_state.device_id+"/telemetry/device", getDeviceStatusJSON, 30000, 0, false);
-    // air780eg.getMQTT().addScheduledTask("location", mqttTopics.getGPSTopic(), getLocationJSON, 60, 0, false);
+    air780eg.getMQTT().addScheduledTask("location", "vehicle/v1/"+device_state.device_id+"/telemetry/location", getLocationJSON, 1000, 0, false);
     // air780eg.getMQTT().addScheduledTask("system_stats", mqttTopics.getSystemStatusTopic(), getSystemStatsJSON, 60, 0, false);
 
     // // 连接到MQTT服务器
