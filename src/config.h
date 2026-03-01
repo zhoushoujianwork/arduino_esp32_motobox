@@ -84,6 +84,11 @@
 #define BUZZER_PIN                   25   // 蜂鸣器引脚
 #endif
 
+// IMU配置
+#ifndef QMI8658_L_SLAVE_ADDRESS
+#define QMI8658_L_SLAVE_ADDRESS     0x6B    // QMI8658 I2C地址
+#endif
+
 // 基础定位功能（默认启用）
 #define ENABLE_GNSS_LOCATION        true    // 启用GNSS定位
 #define ENABLE_FALLBACK_LOCATION    true    // 启用WiFi/LBS兜底定位

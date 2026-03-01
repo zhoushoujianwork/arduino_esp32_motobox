@@ -137,10 +137,28 @@ bool Compass::begin() {
     
     // 初始化QMC5883P传感器（使用独立I2C总线）
     // QMC5883P库使用全局Wire对象，需要确保Wire已经正确初始化
+    // 注意：QMC5883P的begin()方法会调用_bus->begin()（无参数），
+    // 所以我们需要确保Wire已经用正确的引脚初始化
     Serial.printf("[%s] 开始初始化QMC5883P传感器...\n", TAG);
+    
+    // 确保Wire已经用正确的引脚初始化（之前已经初始化过了）
+    // QMC5883P的begin()方法内部会调用_bus->begin()，但不会传入引脚参数
+    // 所以我们需要确保Wire已经正确配置
+    delay(50); // 给I2C总线一些稳定时间
+    
     if (!qmc.begin()) {
         Serial.printf("[%s] ❌ QMC5883P初始化失败！\n", TAG);
-        return false;
+        Serial.printf("[%s] [调试] 检查I2C连接和地址...\n", TAG);
+        // 尝试重新初始化Wire
+        _wire->end();
+        delay(10);
+        _wire->begin(IIC_SDA_GY, IIC_SCL_GY);
+        _wire->setClock(50000);
+        delay(50);
+        if (!qmc.begin()) {
+            Serial.printf("[%s] ❌ QMC5883P初始化仍然失败！\n", TAG);
+            return false;
+        }
     }
     Serial.printf("[%s] ✅ QMC5883P初始化成功\n", TAG);
     
@@ -224,6 +242,18 @@ bool Compass::update() {
     if (!_initialized) {
         return false;
     }
+
+#ifdef IIC_SDA_GY
+#ifdef IIC_SCL_GY
+    // 重要：确保Wire使用独立I2C配置（9/10）
+    // 因为IMU会重新配置Wire为共享I2C（17/16），
+    // 所以每次读取前需要确保Wire使用正确的引脚
+    if (_useIndependentI2C) {
+        Wire.begin(IIC_SDA_GY, IIC_SCL_GY);
+        Wire.setClock(50000);
+    }
+#endif
+#endif
 
     // 注意：QMC5883P库内部管理I2C连接，不需要手动检查
     // 如果readXYZ()成功，说明连接正常

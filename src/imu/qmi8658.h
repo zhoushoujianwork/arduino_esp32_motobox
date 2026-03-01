@@ -1,48 +1,21 @@
 #ifndef IMU_H
 #define IMU_H
 
-
-#include <Wire.h>
-#include <SPI.h>
-#include <math.h>
-#include "SensorQMI8658.hpp"
+#include "QMI8658IMU.h"
 #include "device.h"
 #include "config.h"
 #include "utils/I2CManager.h"
 
-#define ALPHA 0.98 // 互补滤波的系数，范围在0到1之间
-#define IMU_DT 0.01    // 时间间隔，单位是秒（假设采样率为100Hz）
+// 使用库中定义的 imu_data_t 类型
+// 不再重复定义，避免类型冲突
 
-// 运动检测相关参数
-#define MOTION_DETECTION_THRESHOLD_DEFAULT 0.0035   // 0.05 适合震动检测，, 静止的量级0.001~0.003
-#define MOTION_DETECTION_WINDOW_DEFAULT 32       // 增加窗口大小到32
-#define MOTION_DETECTION_DEBOUNCE_MS 200        // 增加去抖时间到200ms
-
-
-typedef struct
-{
-    // 加速度计数据，单位：g
-    float accel_x; // X轴加速度
-    float accel_y; // Y轴加速度
-    float accel_z; // Z轴加速度
-
-    // 陀螺仪数据，单位：°/s
-    float gyro_x; // X轴角速度
-    float gyro_y; // Y轴角速度
-    float gyro_z; // Z轴角速度
-
-    // 姿态角，单位：度
-    float roll;  // 横滚角
-    float pitch; // 俯仰角
-    float yaw;   // 偏航角
-
-    float temperature; // 温度，单位：摄氏度
-} imu_data_t;
-
+// 全局数据声明（在qmi8658.cpp中定义）
 extern imu_data_t imu_data;
 
+// JSON序列化函数声明（在qmi8658.cpp中实现，调用库中的函数）
 String imu_data_to_json(imu_data_t& imu_data);
 
+// IMU包装类，使用QMI8658IMU库
 class IMU
 {
 public:
@@ -50,7 +23,7 @@ public:
     void begin();
     void loop();
     
-    // 运动检测中断标志和ISR
+    // 运动检测中断标志和ISR（转发到库）
     static volatile bool motionInterruptFlag;
     static void IRAM_ATTR motionISR();
     
@@ -59,87 +32,35 @@ public:
     bool configureForDeepSleep();
     bool restoreFromDeepSleep();
     bool isMotionDetected();
-    bool checkWakeOnMotionEvent();  // 新增：检查WakeOnMotion事件
+    bool checkWakeOnMotionEvent();
     
     // 电源管理方法
-    void setAccelPowerMode(uint8_t mode);  // 0=低功耗，1=正常，2=高性能
+    void setAccelPowerMode(uint8_t mode);
     void setGyroEnabled(bool enabled);
 
-    /**
-     * @brief 检测是否有运动
-     * @return true: 检测到运动, false: 未检测到
-     */
     bool detectMotion();
-
-    /**
-     * @brief 打印IMU数据
-     */
     void printImuData();
 
-    /**
-     * @brief 获取加速度数据
-     */
-    float getAccelX() const { return imu_data.accel_x; }
-    float getAccelY() const { return imu_data.accel_y; }
-    float getAccelZ() const { return imu_data.accel_z; }
+    // 数据获取方法（转发到库）
+    float getAccelX() const { return _imu.getAccelX(); }
+    float getAccelY() const { return _imu.getAccelY(); }
+    float getAccelZ() const { return _imu.getAccelZ(); }
+    float getGyroX() const { return _imu.getGyroX(); }
+    float getGyroY() const { return _imu.getGyroY(); }
+    float getGyroZ() const { return _imu.getGyroZ(); }
+    float getRoll() const { return _imu.getRoll(); }
+    float getPitch() const { return _imu.getPitch(); }
+    float getYaw() const { return _imu.getYaw(); }
+    float getTemperature() const { return _imu.getTemperature(); }
+    float getAccelMagnitude() const { return _imu.getAccelMagnitude(); }
     
-    /**
-     * @brief 获取陀螺仪数据
-     */
-    float getGyroX() const { return imu_data.gyro_x; }
-    float getGyroY() const { return imu_data.gyro_y; }
-    float getGyroZ() const { return imu_data.gyro_z; }
-    
-    /**
-     * @brief 获取姿态角数据
-     */
-    float getRoll() const { return imu_data.roll; }
-    float getPitch() const { return imu_data.pitch; }
-    float getYaw() const { return imu_data.yaw; }
-    
-    /**
-     * @brief 获取温度
-     */
-    float getTemperature() const { return imu_data.temperature; }
-    
-    /**
-     * @brief 获取加速度矢量大小
-     */
-    float getAccelMagnitude() const;
-    
-    /**
-     * @brief 设置高精度模式
-     * @param enabled true: 启用高精度模式, false: 标准模式
-     */
-    void setHighPrecisionMode(bool enabled);
-    
-    /**
-     * @brief 获取当前是否为高精度模式
-     */
-    bool isHighPrecisionMode() const { return _highPrecisionMode; }
-
-    void setDebug(bool debug) { _debug = debug; }
+    void setHighPrecisionMode(bool enabled) { _imu.setHighPrecisionMode(enabled); }
+    bool isHighPrecisionMode() const { return _imu.isHighPrecisionMode(); }
+    void setDebug(bool debug) { _imu.setDebug(debug); }
 
 private:
-    bool _debug;
-    int motionIntPin;           // 运动检测中断引脚
-    float motionThreshold;      // 运动检测阈值
-    bool motionDetectionEnabled;// 运动检测是否启用
-    bool _highPrecisionMode;    // 高精度模式标志
-    SensorQMI8658 qmi;
-    
-    // 配置运动检测参数
+    QMI8658IMU _imu;  // 使用库中的实现
     void configureMotionDetection(float threshold);
-
-    // 运动检测相关变量
-    float lastAccelMagnitude = 0;
-    float accumulatedDelta = 0;
-    int sampleIndex = 0;
-    int sampleWindow = MOTION_DETECTION_WINDOW_DEFAULT;
-
-    void debugPrint(const String& message);
-    unsigned long _lastDebugPrintTime;
-
 };
 
 #ifdef ENABLE_IMU
